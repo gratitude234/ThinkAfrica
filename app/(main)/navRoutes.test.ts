@@ -8,7 +8,7 @@ describe("shouldShowMobilePrimaryNav", () => {
     ["/notifications", true],
     ["/me", true],
     ["/writer", true],
-    ["/post/a-published-piece", false],
+    ["/post/a-published-piece", true],
     ["/edit/a-published-piece", false],
     ["/create/post", false],
     ["/write", false],

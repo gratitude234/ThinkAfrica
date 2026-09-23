@@ -1,0 +1,12 @@
+[
+  {
+    "path": "/dev-preview/shell",
+    "status": 404,
+    "pass": true
+  },
+  {
+    "path": "/dev-preview/profile",
+    "status": 404,
+    "pass": true
+  }
+]

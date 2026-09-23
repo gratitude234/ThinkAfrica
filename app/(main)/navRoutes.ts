@@ -30,8 +30,6 @@ export function matchesRoute(pathname: string, route: string) {
 }
 
 export function shouldShowMobilePrimaryNav(pathname: string) {
-  if (pathname.startsWith("/post/")) return false;
-
   return !MOBILE_FOCUS_ROUTE_PREFIXES.some((prefix) =>
     matchesRoute(pathname, prefix)
   );
@@ -41,4 +39,13 @@ export function shouldShowDesktopRail(pathname: string) {
   return !RAIL_SUPPRESSED_PREFIXES.some((prefix) =>
     matchesRoute(pathname, prefix)
   );
+}
+
+/** Only publication detail pages opt into immersive mobile reading. */
+export function isCompactReadingRoute(pathname: string) {
+  return /^\/post\/[^/]+\/?$/.test(pathname);
+}
+
+export function isFocusRoute(pathname: string) {
+  return MOBILE_FOCUS_ROUTE_PREFIXES.some(prefix => matchesRoute(pathname, prefix));
 }

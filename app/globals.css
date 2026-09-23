@@ -58,7 +58,7 @@
     --mobile-visual-viewport-bottom: 0px;
     /* Provider-scoped values override these pre-hydration fallbacks inside the
        app shell. The announcement strip is deliberately not part of the nav. */
-    --app-nav-height: 60px;
+    --app-nav-height: 64px;
     /* Live mobile chrome occupancy. Desktop and reduced-motion modes keep this
        equal to the measured nav height. */
     --app-nav-offset: var(--app-nav-height);
@@ -672,8 +672,8 @@ font-family: var(--font-inter), system-ui, sans-serif;
 @media (min-width: 768px) {
   :root { --app-rail-width: 56px; }
   .app-shell-with-rail { margin-left: var(--app-rail-width); padding: 28px 20px 64px; }
-  .app-side-rail { display: block; position: fixed; left: 0; top: var(--app-nav-offset); bottom: 0; width: var(--app-rail-width); padding: 24px 8px; overflow-y: auto; border-right: 1px solid #E4DFD4; background: #FAF8F5; z-index: 30; }
-  .app-side-rail a, .app-side-rail button { position: relative; min-height: 44px; justify-content: center; padding-left: 8px; padding-right: 8px; }
+  .app-side-rail { display: block; position: fixed; left: 0; top: var(--app-nav-offset); bottom: 0; width: var(--app-rail-width); padding: 24px 8px; overflow-y: auto; border-right: 0; background: #FAF8F5; z-index: 30; }
+  .app-side-rail a, .app-side-rail button { position: relative; min-height: 40px; justify-content: center; padding-left: 8px; padding-right: 8px; }
   .app-rail-label { display: none; }
   .app-rail-write-label { display: block; position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .rail-link-current::before { content: ""; position: absolute; left: 0; top: 50%; transform: translateY(-50%); height: 16px; width: 3px; border-radius: 2px; background: #073929; }
@@ -685,3 +685,43 @@ font-family: var(--font-inter), system-ui, sans-serif;
   .app-rail-label { display: inline; }
   .app-rail-write-label { display: none; }
 }
+
+/* Global utility shell. Editorial typography remains owned by each route. */
+.app-utility-header { height:52px; border-bottom:1px solid #E9E5DE; background:#FAF8F5; }
+.app-utility-inner { height:100%; display:flex; align-items:center; gap:12px; padding:0 16px; }
+.app-brand-icon { width:20px; height:20px; }
+.app-brand-text { font-size:16px; font-weight:600; letter-spacing:-.01em; }
+.app-search-trigger { margin-left:auto; width:34px; height:34px; flex-shrink:0; display:flex; align-items:center; justify-content:center; gap:9px; border-radius:9px; color:#6B6B6B; }
+.app-search-trigger svg { width:17px; height:17px; }
+.app-search-trigger:hover { background:rgba(7,57,41,.06); }
+.app-search-placeholder, .app-search-shortcut { display:none; }
+.app-account { flex-shrink:0; }
+.app-account-trigger > * { width:26px !important; height:26px !important; }
+.app-guest-account { gap:0; }
+.app-guest-account > a:last-child { display:none; }
+.app-guest-account button { padding:6px 8px; font-size:12px; }
+.app-shell-with-rail { padding-bottom:calc(96px + env(safe-area-inset-bottom)); }
+@media (min-width:768px) {
+ .app-utility-header { height:64px; }
+ .app-utility-inner { padding:0 20px; gap:20px; }
+ .app-brand-icon { width:22px; height:22px; }
+ .app-brand-text { font-size:17px; }
+ .app-account-trigger > * { width:30px !important; height:30px !important; }
+ .app-guest-account { gap:8px; }
+ .app-guest-account > a:last-child { display:block; }
+ .app-shell-with-rail { padding-bottom:64px; }
+}
+@media (min-width:1025px) {
+ .app-utility-inner { padding:0 32px; gap:32px; display:grid; grid-template-columns:1fr minmax(0,480px) 1fr; }
+ .app-brand-icon { width:24px; height:24px; }
+ .app-brand-text { font-size:19px; }
+ .app-search-trigger { margin:0; width:100%; height:38px; padding:9px 14px; border:1px solid rgba(7,57,41,.10); background:rgba(7,57,41,.04); }
+ .app-search-trigger svg { width:15px; height:15px; }
+ .app-search-placeholder { display:block; flex:1; text-align:left; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+ .app-search-shortcut { display:block; font:10.5px var(--font-public-sans),sans-serif; border:1px solid rgba(7,57,41,.14); border-radius:5px; padding:2px 6px; white-space:nowrap; color:#8A5D1E; }
+ .app-account { justify-self:end; }
+ .app-account-trigger > * { width:32px !important; height:32px !important; }
+ .app-shell-with-rail { padding:28px 32px 64px; }
+}
+
+.app-account-trigger svg { width:100%; height:100%; }

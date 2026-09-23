@@ -46,7 +46,7 @@ export default function NavUserMenu({ user, profile, isAdmin }: NavUserMenuProps
 
   if (!user) {
     return (
-      <div className="hidden items-center gap-2 sm:flex">
+      <div className="app-guest-account flex items-center gap-2">
         <Link href="/login"><Button variant="ghost" size="sm">Sign in</Button></Link>
         <Link href="/signup"><Button size="sm">Get started</Button></Link>
       </div>
@@ -66,7 +66,7 @@ export default function NavUserMenu({ user, profile, isAdmin }: NavUserMenuProps
         aria-label="Open account menu"
         aria-expanded={open}
         aria-haspopup="menu"
-        className="focus-ring rounded-full"
+        className="app-account-trigger focus-ring rounded-full"
       >
         <UserAvatar name={displayName} src={profile?.avatar_url} size={32} className="overflow-hidden rounded-full" />
       </button>

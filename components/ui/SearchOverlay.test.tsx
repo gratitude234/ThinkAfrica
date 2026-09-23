@@ -4,8 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import SearchOverlay from "./SearchOverlay";
 
+const navigation = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  useRouter: () => ({ push: navigation.push, replace: vi.fn() }),
 }));
 
 /**
@@ -87,12 +88,12 @@ describe("SearchOverlay request handling", () => {
     expect(url).toContain(encodeURIComponent("a, b"));
   });
 
-  it("shows nothing rather than throwing when the request fails", async () => {
+  it("shows a recoverable error when the request fails", async () => {
     fetchMock.mockRejectedValue(new Error("offline"));
     render(<SearchOverlay isOpen onClose={vi.fn()} />);
     await userEvent.type(screen.getByRole("textbox"), "anything");
 
-    expect(await screen.findByText(/No posts found/)).toBeInTheDocument();
+    expect(await screen.findByText(/Search is unavailable/)).toBeInTheDocument();
   });
 
   it("ignores a slow response that a later keystroke has superseded", async () => {
@@ -167,4 +168,59 @@ describe("SearchOverlay request handling", () => {
     expect(screen.queryByText("The stale answer")).not.toBeInTheDocument();
     expect(screen.getByText("The current answer")).toBeInTheDocument();
   });
+});
+
+describe("global shell search", () => {
+  it("shows Post excerpts instead of legacy titles and includes writers", async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({
+      posts: [{ id: "post", title: "Legacy heading", excerpt: "<p>A short thought</p>", content_kind: "post", slug: "thought", profiles: null }],
+      people: [{ id: "writer", username: "amara", full_name: "Amara Okafor", avatar_url: null }],
+    }) });
+    render(<SearchOverlay isOpen onClose={vi.fn()} />);
+    await userEvent.type(screen.getByRole("textbox"), "thought");
+    expect(await screen.findByText("A short thought")).toBeInTheDocument();
+    expect(screen.queryByText("Legacy heading")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Amara Okafor/ })).toHaveAttribute("href", "/amara");
+    expect(screen.getByRole("link", { name: /A short thought/ })).toHaveAttribute("href", "/post/thought");
+  });
+
+  it("cancels pending results when the input is cleared", async () => {
+    let resolve: (value: unknown) => void = () => {};
+    fetchMock.mockImplementation(() => new Promise(done => { resolve = done; }));
+    render(<SearchOverlay isOpen onClose={vi.fn()} />);
+    await userEvent.type(screen.getByRole("textbox"), "pending");
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    await userEvent.click(screen.getByRole("button", { name: "Clear search" }));
+    await act(async () => resolve({ ok: true, json: async () => ({ posts: [{ id: "old", title: "Stale", slug: "old" }] }) }));
+    expect(screen.queryByText("Stale")).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true);
+  });
+
+  it("autofocuses, wraps Tab, and restores focus on close", async () => {
+    const trigger = document.createElement("button"); document.body.append(trigger); trigger.focus();
+    const view = render(<SearchOverlay isOpen onClose={vi.fn()} />);
+    const input = screen.getByRole("textbox");
+    expect(input).toHaveFocus();
+    await userEvent.tab({ shift: true });
+    expect(screen.getByRole("button", { name: "Close search" })).toHaveFocus();
+    await userEvent.tab(); expect(input).toHaveFocus();
+    view.rerender(<SearchOverlay isOpen={false} onClose={vi.fn()} />);
+    expect(trigger).toHaveFocus(); trigger.remove();
+  });
+});
+
+
+it("opens the keyboard-selected writer with Enter", async () => {
+  fetchMock.mockResolvedValue({ ok: true, json: async () => ({
+    posts: [{ id: "a", title: "An article", slug: "article", content_kind: "article", profiles: null }],
+    people: [{ id: "w", username: "amara", full_name: "Amara", avatar_url: null }],
+  }) });
+  const close = vi.fn();
+  render(<SearchOverlay isOpen onClose={close} />);
+  const input = screen.getByRole("textbox");
+  await userEvent.type(input, "amara");
+  await screen.findByText("@amara");
+  await userEvent.keyboard("{ArrowDown}{Enter}");
+  expect(navigation.push).toHaveBeenCalledWith("/amara");
+  expect(close).toHaveBeenCalled();
 });

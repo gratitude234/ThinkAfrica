@@ -12,6 +12,7 @@ import {
   type ReactNode,
 } from "react";
 import { usePathname } from "next/navigation";
+import { isCompactReadingRoute } from "./navRoutes";
 
 export type AppChromeMode = "expanded" | "compact";
 
@@ -31,7 +32,7 @@ interface AppChromeContextValue {
   setInteractionLocked: (locked: boolean) => void;
 }
 
-const DEFAULT_NAV_HEIGHT = 60;
+const DEFAULT_NAV_HEIGHT = 64;
 const DEFAULT_REVEAL_FLOOR = 96;
 const TOP_REVEAL_FLOOR = 8;
 // Sized for a thumb, not a mouse wheel. Momentum scrolling and the rubber-band
@@ -169,6 +170,7 @@ export function AppChromeProvider({ children }: { children: ReactNode }) {
     };
 
     const autoHideEnabled = () =>
+      isCompactReadingRoute(pathname) &&
       (mobileQuery?.matches ?? window.innerWidth < 768) &&
       !(reducedMotionQuery?.matches ?? false);
 
@@ -219,7 +221,7 @@ export function AppChromeProvider({ children }: { children: ReactNode }) {
     };
 
     const onScroll = () => {
-      if (frame !== null) cancelAnimationFrame(frame);
+      if (frame !== null) return;
       frame = requestAnimationFrame(() => {
         frame = null;
         evaluate();

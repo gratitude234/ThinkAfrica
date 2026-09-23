@@ -1,0 +1,528 @@
+{
+  "checks": [
+    {
+      "label": "1440: no overflow",
+      "pass": true,
+      "detail": {
+        "overflow": false,
+        "header": 64,
+        "rail": 176,
+        "bottom": 0,
+        "search": 480,
+        "avatar": 32,
+        "railLabels": "block",
+        "placeholder": "block"
+      }
+    },
+    {
+      "label": "1440: exact header height",
+      "pass": true
+    },
+    {
+      "label": "1440: exact rail width",
+      "pass": true
+    },
+    {
+      "label": "1440: avatar size",
+      "pass": true
+    },
+    {
+      "label": "1440: search trigger size",
+      "pass": true
+    },
+    {
+      "label": "1440: bottom navigation breakpoint",
+      "pass": true
+    },
+    {
+      "label": "1440: / active",
+      "pass": true
+    },
+    {
+      "label": "1440: /explore active",
+      "pass": true
+    },
+    {
+      "label": "1440: /notifications active",
+      "pass": true
+    },
+    {
+      "label": "1440: /amara active",
+      "pass": true
+    },
+    {
+      "label": "1440: /settings active",
+      "pass": true
+    },
+    {
+      "label": "1440: other profile not active",
+      "pass": true
+    },
+    {
+      "label": "1440: account menu opens",
+      "pass": true
+    },
+    {
+      "label": "1440: search autofocus",
+      "pass": true
+    },
+    {
+      "label": "1440: Post excerpt instead of legacy title",
+      "pass": true
+    },
+    {
+      "label": "1440: Posts Articles and writers",
+      "pass": true
+    },
+    {
+      "label": "1440: writer label",
+      "pass": true
+    },
+    {
+      "label": "1440: search panel geometry",
+      "pass": true,
+      "detail": {
+        "x": 440,
+        "y": 104,
+        "width": 560,
+        "height": 306
+      }
+    },
+    {
+      "label": "1440: search placement",
+      "pass": true
+    },
+    {
+      "label": "1440: ArrowDown selects next",
+      "pass": true
+    },
+    {
+      "label": "1440: ArrowUp selects previous",
+      "pass": true
+    },
+    {
+      "label": "1440: focus wraps backwards",
+      "pass": true
+    },
+    {
+      "label": "1440: focus wraps forwards",
+      "pass": true
+    },
+    {
+      "label": "1440: clear search",
+      "pass": true
+    },
+    {
+      "label": "1440: Escape returns focus",
+      "pass": true
+    },
+    {
+      "label": "1440: Ctrl+K opens",
+      "pass": true
+    },
+    {
+      "label": "1440: guest Sign in available",
+      "pass": true
+    },
+    {
+      "label": "1440: guest Join",
+      "pass": true
+    },
+    {
+      "label": "1440: guest Write uses auth gate",
+      "pass": true
+    },
+    {
+      "label": "900: no overflow",
+      "pass": true,
+      "detail": {
+        "overflow": false,
+        "header": 64,
+        "rail": 56,
+        "bottom": 0,
+        "search": 34,
+        "avatar": 30,
+        "railLabels": "none",
+        "placeholder": "none"
+      }
+    },
+    {
+      "label": "900: exact header height",
+      "pass": true
+    },
+    {
+      "label": "900: exact rail width",
+      "pass": true
+    },
+    {
+      "label": "900: avatar size",
+      "pass": true
+    },
+    {
+      "label": "900: search trigger size",
+      "pass": true
+    },
+    {
+      "label": "900: bottom navigation breakpoint",
+      "pass": true
+    },
+    {
+      "label": "900: icon-only labels",
+      "pass": true
+    },
+    {
+      "label": "900: / active",
+      "pass": true
+    },
+    {
+      "label": "900: /explore active",
+      "pass": true
+    },
+    {
+      "label": "900: /notifications active",
+      "pass": true
+    },
+    {
+      "label": "900: /amara active",
+      "pass": true
+    },
+    {
+      "label": "900: /settings active",
+      "pass": true
+    },
+    {
+      "label": "900: other profile not active",
+      "pass": true
+    },
+    {
+      "label": "900: account menu opens",
+      "pass": true
+    },
+    {
+      "label": "900: search autofocus",
+      "pass": true
+    },
+    {
+      "label": "900: Post excerpt instead of legacy title",
+      "pass": true
+    },
+    {
+      "label": "900: Posts Articles and writers",
+      "pass": true
+    },
+    {
+      "label": "900: writer label",
+      "pass": true
+    },
+    {
+      "label": "900: search panel geometry",
+      "pass": true,
+      "detail": {
+        "x": 170,
+        "y": 104,
+        "width": 560,
+        "height": 306
+      }
+    },
+    {
+      "label": "900: search placement",
+      "pass": true
+    },
+    {
+      "label": "900: ArrowDown selects next",
+      "pass": true
+    },
+    {
+      "label": "900: ArrowUp selects previous",
+      "pass": true
+    },
+    {
+      "label": "900: focus wraps backwards",
+      "pass": true
+    },
+    {
+      "label": "900: focus wraps forwards",
+      "pass": true
+    },
+    {
+      "label": "900: clear search",
+      "pass": true
+    },
+    {
+      "label": "900: Escape returns focus",
+      "pass": true
+    },
+    {
+      "label": "900: Ctrl+K opens",
+      "pass": true
+    },
+    {
+      "label": "900: guest Sign in available",
+      "pass": true
+    },
+    {
+      "label": "900: guest Join",
+      "pass": true
+    },
+    {
+      "label": "900: guest Write uses auth gate",
+      "pass": true
+    },
+    {
+      "label": "390: no overflow",
+      "pass": true,
+      "detail": {
+        "overflow": false,
+        "header": 52,
+        "rail": 0,
+        "bottom": 64,
+        "search": 34,
+        "avatar": 26,
+        "railLabels": "block",
+        "placeholder": "none"
+      }
+    },
+    {
+      "label": "390: exact header height",
+      "pass": true
+    },
+    {
+      "label": "390: exact rail width",
+      "pass": true
+    },
+    {
+      "label": "390: avatar size",
+      "pass": true
+    },
+    {
+      "label": "390: search trigger size",
+      "pass": true
+    },
+    {
+      "label": "390: bottom navigation breakpoint",
+      "pass": true
+    },
+    {
+      "label": "390: / active",
+      "pass": true
+    },
+    {
+      "label": "390: /explore active",
+      "pass": true
+    },
+    {
+      "label": "390: /notifications active",
+      "pass": true
+    },
+    {
+      "label": "390: /amara active",
+      "pass": true
+    },
+    {
+      "label": "390: /settings active",
+      "pass": true
+    },
+    {
+      "label": "390: other profile not active",
+      "pass": true
+    },
+    {
+      "label": "390: account menu opens",
+      "pass": true
+    },
+    {
+      "label": "390: search autofocus",
+      "pass": true
+    },
+    {
+      "label": "390: Post excerpt instead of legacy title",
+      "pass": true
+    },
+    {
+      "label": "390: Posts Articles and writers",
+      "pass": true
+    },
+    {
+      "label": "390: writer label",
+      "pass": true
+    },
+    {
+      "label": "390: search panel geometry",
+      "pass": true,
+      "detail": {
+        "x": 12,
+        "y": 12,
+        "width": 366,
+        "height": 314
+      }
+    },
+    {
+      "label": "390: search placement",
+      "pass": true
+    },
+    {
+      "label": "390: ArrowDown selects next",
+      "pass": true
+    },
+    {
+      "label": "390: ArrowUp selects previous",
+      "pass": true
+    },
+    {
+      "label": "390: focus wraps backwards",
+      "pass": true
+    },
+    {
+      "label": "390: focus wraps forwards",
+      "pass": true
+    },
+    {
+      "label": "390: clear search",
+      "pass": true
+    },
+    {
+      "label": "390: Escape returns focus",
+      "pass": true
+    },
+    {
+      "label": "390: Ctrl+K opens",
+      "pass": true
+    },
+    {
+      "label": "390: guest Sign in available",
+      "pass": true
+    },
+    {
+      "label": "390: guest Join",
+      "pass": true
+    },
+    {
+      "label": "390: guest Write uses auth gate",
+      "pass": true
+    },
+    {
+      "label": "390: / stays expanded",
+      "pass": true
+    },
+    {
+      "label": "390: /explore stays expanded",
+      "pass": true
+    },
+    {
+      "label": "390: /amara stays expanded",
+      "pass": true
+    },
+    {
+      "label": "390: /settings stays expanded",
+      "pass": true
+    },
+    {
+      "label": "390: /notifications stays expanded",
+      "pass": true
+    },
+    {
+      "label": "reading: down compacts",
+      "pass": true
+    },
+    {
+      "label": "reading: header retreats",
+      "pass": true
+    },
+    {
+      "label": "reading: bottom retreats",
+      "pass": true
+    },
+    {
+      "label": "reading: up reveals",
+      "pass": true
+    },
+    {
+      "label": "reading: reduced motion retains safe navigation",
+      "pass": true
+    },
+    {
+      "label": "/write: focused chrome suppressed",
+      "pass": true
+    },
+    {
+      "label": "/create/post: focused chrome suppressed",
+      "pass": true
+    },
+    {
+      "label": "/edit/article: focused chrome suppressed",
+      "pass": true
+    },
+    {
+      "label": "1440: Profile width preserved",
+      "pass": true
+    },
+    {
+      "label": "1440: Profile sticky offsets",
+      "pass": true,
+      "detail": {
+        "x": 176,
+        "y": 64,
+        "width": 1264,
+        "height": 57
+      }
+    },
+    {
+      "label": "1440: Profile keeps chrome",
+      "pass": true
+    },
+    {
+      "label": "1440: Profile no overflow",
+      "pass": true
+    },
+    {
+      "label": "900: Profile width preserved",
+      "pass": true
+    },
+    {
+      "label": "900: Profile sticky offsets",
+      "pass": true,
+      "detail": {
+        "x": 56,
+        "y": 64,
+        "width": 844,
+        "height": 57
+      }
+    },
+    {
+      "label": "900: Profile keeps chrome",
+      "pass": true
+    },
+    {
+      "label": "900: Profile no overflow",
+      "pass": true
+    },
+    {
+      "label": "390: Profile width preserved",
+      "pass": true
+    },
+    {
+      "label": "390: Profile sticky offsets",
+      "pass": true,
+      "detail": {
+        "x": 0,
+        "y": 52,
+        "width": 390,
+        "height": 89
+      }
+    },
+    {
+      "label": "390: Profile keeps chrome",
+      "pass": true
+    },
+    {
+      "label": "390: Profile no overflow",
+      "pass": true
+    },
+    {
+      "label": "No browser JavaScript errors",
+      "pass": true,
+      "detail": []
+    }
+  ],
+  "errors": []
+}

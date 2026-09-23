@@ -85,7 +85,7 @@ export interface SearchViewer {
 }
 
 /**
- * The command-palette typeahead: titles only, six results.
+ * The command-palette typeahead: titles and excerpts, six results.
  *
  * The research filter is applied in the query rather than in the caller. It
  * used to be a `.filter()` over the six rows the database returned, which
@@ -98,7 +98,7 @@ export async function searchOverlayPosts(
   query: string,
   { viewerId }: SearchViewer
 ) {
-  return searchRepository(supabase).overlayPosts(query, {
+  return searchRepository(supabase).posts(query, {
     viewerId,
     limit: OVERLAY_RESULT_LIMIT,
   });
@@ -188,4 +188,8 @@ export async function runSiteSearch(
     searchPeople(supabase, query, viewer),
   ]);
   return { posts, people };
+}
+
+export async function searchOverlayPeople(supabase: SupabaseClient, query: string, { viewerId }: SearchViewer) {
+  return searchRepository(supabase).people(query, { viewerId, limit: 3 });
 }

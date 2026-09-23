@@ -61,14 +61,14 @@ describe("BottomNav destinations", () => {
     );
   });
 
-  it("renders no mobile chrome on post pages", () => {
+  it("keeps mobile destinations available on reading pages", () => {
     navigationState.pathname = "/post/a-test-post";
 
     render(<BottomNav username="writer" userId="user-1" />);
 
     expect(
       screen.queryByRole("navigation", { name: "Primary navigation" })
-    ).not.toBeInTheDocument();
+    ).toBeInTheDocument();
   });
 
   it("hides mobile navigation inside dedicated creation flows", () => {

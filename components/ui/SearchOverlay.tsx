@@ -1,261 +1,152 @@
-﻿"use client";
+"use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Badge from "@/components/ui/Badge";
+import UserAvatar from "@/components/ui/UserAvatar";
+import "./search-overlay.css";
 
-interface SearchResult {
+interface PublicationResult {
   id: string;
-  title: string;
+  title: string | null;
+  excerpt?: string | null;
   slug: string;
   content_kind?: string | null;
-  url: string;
   profiles: { full_name: string | null; username: string } | null;
 }
+interface WriterResult {
+  id: string;
+  username: string;
+  full_name: string | null;
+  avatar_url: string | null;
+}
+interface Result {
+  id: string;
+  label: string;
+  detail: string;
+  kind: "Post" | "Article" | "Writer";
+  url: string;
+  avatar?: string | null;
+}
+interface SearchOverlayProps { isOpen: boolean; onClose: () => void; }
 
-interface SearchOverlayProps {
-  isOpen: boolean;
-  onClose: () => void;
+// Text only: legacy markup is never inserted into the result row as HTML.
+function plainExcerpt(value: string | null | undefined) {
+  return (value ?? "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 180);
 }
 
 export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
   const router = useRouter();
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const requestIdRef = useRef(0);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<Result[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(0);
 
   useEffect(() => {
-    if (isOpen) {
-      setQuery("");
-      setResults([]);
-      setFocusedIndex(null);
-      setTimeout(() => inputRef.current?.focus(), 50);
-    }
+    if (!isOpen) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const dialog = dialogRef.current;
+    const oldOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    setQuery(""); setResults([]); setFocusedIndex(0); setFailed(false);
+    // Native modality makes the background inert and traps keyboard focus.
+    if (dialog?.showModal) dialog.showModal();
+    else dialog?.setAttribute("open", "");
+    inputRef.current?.focus();
+    return () => {
+      dialog?.close?.();
+      document.body.style.overflow = oldOverflow;
+      previousFocus?.focus({ preventScroll: true });
+    };
   }, [isOpen]);
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
-
-  /**
-   * The typeahead asks the application, not the database.
-   *
-   * The query, the limit and the research exclusion all live on the server
-   * now: see lib/searchData.ts. This side keeps only what is about this
-   * component, which is the race. Keystrokes are debounced but the responses
-   * still arrive in whatever order the network chooses, and a slow request for
-   * "af" landing after a fast one for "africa" used to replace the right
-   * results with stale ones. The request id is checked before anything is set.
-   */
-  const search = useCallback(async (q: string) => {
-    if (!q.trim()) {
-      requestIdRef.current += 1;
-      setResults([]);
-      setFocusedIndex(null);
-      setLoading(false);
-      return;
-    }
-
-    const requestId = ++requestIdRef.current;
-    setLoading(true);
-
-    let mapped: SearchResult[] = [];
-    try {
-      const response = await fetch(
-        `/api/search?scope=overlay&q=${encodeURIComponent(q)}`
-      );
-      if (response.ok) {
-        const payload = (await response.json()) as { posts?: SearchResult[] };
-        mapped = (payload.posts ?? []).map((post) => ({
-          ...post,
-          url: `/post/${post.slug}`,
+    if (!isOpen || !query.trim()) { setLoading(false); return; }
+    const controller = new AbortController();
+    let current = true;
+    const timer = setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/search?scope=overlay&q=${encodeURIComponent(query)}`, { signal: controller.signal });
+        if (!response.ok) throw new Error("Search unavailable");
+        const payload = await response.json() as { posts?: PublicationResult[]; people?: WriterResult[] };
+        if (!current) return;
+        const posts: Result[] = (payload.posts ?? []).slice(0, 6).map(post => ({
+          id: `post-${post.id}`,
+          label: post.content_kind === "post" ? plainExcerpt(post.excerpt) || "Post" : post.title || plainExcerpt(post.excerpt) || "Article",
+          detail: post.profiles?.full_name || post.profiles?.username || "",
+          kind: post.content_kind === "post" ? "Post" : "Article",
+          url: `/post/${encodeURIComponent(post.slug)}`,
         }));
-      }
-    } catch {
-      // A failed search shows nothing and lets the next keystroke try again.
-      mapped = [];
-    }
-
-    if (requestId !== requestIdRef.current) return;
-
-    setResults(mapped);
-    setFocusedIndex(mapped.length > 0 ? 0 : null);
-    setLoading(false);
-  }, []);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setQuery(val);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      void search(val);
+        const people: Result[] = (payload.people ?? []).slice(0, 3).map(person => ({
+          id: `writer-${person.id}`, label: person.full_name || person.username,
+          detail: `@${person.username}`, kind: "Writer", avatar: person.avatar_url,
+          url: `/${encodeURIComponent(person.username)}`,
+        }));
+        setResults([...posts, ...people]); setFocusedIndex(0);
+      } catch {
+        if (current) { setResults([]); setFailed(true); }
+      } finally { if (current) setLoading(false); }
     }, 300);
-  };
+    return () => { current = false; clearTimeout(timer); controller.abort(); };
+  }, [isOpen, query]);
 
-  const handleInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Escape") {
-      onClose();
-      return;
-    }
+  useEffect(() => {
+    if (isOpen) document.getElementById(`search-result-${focusedIndex}`)?.scrollIntoView?.({ block: "nearest" });
+  }, [focusedIndex, isOpen]);
 
-    if (results.length === 0) {
-      return;
-    }
-
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      setFocusedIndex((current) => {
-        if (current === null) {
-          return 0;
-        }
-
-        return current === results.length - 1 ? 0 : current + 1;
-      });
-    }
-
-    if (event.key === "ArrowUp") {
-      event.preventDefault();
-      setFocusedIndex((current) => {
-        if (current === null) {
-          return results.length - 1;
-        }
-
-        return current === 0 ? results.length - 1 : current - 1;
-      });
-    }
-
-    if (event.key === "Enter" && focusedIndex !== null) {
-      event.preventDefault();
-      const focusedResult = results[focusedIndex];
-      if (focusedResult) {
-        router.push(focusedResult.url);
-        onClose();
-      }
-    }
-  };
+  function changeQuery(value: string) {
+    setQuery(value); setResults([]); setFocusedIndex(0); setFailed(false); setLoading(Boolean(value.trim()));
+  }
 
   if (!isOpen) return null;
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-20"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="search-overlay-title"
-    >
-      <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div className="border-b border-gray-100 p-4">
-          <h2 id="search-overlay-title" className="sr-only">
-            Search Indegenius
-          </h2>
-          <div className="flex items-center gap-3">
-            <svg
-              className="h-5 w-5 flex-shrink-0 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-            <input
-              ref={inputRef}
-              type="text"
-              value={query}
-              onChange={handleChange}
-              onKeyDown={handleInputKeyDown}
-              placeholder="Search posts, articles, writers…"
-              className="flex-1 text-sm text-gray-900 placeholder-gray-400 focus:outline-none"
-              aria-label="Search Indegenius"
-            />
-            {query ? (
-              <button
-                onClick={() => {
-                  setQuery("");
-                  setResults([]);
-                  setFocusedIndex(null);
-                }}
-                aria-label="Clear search"
-                className="text-gray-400 transition-colors hover:text-gray-600"
-              >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="max-h-80 overflow-y-auto">
-          {!query ? (
-            <div className="px-4 py-8 text-center text-sm text-gray-400">
-              Search posts, articles, writers…
-            </div>
-          ) : null}
-          {query && loading ? (
-            <div className="px-4 py-6 text-center text-sm text-gray-400">
-              Searching...
-            </div>
-          ) : null}
-          {query && !loading && results.length === 0 ? (
-            <div className="px-4 py-6 text-center text-sm text-gray-400">
-              No posts found for &ldquo;{query}&rdquo;
-            </div>
-          ) : null}
-          {results.map((result, index) => (
-            <Link
-              key={result.id}
-              href={result.url}
-              onClick={onClose}
-              className={`flex items-center gap-3 px-4 py-3 transition-colors ${
-                focusedIndex === index
-                  ? "bg-emerald-50 ring-1 ring-emerald-200"
-                  : "hover:bg-canvas"
-              }`}
-            >
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-gray-900">
-                  {result.title}
-                </p>
-                {result.profiles ? (
-                  <p className="mt-0.5 text-xs text-gray-400">
-                    {result.profiles.full_name ?? result.profiles.username}
-                  </p>
-                ) : null}
-              </div>
-              <div className="flex shrink-0 flex-col items-end gap-1">
-                <Badge content_kind={result.content_kind} />
-              </div>
-            </Link>
-          ))}
-        </div>
+  return <dialog ref={dialogRef} className="global-search-backdrop" aria-modal="true" aria-labelledby="search-overlay-title"
+    onCancel={event => { event.preventDefault(); onClose(); }}
+    onClick={event => { if (event.target === event.currentTarget) onClose(); }}
+    onKeyDown={event => {
+      if (event.key === "Escape") { event.preventDefault(); onClose(); }
+      if (event.key === "Tab") {
+        const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button, a[href], input'));
+        const first = focusable[0], last = focusable.at(-1);
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
+    }}>
+    <div className="global-search-panel">
+      <h2 id="search-overlay-title" className="sr-only">Search Indegenius</h2>
+      <div className="global-search-input-row">
+        <svg width="17" height="17" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+        <input ref={inputRef} value={query} onChange={event => changeQuery(event.target.value)}
+          aria-label="Search Indegenius" aria-controls="global-search-results" autoComplete="off"
+          placeholder="Search posts, articles, writers…"
+          onKeyDown={event => {
+            if (!results.length) return;
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+              event.preventDefault();
+              setFocusedIndex(index => (index + (event.key === "ArrowDown" ? 1 : results.length - 1)) % results.length);
+            } else if (event.key === "Enter") {
+              event.preventDefault(); router.push(results[focusedIndex].url); onClose();
+            }
+          }} />
+        {query ? <button type="button" aria-label="Clear search" onClick={() => { changeQuery(""); inputRef.current?.focus(); }}>×</button> : null}
+        <button type="button" className="global-search-close" onClick={onClose} aria-label="Close search">Close</button>
       </div>
+      <div className="global-search-results" id="global-search-results" aria-label="Search results" aria-busy={loading}>
+        <p className="sr-only" role="status">{loading ? "Searching" : `${results.length} results`}{results[focusedIndex] ? `, ${results[focusedIndex].label}` : ""}</p>
+        {!query.trim() ? <p className="global-search-message">Search posts, articles, writers…</p> : loading ? <p className="global-search-message">Searching…</p>
+          : failed ? <p className="global-search-message" role="alert">Search is unavailable. Please try again.</p>
+          : !results.length ? <p className="global-search-message">No results found for “{query}”</p> : null}
+        {results.map((result, index) => <Link key={result.id} id={`search-result-${index}`} href={result.url}
+          onClick={onClose} onFocus={() => setFocusedIndex(index)}
+          className={`global-search-result${focusedIndex === index ? " is-selected" : ""}`}>
+          {result.kind === "Writer" ? <UserAvatar name={result.label} src={result.avatar} size={30} /> : null}
+          <span className="global-search-text"><span className="global-search-title">{result.label}</span><span className="global-search-detail">{result.detail}</span></span>
+          <span className={`global-search-kind kind-${result.kind.toLowerCase()}`}>{result.kind}</span>
+        </Link>)}
+      </div>
+      {query.trim() ? <Link className="global-search-all" href={`/search?q=${encodeURIComponent(query.trim())}`} onClick={onClose}>See all results</Link> : null}
     </div>
-  );
+  </dialog>;
 }

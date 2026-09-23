@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { isFocusRoute } from "./navRoutes";
 import type { User } from "@supabase/supabase-js";
 import NavClient from "./NavClient";
 import BottomNav from "./BottomNav";
@@ -24,12 +26,15 @@ export default function NavigationShell({
   isAdmin,
 }: NavigationShellProps) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const pathname = usePathname();
+  const focused = isFocusRoute(pathname);
+  const closeSearch = useCallback(() => setIsSearchOpen(false), []);
 
   useVisualViewportBottom();
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key === "k") {
+      if (!focused && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         setIsSearchOpen(true);
       }
@@ -41,8 +46,10 @@ export default function NavigationShell({
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [focused]);
 
+
+  if (focused) return null;
 
   return (
     <>
@@ -58,7 +65,7 @@ export default function NavigationShell({
       />
       <SearchOverlay
         isOpen={isSearchOpen}
-        onClose={() => setIsSearchOpen(false)}
+        onClose={closeSearch}
       />
     </>
   );

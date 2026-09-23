@@ -1,0 +1,1190 @@
+diff --git a/app/(main)/AppChromeProvider.test.tsx b/app/(main)/AppChromeProvider.test.tsx
+index 01ba105..0985e46 100644
+--- a/app/(main)/AppChromeProvider.test.tsx
++++ b/app/(main)/AppChromeProvider.test.tsx
+@@ -89,7 +89,7 @@ function renderProvider(options: { registerContext?: boolean } = {}) {
+ }
+ 
+ beforeEach(() => {
+-  navigationState.pathname = "/";
++  navigationState.pathname = "/post/reading";
+   frames = [];
+   window.scrollY = 0;
+   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) =>
+@@ -107,6 +107,19 @@ afterEach(() => {
+ });
+ 
+ describe("AppChromeProvider", () => {
++  it.each(["/", "/explore", "/writer", "/settings", "/notifications", "/write", "/post/reading/edit"])("never compacts %s", pathname => {
++    navigationState.pathname = pathname;
++    mediaQueries(); renderProvider(); flushFrames(); scrollTo(400);
++    expect(screen.getByTestId("mode")).toHaveTextContent("expanded");
++  });
++  it("reveals chrome when navigation leaves a reading page", () => {
++    mediaQueries(); const view = renderProvider(); flushFrames(); scrollTo(400);
++    expect(screen.getByTestId("mode")).toHaveTextContent("compact");
++    navigationState.pathname = "/writer";
++    view.rerender(<AppChromeProvider><Harness /></AppChromeProvider>);
++    flushFrames();
++    expect(screen.getByTestId("mode")).toHaveTextContent("expanded");
++  });
+   it("uses one shared scroll listener", () => {
+     mediaQueries();
+     const addSpy = vi.spyOn(window, "addEventListener");
+@@ -183,7 +196,7 @@ describe("AppChromeProvider", () => {
+     fireEvent.click(screen.getByRole("button", { name: "Reveal now" }));
+     expect(root).toHaveAttribute("data-chrome-mode", "expanded");
+     expect(root).toHaveAttribute("data-chrome-instant", "true");
+-    expect(root).toHaveStyle({ "--app-nav-offset": "60px" });
++    expect(root).toHaveStyle({ "--app-nav-offset": "64px" });
+   });
+ 
+   it("holds expanded while an interaction lock is active", () => {
+diff --git a/app/(main)/AppChromeProvider.tsx b/app/(main)/AppChromeProvider.tsx
+index 33d819a..4367439 100644
+--- a/app/(main)/AppChromeProvider.tsx
++++ b/app/(main)/AppChromeProvider.tsx
+@@ -12,6 +12,7 @@ import {
+   type ReactNode,
+ } from "react";
+ import { usePathname } from "next/navigation";
++import { isCompactReadingRoute } from "./navRoutes";
+ 
+ export type AppChromeMode = "expanded" | "compact";
+ 
+@@ -31,7 +32,7 @@ interface AppChromeContextValue {
+   setInteractionLocked: (locked: boolean) => void;
+ }
+ 
+-const DEFAULT_NAV_HEIGHT = 60;
++const DEFAULT_NAV_HEIGHT = 64;
+ const DEFAULT_REVEAL_FLOOR = 96;
+ const TOP_REVEAL_FLOOR = 8;
+ // Sized for a thumb, not a mouse wheel. Momentum scrolling and the rubber-band
+@@ -169,6 +170,7 @@ export function AppChromeProvider({ children }: { children: ReactNode }) {
+     };
+ 
+     const autoHideEnabled = () =>
++      isCompactReadingRoute(pathname) &&
+       (mobileQuery?.matches ?? window.innerWidth < 768) &&
+       !(reducedMotionQuery?.matches ?? false);
+ 
+@@ -219,7 +221,7 @@ export function AppChromeProvider({ children }: { children: ReactNode }) {
+     };
+ 
+     const onScroll = () => {
+-      if (frame !== null) cancelAnimationFrame(frame);
++      if (frame !== null) return;
+       frame = requestAnimationFrame(() => {
+         frame = null;
+         evaluate();
+diff --git a/app/(main)/BottomNav.test.tsx b/app/(main)/BottomNav.test.tsx
+index 30172bc..5666f98 100644
+--- a/app/(main)/BottomNav.test.tsx
++++ b/app/(main)/BottomNav.test.tsx
+@@ -61,14 +61,14 @@ describe("BottomNav destinations", () => {
+     );
+   });
+ 
+-  it("renders no mobile chrome on post pages", () => {
++  it("keeps mobile destinations available on reading pages", () => {
+     navigationState.pathname = "/post/a-test-post";
+ 
+     render(<BottomNav username="writer" userId="user-1" />);
+ 
+     expect(
+       screen.queryByRole("navigation", { name: "Primary navigation" })
+-    ).not.toBeInTheDocument();
++    ).toBeInTheDocument();
+   });
+ 
+   it("hides mobile navigation inside dedicated creation flows", () => {
+diff --git a/app/(main)/BottomNav.tsx b/app/(main)/BottomNav.tsx
+index 58ee7b6..210f609 100644
+--- a/app/(main)/BottomNav.tsx
++++ b/app/(main)/BottomNav.tsx
+@@ -32,11 +32,7 @@ function navLinkClass(isCurrent: boolean) {
+ }
+ 
+ // px-2 rather than px-3: five destinations have to share a 320px-wide bar.
+-function navPillClass(isCurrent: boolean) {
+-  return `flex flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1 transition-colors duration-150 ${
+-    isCurrent ? "bg-emerald-50" : ""
+-  }`;
+-}
++const NAV_MARK_CLASS = "flex flex-col items-center justify-center gap-0.5 px-2 py-1";
+ 
+ const WRITE_CLASS =
+   "flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold";
+@@ -44,10 +40,10 @@ const WRITE_CLASS =
+ function WriteMark() {
+   return (
+     <span className="flex flex-col items-center justify-center gap-0.5">
+-      <span className="flex h-8 w-11 items-center justify-center rounded-full bg-emerald-brand text-white shadow-sm">
++      <span className="flex h-[30px] w-[42px] items-center justify-center rounded-lg bg-emerald-brand text-white shadow-sm">
+         <WriteIcon className="h-[20px] w-[20px]" />
+       </span>
+-      <span className="whitespace-nowrap text-[11px] font-semibold">Write</span>
++      <span className="whitespace-nowrap text-[10.5px] font-semibold">Write</span>
+     </span>
+   );
+ }
+@@ -65,9 +61,8 @@ export default function BottomNav({
+   }, [setInteractionLocked]);
+ 
+   const showPrimaryNav = shouldShowMobilePrimaryNav(pathname);
+-  // Post pages and the writing surfaces get no mobile chrome from here: a
+-  // reader finishing a piece, or a writer mid-draft, should have the whole
+-  // screen.
++  // Focused writing surfaces own their navigation. Reading pages keep
++  // destinations available, with scroll behavior managed by AppChromeProvider.
+   if (!showPrimaryNav) {
+     return null;
+   }
+@@ -82,7 +77,7 @@ export default function BottomNav({
+ 
+   return (
+     // The bar drops away on a downward scroll and returns on an upward one, in
+-    // step with the top nav: reading a feed on a phone should get the whole
++    // step with the top nav on publication detail pages, giving readers the whole
+     // screen, and the destinations are one flick away rather than a page scroll
+     // away. transform rather than bottom so the slide is composited and the
+     // safe-area padding travels with the bar.
+@@ -95,22 +90,23 @@ export default function BottomNav({
+           setInteractionLocked(false);
+         }
+       }}
+-      className="fixed left-0 right-0 z-50 translate-y-0 border-t border-gray-100 bg-white shadow-[0_-2px_12px_-2px_rgb(0_0_0/0.06)] transition-transform duration-200 ease-out motion-reduce:transition-none md:hidden"
++      className="fixed left-0 right-0 z-50 translate-y-0 border-t border-[#E9E5DE] bg-[#FAF8F5] shadow-[0_-2px_12px_-2px_rgb(0_0_0/0.06)] transition-transform duration-200 ease-out motion-reduce:transition-none md:hidden"
+       style={{
+         bottom: "var(--mobile-visual-viewport-bottom, 0px)",
+         paddingBottom: "env(safe-area-inset-bottom)",
++        height: "calc(64px + env(safe-area-inset-bottom))",
+       }}
+       aria-label="Primary navigation"
+     >
+-      <div className="flex h-[60px] items-center justify-around px-2">
++      <div className="flex h-full items-center justify-around px-2">
+         <Link
+           href="/"
+           className={navLinkClass(isHomeActive)}
+           aria-current={isHomeActive ? "page" : undefined}
+         >
+-          <span className={navPillClass(isHomeActive)}>
++          <span className={NAV_MARK_CLASS}>
+             <HomeIcon className="h-[22px] w-[22px]" filled={isHomeActive} />
+-            <span className="whitespace-nowrap text-[11px] font-medium">Home</span>
++            <span className="whitespace-nowrap text-[10.5px] font-medium">Home</span>
+           </span>
+         </Link>
+ 
+@@ -119,9 +115,9 @@ export default function BottomNav({
+           className={navLinkClass(isExploreActive)}
+           aria-current={isExploreActive ? "page" : undefined}
+         >
+-          <span className={navPillClass(isExploreActive)}>
++          <span className={NAV_MARK_CLASS}>
+             <ExploreIcon className="h-[22px] w-[22px]" />
+-            <span className="whitespace-nowrap text-[11px] font-medium">Explore</span>
++            <span className="whitespace-nowrap text-[10.5px] font-medium">Explore</span>
+           </span>
+         </Link>
+ 
+@@ -144,12 +140,12 @@ export default function BottomNav({
+           className={navLinkClass(isNotificationsActive)}
+           aria-current={isNotificationsActive ? "page" : undefined}
+         >
+-          <span className={navPillClass(isNotificationsActive)}>
++          <span className={NAV_MARK_CLASS}>
+             <NotificationsIcon
+               className="h-[22px] w-[22px]"
+               filled={isNotificationsActive}
+             />
+-            <span className="whitespace-nowrap text-[11px] font-medium">
++            <span className="whitespace-nowrap text-[10.5px] font-medium">
+               Notifications
+             </span>
+           </span>
+@@ -160,9 +156,9 @@ export default function BottomNav({
+           className={navLinkClass(profileActive)}
+           aria-current={profileActive ? "page" : undefined}
+         >
+-          <span className={navPillClass(profileActive)}>
++          <span className={NAV_MARK_CLASS}>
+             <ProfileIcon className="h-[22px] w-[22px]" filled={profileActive} />
+-            <span className="whitespace-nowrap text-[11px] font-medium">
++            <span className="whitespace-nowrap text-[10.5px] font-medium">
+               {userId ? "Profile" : "Join"}
+             </span>
+           </span>
+diff --git a/app/(main)/NavClient.test.tsx b/app/(main)/NavClient.test.tsx
+index ab8d101..a9c440d 100644
+--- a/app/(main)/NavClient.test.tsx
++++ b/app/(main)/NavClient.test.tsx
+@@ -63,13 +63,14 @@ describe("NavClient utilities", () => {
+     }
+   });
+ 
+-  it("opens search from a field that shows from md", () => {
++  it("opens search from the responsive utility trigger", () => {
+     const onOpenSearch = vi.fn();
+     renderNav(null, onOpenSearch);
+ 
+     const search = screen.getByRole("button", { name: "Open search" });
+     // jsdom has no layout engine, so the breakpoint is a class contract.
+-    expect(search).toHaveClass("md:flex", "max-w-[520px]");
++    expect(search).toHaveClass("app-search-trigger");
++    expect(search).toHaveAttribute("aria-haspopup", "dialog");
+ 
+     fireEvent.click(search);
+     expect(onOpenSearch).toHaveBeenCalledTimes(1);
+@@ -87,7 +88,7 @@ describe("NavClient utilities", () => {
+     expect(screen.queryByText(/Intellectual Social Network/)).not.toBeInTheDocument();
+   });
+ 
+-  it("gains a shadow once the page is scrolled, and loses it at the top", () => {
++  it("keeps the flat header treatment while scrolling", () => {
+     renderNav();
+     const nav = screen.getByRole("navigation", { name: "Application header" });
+ 
+@@ -97,7 +98,7 @@ describe("NavClient utilities", () => {
+       window.scrollY = 200;
+       window.dispatchEvent(new Event("scroll"));
+     });
+-    expect(nav.className).toMatch(/shadow-/);
++    expect(nav.className).not.toMatch(/shadow-/);
+ 
+     act(() => {
+       window.scrollY = 0;
+diff --git a/app/(main)/NavClient.tsx b/app/(main)/NavClient.tsx
+index 7077dcc..6997e4a 100644
+--- a/app/(main)/NavClient.tsx
++++ b/app/(main)/NavClient.tsx
+@@ -1,10 +1,10 @@
+ "use client";
+ 
+ import Link from "next/link";
+-import { useEffect } from "react";
++import { useEffect, useState } from "react";
+ import type { User } from "@supabase/supabase-js";
+ import BrandWordmark from "@/components/ui/BrandWordmark";
+-import { useHasScrolled } from "@/lib/useHasScrolled";
++
+ import { useAppChrome } from "./AppChromeProvider";
+ import NavUserMenu from "./NavUserMenu";
+ 
+@@ -31,7 +31,10 @@ export default function NavClient({
+   onOpenSearch,
+ }: NavClientProps) {
+   const { registerNav, setInteractionLocked } = useAppChrome();
+-  const hasScrolled = useHasScrolled();
++  const [shortcut, setShortcut] = useState("Ctrl+K");
++  useEffect(() => {
++    if (/Mac|iPhone|iPad/.test(navigator.platform)) setShortcut("⌘K");
++  }, []);
+ 
+   useEffect(() => {
+     return () => setInteractionLocked(false);
+@@ -51,32 +54,33 @@ export default function NavClient({
+       className="sticky top-0 z-50 transition-transform duration-200 ease-out motion-reduce:transition-none"
+     >
+       <nav
+-        className={`h-[52px] md:h-16 border-b border-gray-200 bg-white transition-shadow duration-300 motion-reduce:transition-none ${
+-          hasScrolled ? "shadow-[0_1px_12px_rgb(0,0,0,0.08)]" : ""
+-        }`}
++        className="app-utility-header"
+         aria-label="Application header"
+       >
+-        <div className="mx-auto flex h-full max-w-[1240px] items-center gap-5 px-4 sm:px-6 lg:px-8">
++        <div className="app-utility-inner">
+           <Link href="/" className="shrink-0" aria-label="Indegenius home">
+             <BrandWordmark
+-              iconClassName="hidden h-6 w-6 md:block"
+-              textClassName="text-[18px] md:text-[19px]"
++              iconClassName="app-brand-icon"
++              textClassName="app-brand-text"
+             />
+           </Link>
+ 
+           <button
+             type="button"
+             onClick={onOpenSearch}
+-            className="ml-auto hidden min-h-11 w-full max-w-[520px] items-center gap-2 rounded-full border border-gray-200 bg-canvas px-3.5 py-2 text-[13px] text-ink-muted transition-colors hover:border-gray-300 hover:bg-white hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 md:flex"
++            className="app-search-trigger focus-ring"
++            aria-haspopup="dialog"
++            aria-keyshortcuts="Meta+K Control+K"
+             aria-label="Open search"
+           >
+             <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+             </svg>
+-            <span className="truncate">Search Posts, Articles, and writers…</span>
++            <span className="app-search-placeholder">Search Posts, Articles, and writers…</span>
++            <kbd className="app-search-shortcut">{shortcut}</kbd>
+           </button>
+ 
+-          <div className="hidden md:block">
++          <div className="app-account">
+             <NavUserMenu user={user} profile={profile} isAdmin={isAdmin} />
+           </div>
+         </div>
+diff --git a/app/(main)/NavUserMenu.tsx b/app/(main)/NavUserMenu.tsx
+index 897fce9..cc2e6a1 100644
+--- a/app/(main)/NavUserMenu.tsx
++++ b/app/(main)/NavUserMenu.tsx
+@@ -46,7 +46,7 @@ export default function NavUserMenu({ user, profile, isAdmin }: NavUserMenuProps
+ 
+   if (!user) {
+     return (
+-      <div className="hidden items-center gap-2 sm:flex">
++      <div className="app-guest-account flex items-center gap-2">
+         <Link href="/login"><Button variant="ghost" size="sm">Sign in</Button></Link>
+         <Link href="/signup"><Button size="sm">Get started</Button></Link>
+       </div>
+@@ -66,7 +66,7 @@ export default function NavUserMenu({ user, profile, isAdmin }: NavUserMenuProps
+         aria-label="Open account menu"
+         aria-expanded={open}
+         aria-haspopup="menu"
+-        className="focus-ring rounded-full"
++        className="app-account-trigger focus-ring rounded-full"
+       >
+         <UserAvatar name={displayName} src={profile?.avatar_url} size={32} className="overflow-hidden rounded-full" />
+       </button>
+diff --git a/app/(main)/NavigationShell.tsx b/app/(main)/NavigationShell.tsx
+index 9463c84..504bd7c 100644
+--- a/app/(main)/NavigationShell.tsx
++++ b/app/(main)/NavigationShell.tsx
+@@ -1,6 +1,8 @@
+ "use client";
+ 
+-import { useEffect, useState } from "react";
++import { useCallback, useEffect, useState } from "react";
++import { usePathname } from "next/navigation";
++import { isFocusRoute } from "./navRoutes";
+ import type { User } from "@supabase/supabase-js";
+ import NavClient from "./NavClient";
+ import BottomNav from "./BottomNav";
+@@ -24,12 +26,15 @@ export default function NavigationShell({
+   isAdmin,
+ }: NavigationShellProps) {
+   const [isSearchOpen, setIsSearchOpen] = useState(false);
++  const pathname = usePathname();
++  const focused = isFocusRoute(pathname);
++  const closeSearch = useCallback(() => setIsSearchOpen(false), []);
+ 
+   useVisualViewportBottom();
+ 
+   useEffect(() => {
+     function handleKeyDown(event: KeyboardEvent) {
+-      if ((event.metaKey || event.ctrlKey) && event.key === "k") {
++      if (!focused && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+         event.preventDefault();
+         setIsSearchOpen(true);
+       }
+@@ -41,9 +46,11 @@ export default function NavigationShell({
+ 
+     document.addEventListener("keydown", handleKeyDown);
+     return () => document.removeEventListener("keydown", handleKeyDown);
+-  }, []);
++  }, [focused]);
+ 
+ 
++  if (focused) return null;
++
+   return (
+     <>
+       <NavClient
+@@ -58,7 +65,7 @@ export default function NavigationShell({
+       />
+       <SearchOverlay
+         isOpen={isSearchOpen}
+-        onClose={() => setIsSearchOpen(false)}
++        onClose={closeSearch}
+       />
+     </>
+   );
+diff --git a/app/(main)/SideRail.tsx b/app/(main)/SideRail.tsx
+index 048b248..fa3d7bb 100644
+--- a/app/(main)/SideRail.tsx
++++ b/app/(main)/SideRail.tsx
+@@ -27,14 +27,14 @@ interface SideRailProps {
+ // inventing a rail-specific treatment -- this rail is a structural change, not
+ // a visual one.
+ function railLinkClass(isCurrent: boolean) {
+-  return `group flex items-center gap-3 rounded-xl border px-3 py-2.5 text-[14.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 ${
++  return `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-[14.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 ${
+     isCurrent
+-      ? "border-transparent font-semibold text-emerald-brand rail-link-current"
+-      : "border-transparent font-medium text-ink-muted hover:border-gray-200 hover:bg-white hover:text-ink"
++      ? "font-semibold text-emerald-brand rail-link-current"
++      : "font-medium text-ink-muted hover:bg-[#073929]/[0.04] hover:text-ink"
+   }`;
+ }
+ 
+-const ICON_CLASS = "h-[21px] w-[21px] shrink-0";
++const ICON_CLASS = "h-5 w-5 shrink-0";
+ 
+ function RailLink({
+   href,
+@@ -74,7 +74,7 @@ export default function SideRail({
+       // Shared fixed rail: 56px icons on tablet, 176px labelled on desktop.
+       className="app-side-rail"
+     >
+-      <nav aria-label="Sections" className="flex flex-col gap-0.5">
++      <nav aria-label="Sections" className="flex flex-col gap-[3px]">
+         <RailLink
+           href="/"
+           label="Home"
+@@ -94,7 +94,7 @@ export default function SideRail({
+           aria-label="Write"
+           title="Write"
+           userId={userId}
+-          className="my-1 flex min-h-11 w-full items-center gap-3 rounded-xl bg-emerald-brand px-3 py-2.5 text-[14.5px] font-semibold text-white shadow-sm transition-colors hover:bg-[#0E4B37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70"
++          className="my-1 flex min-h-11 w-full items-center gap-3 rounded-[10px] bg-emerald-brand px-3 py-2.5 text-[14.5px] font-semibold text-white shadow-sm transition-colors hover:bg-[#0E4B37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70"
+         >
+           <WriteIcon className={ICON_CLASS} />
+           <span className="app-rail-label truncate">Write</span>
+diff --git a/app/(main)/navRoutes.test.ts b/app/(main)/navRoutes.test.ts
+index 2e6f14b..a620402 100644
+--- a/app/(main)/navRoutes.test.ts
++++ b/app/(main)/navRoutes.test.ts
+@@ -8,7 +8,7 @@ describe("shouldShowMobilePrimaryNav", () => {
+     ["/notifications", true],
+     ["/me", true],
+     ["/writer", true],
+-    ["/post/a-published-piece", false],
++    ["/post/a-published-piece", true],
+     ["/edit/a-published-piece", false],
+     ["/create/post", false],
+     ["/write", false],
+diff --git a/app/(main)/navRoutes.ts b/app/(main)/navRoutes.ts
+index 85a2da6..6cff128 100644
+--- a/app/(main)/navRoutes.ts
++++ b/app/(main)/navRoutes.ts
+@@ -30,8 +30,6 @@ export function matchesRoute(pathname: string, route: string) {
+ }
+ 
+ export function shouldShowMobilePrimaryNav(pathname: string) {
+-  if (pathname.startsWith("/post/")) return false;
+-
+   return !MOBILE_FOCUS_ROUTE_PREFIXES.some((prefix) =>
+     matchesRoute(pathname, prefix)
+   );
+@@ -42,3 +40,12 @@ export function shouldShowDesktopRail(pathname: string) {
+     matchesRoute(pathname, prefix)
+   );
+ }
++
++/** Only publication detail pages opt into immersive mobile reading. */
++export function isCompactReadingRoute(pathname: string) {
++  return /^\/post\/[^/]+\/?$/.test(pathname);
++}
++
++export function isFocusRoute(pathname: string) {
++  return MOBILE_FOCUS_ROUTE_PREFIXES.some(prefix => matchesRoute(pathname, prefix));
++}
+diff --git a/app/api/search/route.ts b/app/api/search/route.ts
+index 7d2e00d..a3773a2 100644
+--- a/app/api/search/route.ts
++++ b/app/api/search/route.ts
+@@ -8,6 +8,7 @@ import {
+   normalizeSearchQuery,
+   runSiteSearch,
+   searchOverlayPosts,
++  searchOverlayPeople,
+ } from "@/lib/searchData";
+ 
+ /**
+@@ -20,8 +21,7 @@ import {
+  * credential, which is a prerequisite for the database not being Supabase.
+  *
+  * Two scopes rather than two routes, because they are the same search with
+- * different appetites: `overlay` is the command-palette typeahead (titles, six
+- * results) and `full` is the search page (posts and people).
++ * different appetites: `overlay` is the command-palette typeahead (six publications and three writers) and `full` is the search page (posts and people).
+  * Splitting them into separate files would duplicate the query normalisation,
+  * which is the part that must not differ between them.
+  */
+@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
+   if (!query) {
+     return NextResponse.json(
+       scope === "overlay"
+-        ? { posts: [] }
++        ? { posts: [], people: [] }
+         : { posts: [], people: [] },
+       { headers: readBackendHeaders("search") }
+     );
+@@ -55,8 +55,12 @@ export async function GET(request: NextRequest) {
+ 
+   try {
+     if (scope === "overlay") {
++      const [posts, people] = await Promise.all([
++        searchOverlayPosts(supabase, query, viewer),
++        searchOverlayPeople(supabase, query, viewer),
++      ]);
+       return NextResponse.json(
+-        { posts: await searchOverlayPosts(supabase, query, viewer) },
++        { posts, people },
+         { headers: readBackendHeaders("search") }
+       );
+     }
+diff --git a/app/dev-preview/shell/page.tsx b/app/dev-preview/shell/page.tsx
+new file mode 100644
+index 0000000..f283539
+--- /dev/null
++++ b/app/dev-preview/shell/page.tsx
+@@ -0,0 +1,23 @@
++import { notFound } from "next/navigation";
++import type { User } from "@supabase/supabase-js";
++import { AppChromeProvider } from "@/app/(main)/AppChromeProvider";
++import NavigationShell from "@/app/(main)/NavigationShell";
++import AppShell from "@/app/(main)/AppShell";
++
++/** Development-only shell harness; no credentials or mutation fixtures. */
++export default async function ShellPreview({ searchParams }: { searchParams: Promise<{ guest?: string }> }) {
++  if (process.env.NODE_ENV !== "development") notFound();
++  const guest = (await searchParams).guest === "1";
++  const user = guest ? null : { id: "shell-preview", email: "preview@example.test" } as User;
++  const profile = guest ? null : { username: "amara", full_name: "Amara Okafor", avatar_url: null };
++  return <AppChromeProvider>
++    <NavigationShell user={user} profile={profile} isAdmin={false} />
++    <AppShell showGuestBanner={false} userId={user?.id ?? null} username={profile?.username ?? null}>
++      <div style={{ maxWidth: 740, margin: "0 auto", minHeight: 2400 }}>
++        <h1>Shell verification</h1>
++        <p>Development fixture using the production navigation components.</p>
++        <label>Interaction check <input aria-label="Interaction check" /></label>
++      </div>
++    </AppShell>
++  </AppChromeProvider>;
++}
+diff --git a/app/globals.css b/app/globals.css
+index b0066e9..fa91c3a 100644
+--- a/app/globals.css
++++ b/app/globals.css
+@@ -58,7 +58,7 @@
+     --mobile-visual-viewport-bottom: 0px;
+     /* Provider-scoped values override these pre-hydration fallbacks inside the
+        app shell. The announcement strip is deliberately not part of the nav. */
+-    --app-nav-height: 60px;
++    --app-nav-height: 64px;
+     /* Live mobile chrome occupancy. Desktop and reduced-motion modes keep this
+        equal to the measured nav height. */
+     --app-nav-offset: var(--app-nav-height);
+@@ -672,8 +672,8 @@ font-family: var(--font-inter), system-ui, sans-serif;
+ @media (min-width: 768px) {
+   :root { --app-rail-width: 56px; }
+   .app-shell-with-rail { margin-left: var(--app-rail-width); padding: 28px 20px 64px; }
+-  .app-side-rail { display: block; position: fixed; left: 0; top: var(--app-nav-offset); bottom: 0; width: var(--app-rail-width); padding: 24px 8px; overflow-y: auto; border-right: 1px solid #E4DFD4; background: #FAF8F5; z-index: 30; }
+-  .app-side-rail a, .app-side-rail button { position: relative; min-height: 44px; justify-content: center; padding-left: 8px; padding-right: 8px; }
++  .app-side-rail { display: block; position: fixed; left: 0; top: var(--app-nav-offset); bottom: 0; width: var(--app-rail-width); padding: 24px 8px; overflow-y: auto; border-right: 0; background: #FAF8F5; z-index: 30; }
++  .app-side-rail a, .app-side-rail button { position: relative; min-height: 40px; justify-content: center; padding-left: 8px; padding-right: 8px; }
+   .app-rail-label { display: none; }
+   .app-rail-write-label { display: block; position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+   .rail-link-current::before { content: ""; position: absolute; left: 0; top: 50%; transform: translateY(-50%); height: 16px; width: 3px; border-radius: 2px; background: #073929; }
+@@ -685,3 +685,43 @@ font-family: var(--font-inter), system-ui, sans-serif;
+   .app-rail-label { display: inline; }
+   .app-rail-write-label { display: none; }
+ }
++
++/* Global utility shell. Editorial typography remains owned by each route. */
++.app-utility-header { height:52px; border-bottom:1px solid #E9E5DE; background:#FAF8F5; }
++.app-utility-inner { height:100%; display:flex; align-items:center; gap:12px; padding:0 16px; }
++.app-brand-icon { width:20px; height:20px; }
++.app-brand-text { font-size:16px; font-weight:600; letter-spacing:-.01em; }
++.app-search-trigger { margin-left:auto; width:34px; height:34px; flex-shrink:0; display:flex; align-items:center; justify-content:center; gap:9px; border-radius:9px; color:#6B6B6B; }
++.app-search-trigger svg { width:17px; height:17px; }
++.app-search-trigger:hover { background:rgba(7,57,41,.06); }
++.app-search-placeholder, .app-search-shortcut { display:none; }
++.app-account { flex-shrink:0; }
++.app-account-trigger > * { width:26px !important; height:26px !important; }
++.app-guest-account { gap:0; }
++.app-guest-account > a:last-child { display:none; }
++.app-guest-account button { padding:6px 8px; font-size:12px; }
++.app-shell-with-rail { padding-bottom:calc(96px + env(safe-area-inset-bottom)); }
++@media (min-width:768px) {
++ .app-utility-header { height:64px; }
++ .app-utility-inner { padding:0 20px; gap:20px; }
++ .app-brand-icon { width:22px; height:22px; }
++ .app-brand-text { font-size:17px; }
++ .app-account-trigger > * { width:30px !important; height:30px !important; }
++ .app-guest-account { gap:8px; }
++ .app-guest-account > a:last-child { display:block; }
++ .app-shell-with-rail { padding-bottom:64px; }
++}
++@media (min-width:1025px) {
++ .app-utility-inner { padding:0 32px; gap:32px; display:grid; grid-template-columns:1fr minmax(0,480px) 1fr; }
++ .app-brand-icon { width:24px; height:24px; }
++ .app-brand-text { font-size:19px; }
++ .app-search-trigger { margin:0; width:100%; height:38px; padding:9px 14px; border:1px solid rgba(7,57,41,.10); background:rgba(7,57,41,.04); }
++ .app-search-trigger svg { width:15px; height:15px; }
++ .app-search-placeholder { display:block; flex:1; text-align:left; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
++ .app-search-shortcut { display:block; font:10.5px var(--font-public-sans),sans-serif; border:1px solid rgba(7,57,41,.14); border-radius:5px; padding:2px 6px; white-space:nowrap; color:#8A5D1E; }
++ .app-account { justify-self:end; }
++ .app-account-trigger > * { width:32px !important; height:32px !important; }
++ .app-shell-with-rail { padding:28px 32px 64px; }
++}
++
++.app-account-trigger svg { width:100%; height:100%; }
+diff --git a/components/ui/SearchOverlay.test.tsx b/components/ui/SearchOverlay.test.tsx
+index 6dca86b..ad68bee 100644
+--- a/components/ui/SearchOverlay.test.tsx
++++ b/components/ui/SearchOverlay.test.tsx
+@@ -4,8 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+ 
+ import SearchOverlay from "./SearchOverlay";
+ 
++const navigation = vi.hoisted(() => ({ push: vi.fn() }));
+ vi.mock("next/navigation", () => ({
+-  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
++  useRouter: () => ({ push: navigation.push, replace: vi.fn() }),
+ }));
+ 
+ /**
+@@ -87,12 +88,12 @@ describe("SearchOverlay request handling", () => {
+     expect(url).toContain(encodeURIComponent("a, b"));
+   });
+ 
+-  it("shows nothing rather than throwing when the request fails", async () => {
++  it("shows a recoverable error when the request fails", async () => {
+     fetchMock.mockRejectedValue(new Error("offline"));
+     render(<SearchOverlay isOpen onClose={vi.fn()} />);
+     await userEvent.type(screen.getByRole("textbox"), "anything");
+ 
+-    expect(await screen.findByText(/No posts found/)).toBeInTheDocument();
++    expect(await screen.findByText(/Search is unavailable/)).toBeInTheDocument();
+   });
+ 
+   it("ignores a slow response that a later keystroke has superseded", async () => {
+@@ -168,3 +169,58 @@ describe("SearchOverlay request handling", () => {
+     expect(screen.getByText("The current answer")).toBeInTheDocument();
+   });
+ });
++
++describe("global shell search", () => {
++  it("shows Post excerpts instead of legacy titles and includes writers", async () => {
++    fetchMock.mockResolvedValue({ ok: true, json: async () => ({
++      posts: [{ id: "post", title: "Legacy heading", excerpt: "<p>A short thought</p>", content_kind: "post", slug: "thought", profiles: null }],
++      people: [{ id: "writer", username: "amara", full_name: "Amara Okafor", avatar_url: null }],
++    }) });
++    render(<SearchOverlay isOpen onClose={vi.fn()} />);
++    await userEvent.type(screen.getByRole("textbox"), "thought");
++    expect(await screen.findByText("A short thought")).toBeInTheDocument();
++    expect(screen.queryByText("Legacy heading")).not.toBeInTheDocument();
++    expect(screen.getByRole("link", { name: /Amara Okafor/ })).toHaveAttribute("href", "/amara");
++    expect(screen.getByRole("link", { name: /A short thought/ })).toHaveAttribute("href", "/post/thought");
++  });
++
++  it("cancels pending results when the input is cleared", async () => {
++    let resolve: (value: unknown) => void = () => {};
++    fetchMock.mockImplementation(() => new Promise(done => { resolve = done; }));
++    render(<SearchOverlay isOpen onClose={vi.fn()} />);
++    await userEvent.type(screen.getByRole("textbox"), "pending");
++    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
++    await userEvent.click(screen.getByRole("button", { name: "Clear search" }));
++    await act(async () => resolve({ ok: true, json: async () => ({ posts: [{ id: "old", title: "Stale", slug: "old" }] }) }));
++    expect(screen.queryByText("Stale")).not.toBeInTheDocument();
++    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true);
++  });
++
++  it("autofocuses, wraps Tab, and restores focus on close", async () => {
++    const trigger = document.createElement("button"); document.body.append(trigger); trigger.focus();
++    const view = render(<SearchOverlay isOpen onClose={vi.fn()} />);
++    const input = screen.getByRole("textbox");
++    expect(input).toHaveFocus();
++    await userEvent.tab({ shift: true });
++    expect(screen.getByRole("button", { name: "Close search" })).toHaveFocus();
++    await userEvent.tab(); expect(input).toHaveFocus();
++    view.rerender(<SearchOverlay isOpen={false} onClose={vi.fn()} />);
++    expect(trigger).toHaveFocus(); trigger.remove();
++  });
++});
++
++
++it("opens the keyboard-selected writer with Enter", async () => {
++  fetchMock.mockResolvedValue({ ok: true, json: async () => ({
++    posts: [{ id: "a", title: "An article", slug: "article", content_kind: "article", profiles: null }],
++    people: [{ id: "w", username: "amara", full_name: "Amara", avatar_url: null }],
++  }) });
++  const close = vi.fn();
++  render(<SearchOverlay isOpen onClose={close} />);
++  const input = screen.getByRole("textbox");
++  await userEvent.type(input, "amara");
++  await screen.findByText("@amara");
++  await userEvent.keyboard("{ArrowDown}{Enter}");
++  expect(navigation.push).toHaveBeenCalledWith("/amara");
++  expect(close).toHaveBeenCalled();
++});
+diff --git a/components/ui/SearchOverlay.tsx b/components/ui/SearchOverlay.tsx
+index 62eaeb1..c2c139f 100644
+--- a/components/ui/SearchOverlay.tsx
++++ b/components/ui/SearchOverlay.tsx
+@@ -1,261 +1,152 @@
+-﻿"use client";
++"use client";
+ 
+-import { useState, useEffect, useRef, useCallback } from "react";
++import { useEffect, useRef, useState } from "react";
+ import Link from "next/link";
+ import { useRouter } from "next/navigation";
+-import Badge from "@/components/ui/Badge";
++import UserAvatar from "@/components/ui/UserAvatar";
++import "./search-overlay.css";
+ 
+-interface SearchResult {
++interface PublicationResult {
+   id: string;
+-  title: string;
++  title: string | null;
++  excerpt?: string | null;
+   slug: string;
+   content_kind?: string | null;
+-  url: string;
+   profiles: { full_name: string | null; username: string } | null;
+ }
++interface WriterResult {
++  id: string;
++  username: string;
++  full_name: string | null;
++  avatar_url: string | null;
++}
++interface Result {
++  id: string;
++  label: string;
++  detail: string;
++  kind: "Post" | "Article" | "Writer";
++  url: string;
++  avatar?: string | null;
++}
++interface SearchOverlayProps { isOpen: boolean; onClose: () => void; }
+ 
+-interface SearchOverlayProps {
+-  isOpen: boolean;
+-  onClose: () => void;
++// Text only: legacy markup is never inserted into the result row as HTML.
++function plainExcerpt(value: string | null | undefined) {
++  return (value ?? "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 180);
+ }
+ 
+ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
+   const router = useRouter();
++  const dialogRef = useRef<HTMLDialogElement>(null);
++  const inputRef = useRef<HTMLInputElement>(null);
+   const [query, setQuery] = useState("");
+-  const [results, setResults] = useState<SearchResult[]>([]);
++  const [results, setResults] = useState<Result[]>([]);
+   const [loading, setLoading] = useState(false);
+-  const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
+-  const inputRef = useRef<HTMLInputElement>(null);
+-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+-  const requestIdRef = useRef(0);
++  const [failed, setFailed] = useState(false);
++  const [focusedIndex, setFocusedIndex] = useState(0);
+ 
+   useEffect(() => {
+-    if (isOpen) {
+-      setQuery("");
+-      setResults([]);
+-      setFocusedIndex(null);
+-      setTimeout(() => inputRef.current?.focus(), 50);
+-    }
++    if (!isOpen) return;
++    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
++    const dialog = dialogRef.current;
++    const oldOverflow = document.body.style.overflow;
++    document.body.style.overflow = "hidden";
++    setQuery(""); setResults([]); setFocusedIndex(0); setFailed(false);
++    // Native modality makes the background inert and traps keyboard focus.
++    if (dialog?.showModal) dialog.showModal();
++    else dialog?.setAttribute("open", "");
++    inputRef.current?.focus();
++    return () => {
++      dialog?.close?.();
++      document.body.style.overflow = oldOverflow;
++      previousFocus?.focus({ preventScroll: true });
++    };
+   }, [isOpen]);
+ 
+   useEffect(() => {
+-    const handleKeyDown = (e: KeyboardEvent) => {
+-      if (e.key === "Escape") onClose();
+-    };
+-    document.addEventListener("keydown", handleKeyDown);
+-    return () => document.removeEventListener("keydown", handleKeyDown);
+-  }, [onClose]);
+-
+-  /**
+-   * The typeahead asks the application, not the database.
+-   *
+-   * The query, the limit and the research exclusion all live on the server
+-   * now: see lib/searchData.ts. This side keeps only what is about this
+-   * component, which is the race. Keystrokes are debounced but the responses
+-   * still arrive in whatever order the network chooses, and a slow request for
+-   * "af" landing after a fast one for "africa" used to replace the right
+-   * results with stale ones. The request id is checked before anything is set.
+-   */
+-  const search = useCallback(async (q: string) => {
+-    if (!q.trim()) {
+-      requestIdRef.current += 1;
+-      setResults([]);
+-      setFocusedIndex(null);
+-      setLoading(false);
+-      return;
+-    }
+-
+-    const requestId = ++requestIdRef.current;
+-    setLoading(true);
+-
+-    let mapped: SearchResult[] = [];
+-    try {
+-      const response = await fetch(
+-        `/api/search?scope=overlay&q=${encodeURIComponent(q)}`
+-      );
+-      if (response.ok) {
+-        const payload = (await response.json()) as { posts?: SearchResult[] };
+-        mapped = (payload.posts ?? []).map((post) => ({
+-          ...post,
+-          url: `/post/${post.slug}`,
++    if (!isOpen || !query.trim()) { setLoading(false); return; }
++    const controller = new AbortController();
++    let current = true;
++    const timer = setTimeout(async () => {
++      try {
++        const response = await fetch(`/api/search?scope=overlay&q=${encodeURIComponent(query)}`, { signal: controller.signal });
++        if (!response.ok) throw new Error("Search unavailable");
++        const payload = await response.json() as { posts?: PublicationResult[]; people?: WriterResult[] };
++        if (!current) return;
++        const posts: Result[] = (payload.posts ?? []).slice(0, 6).map(post => ({
++          id: `post-${post.id}`,
++          label: post.content_kind === "post" ? plainExcerpt(post.excerpt) || "Post" : post.title || plainExcerpt(post.excerpt) || "Article",
++          detail: post.profiles?.full_name || post.profiles?.username || "",
++          kind: post.content_kind === "post" ? "Post" : "Article",
++          url: `/post/${encodeURIComponent(post.slug)}`,
+         }));
+-      }
+-    } catch {
+-      // A failed search shows nothing and lets the next keystroke try again.
+-      mapped = [];
+-    }
+-
+-    if (requestId !== requestIdRef.current) return;
+-
+-    setResults(mapped);
+-    setFocusedIndex(mapped.length > 0 ? 0 : null);
+-    setLoading(false);
+-  }, []);
+-
+-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+-    const val = e.target.value;
+-    setQuery(val);
+-    if (debounceRef.current) clearTimeout(debounceRef.current);
+-    debounceRef.current = setTimeout(() => {
+-      void search(val);
++        const people: Result[] = (payload.people ?? []).slice(0, 3).map(person => ({
++          id: `writer-${person.id}`, label: person.full_name || person.username,
++          detail: `@${person.username}`, kind: "Writer", avatar: person.avatar_url,
++          url: `/${encodeURIComponent(person.username)}`,
++        }));
++        setResults([...posts, ...people]); setFocusedIndex(0);
++      } catch {
++        if (current) { setResults([]); setFailed(true); }
++      } finally { if (current) setLoading(false); }
+     }, 300);
+-  };
+-
+-  const handleInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+-    if (event.key === "Escape") {
+-      onClose();
+-      return;
+-    }
+-
+-    if (results.length === 0) {
+-      return;
+-    }
+-
+-    if (event.key === "ArrowDown") {
+-      event.preventDefault();
+-      setFocusedIndex((current) => {
+-        if (current === null) {
+-          return 0;
+-        }
+-
+-        return current === results.length - 1 ? 0 : current + 1;
+-      });
+-    }
++    return () => { current = false; clearTimeout(timer); controller.abort(); };
++  }, [isOpen, query]);
+ 
+-    if (event.key === "ArrowUp") {
+-      event.preventDefault();
+-      setFocusedIndex((current) => {
+-        if (current === null) {
+-          return results.length - 1;
+-        }
+-
+-        return current === 0 ? results.length - 1 : current - 1;
+-      });
+-    }
++  useEffect(() => {
++    if (isOpen) document.getElementById(`search-result-${focusedIndex}`)?.scrollIntoView?.({ block: "nearest" });
++  }, [focusedIndex, isOpen]);
+ 
+-    if (event.key === "Enter" && focusedIndex !== null) {
+-      event.preventDefault();
+-      const focusedResult = results[focusedIndex];
+-      if (focusedResult) {
+-        router.push(focusedResult.url);
+-        onClose();
+-      }
+-    }
+-  };
++  function changeQuery(value: string) {
++    setQuery(value); setResults([]); setFocusedIndex(0); setFailed(false); setLoading(Boolean(value.trim()));
++  }
+ 
+   if (!isOpen) return null;
+-
+-  return (
+-    <div
+-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-20"
+-      onClick={(e) => {
+-        if (e.target === e.currentTarget) onClose();
+-      }}
+-      role="dialog"
+-      aria-modal="true"
+-      aria-labelledby="search-overlay-title"
+-    >
+-      <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+-        <div className="border-b border-gray-100 p-4">
+-          <h2 id="search-overlay-title" className="sr-only">
+-            Search Indegenius
+-          </h2>
+-          <div className="flex items-center gap-3">
+-            <svg
+-              className="h-5 w-5 flex-shrink-0 text-gray-400"
+-              fill="none"
+-              stroke="currentColor"
+-              viewBox="0 0 24 24"
+-            >
+-              <path
+-                strokeLinecap="round"
+-                strokeLinejoin="round"
+-                strokeWidth={2}
+-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+-              />
+-            </svg>
+-            <input
+-              ref={inputRef}
+-              type="text"
+-              value={query}
+-              onChange={handleChange}
+-              onKeyDown={handleInputKeyDown}
+-              placeholder="Search posts, articles, writers…"
+-              className="flex-1 text-sm text-gray-900 placeholder-gray-400 focus:outline-none"
+-              aria-label="Search Indegenius"
+-            />
+-            {query ? (
+-              <button
+-                onClick={() => {
+-                  setQuery("");
+-                  setResults([]);
+-                  setFocusedIndex(null);
+-                }}
+-                aria-label="Clear search"
+-                className="text-gray-400 transition-colors hover:text-gray-600"
+-              >
+-                <svg
+-                  className="h-4 w-4"
+-                  fill="none"
+-                  stroke="currentColor"
+-                  viewBox="0 0 24 24"
+-                >
+-                  <path
+-                    strokeLinecap="round"
+-                    strokeLinejoin="round"
+-                    strokeWidth={2}
+-                    d="M6 18L18 6M6 6l12 12"
+-                  />
+-                </svg>
+-              </button>
+-            ) : null}
+-          </div>
+-        </div>
+-
+-        <div className="max-h-80 overflow-y-auto">
+-          {!query ? (
+-            <div className="px-4 py-8 text-center text-sm text-gray-400">
+-              Search posts, articles, writers…
+-            </div>
+-          ) : null}
+-          {query && loading ? (
+-            <div className="px-4 py-6 text-center text-sm text-gray-400">
+-              Searching...
+-            </div>
+-          ) : null}
+-          {query && !loading && results.length === 0 ? (
+-            <div className="px-4 py-6 text-center text-sm text-gray-400">
+-              No posts found for &ldquo;{query}&rdquo;
+-            </div>
+-          ) : null}
+-          {results.map((result, index) => (
+-            <Link
+-              key={result.id}
+-              href={result.url}
+-              onClick={onClose}
+-              className={`flex items-center gap-3 px-4 py-3 transition-colors ${
+-                focusedIndex === index
+-                  ? "bg-emerald-50 ring-1 ring-emerald-200"
+-                  : "hover:bg-canvas"
+-              }`}
+-            >
+-              <div className="min-w-0 flex-1">
+-                <p className="truncate text-sm font-semibold text-gray-900">
+-                  {result.title}
+-                </p>
+-                {result.profiles ? (
+-                  <p className="mt-0.5 text-xs text-gray-400">
+-                    {result.profiles.full_name ?? result.profiles.username}
+-                  </p>
+-                ) : null}
+-              </div>
+-              <div className="flex shrink-0 flex-col items-end gap-1">
+-                <Badge content_kind={result.content_kind} />
+-              </div>
+-            </Link>
+-          ))}
+-        </div>
++  return <dialog ref={dialogRef} className="global-search-backdrop" aria-modal="true" aria-labelledby="search-overlay-title"
++    onCancel={event => { event.preventDefault(); onClose(); }}
++    onClick={event => { if (event.target === event.currentTarget) onClose(); }}
++    onKeyDown={event => {
++      if (event.key === "Escape") { event.preventDefault(); onClose(); }
++      if (event.key === "Tab") {
++        const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button, a[href], input'));
++        const first = focusable[0], last = focusable.at(-1);
++        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
++        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
++      }
++    }}>
++    <div className="global-search-panel">
++      <h2 id="search-overlay-title" className="sr-only">Search Indegenius</h2>
++      <div className="global-search-input-row">
++        <svg width="17" height="17" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
++        <input ref={inputRef} value={query} onChange={event => changeQuery(event.target.value)}
++          aria-label="Search Indegenius" aria-controls="global-search-results" autoComplete="off"
++          placeholder="Search posts, articles, writers…"
++          onKeyDown={event => {
++            if (!results.length) return;
++            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
++              event.preventDefault();
++              setFocusedIndex(index => (index + (event.key === "ArrowDown" ? 1 : results.length - 1)) % results.length);
++            } else if (event.key === "Enter") {
++              event.preventDefault(); router.push(results[focusedIndex].url); onClose();
++            }
++          }} />
++        {query ? <button type="button" aria-label="Clear search" onClick={() => { changeQuery(""); inputRef.current?.focus(); }}>×</button> : null}
++        <button type="button" className="global-search-close" onClick={onClose} aria-label="Close search">Close</button>
++      </div>
++      <div className="global-search-results" id="global-search-results" aria-label="Search results" aria-busy={loading}>
++        <p className="sr-only" role="status">{loading ? "Searching" : `${results.length} results`}{results[focusedIndex] ? `, ${results[focusedIndex].label}` : ""}</p>
++        {!query.trim() ? <p className="global-search-message">Search posts, articles, writers…</p> : loading ? <p className="global-search-message">Searching…</p>
++          : failed ? <p className="global-search-message" role="alert">Search is unavailable. Please try again.</p>
++          : !results.length ? <p className="global-search-message">No results found for “{query}”</p> : null}
++        {results.map((result, index) => <Link key={result.id} id={`search-result-${index}`} href={result.url}
++          onClick={onClose} onFocus={() => setFocusedIndex(index)}
++          className={`global-search-result${focusedIndex === index ? " is-selected" : ""}`}>
++          {result.kind === "Writer" ? <UserAvatar name={result.label} src={result.avatar} size={30} /> : null}
++          <span className="global-search-text"><span className="global-search-title">{result.label}</span><span className="global-search-detail">{result.detail}</span></span>
++          <span className={`global-search-kind kind-${result.kind.toLowerCase()}`}>{result.kind}</span>
++        </Link>)}
+       </div>
++      {query.trim() ? <Link className="global-search-all" href={`/search?q=${encodeURIComponent(query.trim())}`} onClick={onClose}>See all results</Link> : null}
+     </div>
+-  );
++  </dialog>;
+ }
+diff --git a/components/ui/search-overlay.css b/components/ui/search-overlay.css
+new file mode 100644
+index 0000000..f8a8b7f
+--- /dev/null
++++ b/components/ui/search-overlay.css
+@@ -0,0 +1,29 @@
++.global-search-backdrop { position:fixed; inset:0; width:100%; height:100dvh; max-width:none; max-height:none; margin:0; padding:104px 24px 24px; border:0; background:rgba(7,41,32,.30); color:#1A1A1A; font-family:var(--font-public-sans),system-ui,sans-serif; }
++.global-search-backdrop[open] { display:flex; justify-content:center; align-items:flex-start; }
++.global-search-backdrop::backdrop { background:transparent; }
++.global-search-panel { width:560px; max-width:100%; max-height:min(420px,calc(100dvh - 128px)); display:flex; flex-direction:column; overflow:hidden; border:1px solid #E9E5DE; border-radius:10px; background:#FDFCFA; box-shadow:0 12px 28px rgba(7,41,32,.14); }
++.global-search-input-row { display:flex; flex-shrink:0; align-items:center; gap:11px; padding:12px 18px; border-bottom:1px solid #EFEBE2; color:#6B6B6B; }
++.global-search-input-row input { min-width:0; flex:1; background:transparent; outline:none; font-size:14.5px; color:#1A1A1A; }
++.global-search-input-row svg { flex-shrink:0; }
++.global-search-input-row button { min-width:28px; min-height:32px; border-radius:5px; }
++.global-search-input-row button:focus-visible, .global-search-all:focus-visible { outline:2px solid #073929; outline-offset:2px; }
++.global-search-close { font-size:12px; }
++.global-search-results { overflow-y:auto; overscroll-behavior:contain; min-height:0; }
++.global-search-message { padding:28px 18px; text-align:center; font-size:13px; color:#6B7280; }
++.global-search-result { display:flex; align-items:center; gap:14px; padding:13px 18px; border-bottom:1px solid #EFEBE2; }
++.global-search-result:hover, .global-search-result.is-selected { background:#F4F7F5; }
++.global-search-result:focus-visible { outline:2px solid #073929; outline-offset:-2px; }
++.global-search-text { min-width:0; flex:1; }
++.global-search-title { display:block; font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
++.global-search-detail { display:block; margin-top:2px; font-size:12px; color:#6B7280; }
++.global-search-kind { flex-shrink:0; border-radius:999px; padding:3px 10px; font-size:11px; font-weight:600; background:#EFEBE2; color:#6B6B6B; }
++.global-search-kind.kind-article { background:#F7EEDD; color:#8A5D1E; }
++.global-search-kind.kind-post { background:#DFF0E7; color:#047857; }
++.global-search-all { display:block; flex-shrink:0; padding:12px 18px; border-top:1px solid #EFEBE2; font-size:12px; color:#073929; }
++@media (max-width:767px) {
++ .global-search-backdrop { padding:calc(12px + env(safe-area-inset-top)) 12px 12px; }
++ .global-search-panel { max-height:calc(100dvh - 24px - env(safe-area-inset-top) - var(--mobile-visual-viewport-bottom, 0px)); }
++ .global-search-input-row { padding:10px; gap:7px; }
++ .global-search-input-row input { font-size:16px; }
++ .global-search-input-row button { min-height:44px; }
++}
+diff --git a/lib/searchData.ts b/lib/searchData.ts
+index 7b78121..c4a1a64 100644
+--- a/lib/searchData.ts
++++ b/lib/searchData.ts
+@@ -85,7 +85,7 @@ export interface SearchViewer {
+ }
+ 
+ /**
+- * The command-palette typeahead: titles only, six results.
++ * The command-palette typeahead: titles and excerpts, six results.
+  *
+  * The research filter is applied in the query rather than in the caller. It
+  * used to be a `.filter()` over the six rows the database returned, which
+@@ -98,7 +98,7 @@ export async function searchOverlayPosts(
+   query: string,
+   { viewerId }: SearchViewer
+ ) {
+-  return searchRepository(supabase).overlayPosts(query, {
++  return searchRepository(supabase).posts(query, {
+     viewerId,
+     limit: OVERLAY_RESULT_LIMIT,
+   });
+@@ -189,3 +189,7 @@ export async function runSiteSearch(
+   ]);
+   return { posts, people };
+ }
++
++export async function searchOverlayPeople(supabase: SupabaseClient, query: string, { viewerId }: SearchViewer) {
++  return searchRepository(supabase).people(query, { viewerId, limit: 3 });
++}
+diff --git a/lib/searchOverlayData.test.ts b/lib/searchOverlayData.test.ts
+new file mode 100644
+index 0000000..d0fffb1
+--- /dev/null
++++ b/lib/searchOverlayData.test.ts
+@@ -0,0 +1,15 @@
++import { describe, expect, it, vi } from "vitest";
++const repository = vi.hoisted(() => ({ posts: vi.fn().mockResolvedValue([]), people: vi.fn().mockResolvedValue([]) }));
++vi.mock("@/lib/db/readAdapter", () => ({ searchRepository: () => repository }));
++import { searchOverlayPosts, searchOverlayPeople } from "./searchData";
++import type { SupabaseClient } from "@supabase/supabase-js";
++describe("bounded overlay data", () => {
++  it("reuses excerpt-aware publication search with six results and the server viewer", async () => {
++    await searchOverlayPosts({} as SupabaseClient, "thought", { viewerId: "viewer" });
++    expect(repository.posts).toHaveBeenCalledWith("thought", { viewerId: "viewer", limit: 6 });
++  });
++  it("bounds visibility-aware writer search to three results", async () => {
++    await searchOverlayPeople({} as SupabaseClient, "amara", { viewerId: null });
++    expect(repository.people).toHaveBeenCalledWith("amara", { viewerId: null, limit: 3 });
++  });
++});

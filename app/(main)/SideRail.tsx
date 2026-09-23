@@ -27,14 +27,14 @@ interface SideRailProps {
 // inventing a rail-specific treatment -- this rail is a structural change, not
 // a visual one.
 function railLinkClass(isCurrent: boolean) {
-  return `group flex items-center gap-3 rounded-xl border px-3 py-2.5 text-[14.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 ${
+  return `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-[14.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 ${
     isCurrent
-      ? "border-transparent font-semibold text-emerald-brand rail-link-current"
-      : "border-transparent font-medium text-ink-muted hover:border-gray-200 hover:bg-white hover:text-ink"
+      ? "font-semibold text-emerald-brand rail-link-current"
+      : "font-medium text-ink-muted hover:bg-[#073929]/[0.04] hover:text-ink"
   }`;
 }
 
-const ICON_CLASS = "h-[21px] w-[21px] shrink-0";
+const ICON_CLASS = "h-5 w-5 shrink-0";
 
 function RailLink({
   href,
@@ -74,7 +74,7 @@ export default function SideRail({
       // Shared fixed rail: 56px icons on tablet, 176px labelled on desktop.
       className="app-side-rail"
     >
-      <nav aria-label="Sections" className="flex flex-col gap-0.5">
+      <nav aria-label="Sections" className="flex flex-col gap-[3px]">
         <RailLink
           href="/"
           label="Home"
@@ -94,7 +94,7 @@ export default function SideRail({
           aria-label="Write"
           title="Write"
           userId={userId}
-          className="my-1 flex min-h-11 w-full items-center gap-3 rounded-xl bg-emerald-brand px-3 py-2.5 text-[14.5px] font-semibold text-white shadow-sm transition-colors hover:bg-[#0E4B37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70"
+          className="my-1 flex min-h-11 w-full items-center gap-3 rounded-[10px] bg-emerald-brand px-3 py-2.5 text-[14.5px] font-semibold text-white shadow-sm transition-colors hover:bg-[#0E4B37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70"
         >
           <WriteIcon className={ICON_CLASS} />
           <span className="app-rail-label truncate">Write</span>

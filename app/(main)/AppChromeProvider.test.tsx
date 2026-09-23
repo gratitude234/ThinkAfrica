@@ -89,7 +89,7 @@ function renderProvider(options: { registerContext?: boolean } = {}) {
 }
 
 beforeEach(() => {
-  navigationState.pathname = "/";
+  navigationState.pathname = "/post/reading";
   frames = [];
   window.scrollY = 0;
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) =>
@@ -107,6 +107,19 @@ afterEach(() => {
 });
 
 describe("AppChromeProvider", () => {
+  it.each(["/", "/explore", "/writer", "/settings", "/notifications", "/write", "/post/reading/edit"])("never compacts %s", pathname => {
+    navigationState.pathname = pathname;
+    mediaQueries(); renderProvider(); flushFrames(); scrollTo(400);
+    expect(screen.getByTestId("mode")).toHaveTextContent("expanded");
+  });
+  it("reveals chrome when navigation leaves a reading page", () => {
+    mediaQueries(); const view = renderProvider(); flushFrames(); scrollTo(400);
+    expect(screen.getByTestId("mode")).toHaveTextContent("compact");
+    navigationState.pathname = "/writer";
+    view.rerender(<AppChromeProvider><Harness /></AppChromeProvider>);
+    flushFrames();
+    expect(screen.getByTestId("mode")).toHaveTextContent("expanded");
+  });
   it("uses one shared scroll listener", () => {
     mediaQueries();
     const addSpy = vi.spyOn(window, "addEventListener");
@@ -183,7 +196,7 @@ describe("AppChromeProvider", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reveal now" }));
     expect(root).toHaveAttribute("data-chrome-mode", "expanded");
     expect(root).toHaveAttribute("data-chrome-instant", "true");
-    expect(root).toHaveStyle({ "--app-nav-offset": "60px" });
+    expect(root).toHaveStyle({ "--app-nav-offset": "64px" });
   });
 
   it("holds expanded while an interaction lock is active", () => {

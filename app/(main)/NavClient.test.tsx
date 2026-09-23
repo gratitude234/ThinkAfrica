@@ -63,13 +63,14 @@ describe("NavClient utilities", () => {
     }
   });
 
-  it("opens search from a field that shows from md", () => {
+  it("opens search from the responsive utility trigger", () => {
     const onOpenSearch = vi.fn();
     renderNav(null, onOpenSearch);
 
     const search = screen.getByRole("button", { name: "Open search" });
     // jsdom has no layout engine, so the breakpoint is a class contract.
-    expect(search).toHaveClass("md:flex", "max-w-[520px]");
+    expect(search).toHaveClass("app-search-trigger");
+    expect(search).toHaveAttribute("aria-haspopup", "dialog");
 
     fireEvent.click(search);
     expect(onOpenSearch).toHaveBeenCalledTimes(1);
@@ -87,7 +88,7 @@ describe("NavClient utilities", () => {
     expect(screen.queryByText(/Intellectual Social Network/)).not.toBeInTheDocument();
   });
 
-  it("gains a shadow once the page is scrolled, and loses it at the top", () => {
+  it("keeps the flat header treatment while scrolling", () => {
     renderNav();
     const nav = screen.getByRole("navigation", { name: "Application header" });
 
@@ -97,7 +98,7 @@ describe("NavClient utilities", () => {
       window.scrollY = 200;
       window.dispatchEvent(new Event("scroll"));
     });
-    expect(nav.className).toMatch(/shadow-/);
+    expect(nav.className).not.toMatch(/shadow-/);
 
     act(() => {
       window.scrollY = 0;
