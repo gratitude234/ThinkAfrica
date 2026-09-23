@@ -19,7 +19,7 @@ vi.mock("@/lib/feedData", () => ({
   fetchFeedPage: mocks.fetchFeedPage,
   MAX_FEED_PAGE: 100,
   MAX_FEED_PAGE_SIZE: 30,
-  RANKED_FEED_WINDOW: 120,
+  RANKED_FEED_WINDOW: 192,
   normalizeFeedContentFilter: (value: string | null) => value ?? "all",
 }));
 
@@ -37,9 +37,9 @@ const ANONYMOUS = {
 function signedInAs(userId: string | null) {
   mocks.createClient.mockResolvedValue({
     auth: {
-      getUser: vi
-        .fn()
-        .mockResolvedValue({ data: { user: userId ? { id: userId } : null } }),
+      getClaims: vi.fn().mockResolvedValue({
+        data: { claims: userId ? { sub: userId } : null },
+      }),
     },
   });
 }
@@ -124,7 +124,7 @@ describe("GET /api/feed", () => {
     expect(body.posts[0].feed_exposure).toMatchObject({
       algorithmVersion: FEED_ALGORITHM_VERSION,
       surface: "home",
-      candidateSource: "for_you_ranked",
+      candidateSource: "for_you_discovery",
       position: 1,
     });
   });
@@ -139,7 +139,7 @@ describe("GET /api/feed", () => {
     }
   );
 
-  it("loads the reader through the shared three-read context", async () => {
+  it("loads the reader through the shared feed-viewer context", async () => {
     signedInAs("user-1");
     const viewer = {
       userId: "user-1",

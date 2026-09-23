@@ -72,7 +72,7 @@ describe("prepareFeedPageForClient", () => {
 
   it("strips ranking-only fields and adds experiment-grade exposure context", () => {
     const result = prepareFeedPageForClient(
-      { posts: [post("a", { candidate_source: "for_you_ranked" })], hasMore: true },
+      { posts: [post("a", { candidate_source: "for_you_fresh" })], hasMore: true },
       {
         tab: "home",
         page: 2,
@@ -100,9 +100,9 @@ describe("prepareFeedPageForClient", () => {
       feedSessionId: "request-1",
       requestId: "request-1",
       algorithmVersion: FEED_ALGORITHM_VERSION,
-      experimentVariant: "ranking_v2",
+      experimentVariant: "ranking_v4",
       surface: "home",
-      candidateSource: "for_you_ranked",
+      candidateSource: "for_you_fresh",
       position: 13,
       page: 2,
       servedAt: "2026-08-18T12:00:00.000Z",
@@ -141,7 +141,7 @@ describe("prepareFeedPageForClient", () => {
       { posts: [post("tail")], hasMore: false },
       {
         tab: "home",
-        page: 11,
+        page: 17,
         pageSize: 12,
         rankedWindow: 120,
         requestId: "request-tail",
@@ -172,8 +172,8 @@ describe("prepareFeedPageForClient", () => {
       { surface: "latest", candidateSource: "latest" },
       { surface: "subscriptions", candidateSource: "subscription" },
       { surface: "home_featured", candidateSource: "featured_editorial" },
-      { surface: "home", candidateSource: "for_you_evergreen" },
-      { surface: "home", candidateSource: "for_you_ranked", algorithmVersion: "feed-v2.1.0" },
+      { surface: "home", candidateSource: "for_you_ranked" },
+      { surface: "home", candidateSource: "for_you_fresh", algorithmVersion: "feed-v3.0.0" },
     ]) {
       const forged = { ...served, ...retired } as Omit<FeedExposure, "signature">;
       expect(

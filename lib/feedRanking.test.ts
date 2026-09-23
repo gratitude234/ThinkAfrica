@@ -3,10 +3,12 @@ import {
   DIVERSITY_WINDOW_SIZE,
   FRESHNESS_HALF_LIFE_HOURS,
   MAX_POSTS_PER_AUTHOR_PER_WINDOW,
+  MAX_POSTS_PER_TOPIC_PER_WINDOW,
   RELEVANCE_WEIGHTS,
   SCORE_WEIGHTS,
   rankPosts,
   scorePost,
+  scorePostBreakdown,
   type RankablePost,
   type RankingContext,
 } from "./feedRanking";
@@ -17,6 +19,7 @@ const anonymous: RankingContext = {
   userId: null,
   followedIds: new Set(),
   userInterests: [],
+  snapshotAt: NOW,
 };
 
 function hoursAgo(hours: number) {
@@ -55,12 +58,16 @@ describe("scorePost", () => {
       tags: ["Climate"],
       read_count: 100_000,
       like_count: 100_000,
+      comment_count: 100_000,
       bookmark_count: 100_000,
     });
     const score = scorePost(strongest, {
       userId: "reader",
       followedIds: new Set(["author-1"]),
       userInterests: ["climate"],
+      snapshotAt: NOW,
+      authorAffinity: new Map([["author-1", 1]]),
+      topicAffinity: new Map([["climate", 1]]),
     });
     expect(score).toBeGreaterThan(0);
     expect(score).toBeLessThanOrEqual(100);
@@ -89,39 +96,70 @@ describe("scorePost", () => {
     );
   });
 
-  it("rewards reads, likes and saves relative to how often a post was shown", () => {
-    const wellRead = post({ impression_count: 100, read_count: 30 });
-    const barelyRead = post({ impression_count: 100, read_count: 3 });
-    expect(scorePost(wellRead, anonymous)).toBeGreaterThan(scorePost(barelyRead, anonymous));
+  it("rewards qualified reads and saves more strongly than lightweight reactions", () => {
+    const baseline = post({ impression_count: 100 });
+    const read = scorePost(post({ impression_count: 100, read_count: 10 }), anonymous);
+    const saved = scorePost(post({ impression_count: 100, bookmark_count: 10 }), anonymous);
+    const liked = scorePost(post({ impression_count: 100, like_count: 10 }), anonymous);
+    const commented = scorePost(post({ impression_count: 100, comment_count: 10 }), anonymous);
 
-    const liked = post({ impression_count: 100, like_count: 10 });
-    const saved = post({ impression_count: 100, bookmark_count: 10 });
-    expect(scorePost(liked, anonymous)).toBeGreaterThan(scorePost(post(), anonymous));
-    expect(scorePost(saved, anonymous)).toBeGreaterThan(scorePost(post(), anonymous));
+    expect(read).toBeGreaterThan(scorePost(baseline, anonymous));
+    expect(saved).toBeGreaterThan(liked);
+    expect(commented).toBeGreaterThan(liked);
   });
 
-  it("never raises a score for exposure alone", () => {
-    expect(scorePost(post({ impression_count: 10_000 }), anonymous)).toBe(
-      scorePost(post({ impression_count: 0 }), anonymous)
-    );
+  it("never raises satisfaction for exposure alone and reduces exploration as exposure grows", () => {
+    const unseen = scorePostBreakdown(post({ impression_count: 0 }), anonymous);
+    const exposed = scorePostBreakdown(post({ impression_count: 10_000 }), anonymous);
+    expect(exposed.satisfaction).toBe(unseen.satisfaction);
+    expect(exposed.exploration).toBeLessThan(unseen.exploration);
+    expect(exposed.total).toBeLessThanOrEqual(unseen.total);
+
     expect(scorePost(post({ read_count: 10, impression_count: 1_000 }), anonymous)).toBeLessThan(
       scorePost(post({ read_count: 10, impression_count: 0 }), anonymous)
     );
   });
 
-  it("halves freshness every day and a half", () => {
-    const fresh = scorePost(post(), anonymous);
-    const halfLife = scorePost(
+  it("halves the freshness component every two days", () => {
+    const fresh = scorePostBreakdown(post(), anonymous);
+    const halfLife = scorePostBreakdown(
       post({ published_at: hoursAgo(FRESHNESS_HALF_LIFE_HOURS) }),
       anonymous
     );
-    expect(fresh).toBeCloseTo(100 * SCORE_WEIGHTS.freshness, 6);
-    expect(halfLife).toBeCloseTo(fresh / 2, 6);
+    expect(fresh.freshness).toBeCloseTo(1, 6);
+    expect(halfLife.freshness).toBeCloseTo(0.5, 6);
   });
 
-  it("reads no signal from a retired product", () => {
-    // Citation identity, formal review, views, references, co-authorship and
-    // a shared university all used to move the score. None of them does now.
+  it("learns from qualified-read writer and topic affinity without replacing explicit interests", () => {
+    const candidate = post({ tags: ["Climate Policy"] });
+    const learned = scorePostBreakdown(candidate, {
+      ...anonymous,
+      authorAffinity: new Map([["author-1", 1]]),
+      topicAffinity: new Map([["climate policy", 0.5]]),
+    });
+    const cold = scorePostBreakdown(candidate, anonymous);
+
+    expect(learned.writerAffinity).toBeGreaterThan(cold.writerAffinity);
+    expect(learned.total).toBeGreaterThan(cold.total);
+  });
+
+  it("penalizes repeated exposure and especially a publication already read", () => {
+    const candidate = post();
+    const unseen = scorePost(candidate, anonymous);
+    const repeated = scorePost(candidate, {
+      ...anonymous,
+      viewerEngagement: new Map([[candidate.id, { impressions: 3, hasRead: false }]]),
+    });
+    const alreadyRead = scorePost(candidate, {
+      ...anonymous,
+      viewerEngagement: new Map([[candidate.id, { impressions: 3, hasRead: true }]]),
+    });
+
+    expect(unseen).toBeGreaterThan(repeated);
+    expect(repeated).toBeGreaterThan(alreadyRead);
+  });
+
+  it("reads no signal from retired product metadata", () => {
     const retired = {
       ...post(),
       citation_id: "IND-2026-0001",
@@ -148,23 +186,35 @@ describe("scorePost", () => {
 });
 
 describe("rankPosts", () => {
-  it("orders by score, then newest, then id", () => {
-    const old = (id: string, publishedAt: string) =>
-      post({ id, author_id: id, published_at: publishedAt, created_at: publishedAt });
-    const ranked = rankPosts(
-      [
-        old("b", "2020-01-01T00:00:00.000Z"),
-        old("a", "2020-01-01T00:00:00.000Z"),
-        old("c", "2020-01-02T00:00:00.000Z"),
-        post({ id: "read", author_id: "read", read_count: 50 }),
-      ],
-      anonymous
+  it("guarantees a fresh cold-start candidate a place in the first screen", () => {
+    const established = Array.from({ length: 12 }, (_, index) =>
+      post({
+        id: `old-${index}`,
+        author_id: `old-author-${index}`,
+        published_at: hoursAgo(72 + index),
+        created_at: hoursAgo(72 + index),
+        impression_count: 500,
+        read_count: 150,
+        bookmark_count: 30,
+      })
     );
-    expect(ranked.map((item) => item.id)).toEqual(["read", "c", "a", "b"]);
-    expect(ranked[0].score).toBeGreaterThan(0);
+    const fresh = post({
+      id: "fresh-cold-start",
+      author_id: "new-writer",
+      impression_count: 0,
+      read_count: 0,
+    });
+
+    const ranked = rankPosts([...established, fresh], anonymous);
+    expect(ranked.slice(0, DIVERSITY_WINDOW_SIZE).map((item) => item.id)).toContain(
+      "fresh-cold-start"
+    );
+    expect(ranked.find((item) => item.id === "fresh-cold-start")?.candidate_source).toBe(
+      "for_you_fresh"
+    );
   });
 
-  it("keeps one writer to two posts per block of twelve, and drops nobody", () => {
+  it("keeps one writer to two posts per block of twelve when alternatives exist, and drops nobody", () => {
     const prolific = Array.from({ length: 6 }, (_, index) =>
       post({ id: `a${index}`, author_id: "prolific", read_count: 500 })
     );
@@ -181,12 +231,58 @@ describe("rankPosts", () => {
     ).toHaveLength(MAX_POSTS_PER_AUTHOR_PER_WINDOW);
   });
 
-  it("uses the next best post when every candidate is by the same writer", () => {
+  it("keeps one topic from monopolizing a screen when alternatives exist", () => {
+    const oneTopic = Array.from({ length: 9 }, (_, index) =>
+      post({
+        id: `climate-${index}`,
+        author_id: `climate-author-${index}`,
+        tags: ["Climate"],
+        read_count: 500,
+      })
+    );
+    const alternatives = Array.from({ length: 8 }, (_, index) =>
+      post({
+        id: `other-${index}`,
+        author_id: `other-author-${index}`,
+        tags: [`Topic ${index}`],
+      })
+    );
+
+    const ranked = rankPosts([...oneTopic, ...alternatives], anonymous);
+    expect(
+      ranked
+        .slice(0, DIVERSITY_WINDOW_SIZE)
+        .filter((item) => item.tags?.includes("Climate"))
+    ).toHaveLength(MAX_POSTS_PER_TOPIC_PER_WINDOW);
+  });
+
+  it("avoids placing the same writer consecutively when another candidate is available", () => {
     const ranked = rankPosts(
       [
-        post({ id: "low", read_count: 1 }),
-        post({ id: "high", read_count: 90 }),
-        post({ id: "mid", read_count: 20 }),
+        post({ id: "a1", author_id: "a", read_count: 500 }),
+        post({ id: "a2", author_id: "a", read_count: 450 }),
+        post({ id: "b1", author_id: "b", read_count: 10 }),
+        post({ id: "c1", author_id: "c", read_count: 5 }),
+      ],
+      anonymous
+    );
+
+    for (let index = 1; index < ranked.length; index += 1) {
+      if (ranked[index - 1].author_id === ranked[index].author_id) {
+        const laterDifferentAuthor = ranked.slice(index + 1).some(
+          (item) => item.author_id !== ranked[index].author_id
+        );
+        expect(laterDifferentAuthor).toBe(false);
+      }
+    }
+  });
+
+  it("uses score order as the fallback when every candidate is by the same writer", () => {
+    const ranked = rankPosts(
+      [
+        post({ id: "low", read_count: 1, published_at: hoursAgo(72) }),
+        post({ id: "high", read_count: 90, published_at: hoursAgo(72) }),
+        post({ id: "mid", read_count: 20, published_at: hoursAgo(72) }),
       ],
       anonymous
     );

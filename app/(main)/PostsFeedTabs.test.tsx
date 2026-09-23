@@ -352,7 +352,7 @@ describe("PostsFeedTabs -- pagination", () => {
     expect(requestParams(fetchMock, 0).get("tab")).toBe("following");
   });
 
-  it("pages For You by number, never by cursor", async () => {
+  it("continues For You from its frozen snapshot cursor", async () => {
     const fetchMock = vi.fn(async () => page([]));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -369,12 +369,12 @@ describe("PostsFeedTabs -- pagination", () => {
 
     expect(requestParams(fetchMock, 0).get("tab")).toBe("home");
     expect(requestParams(fetchMock, 0).get("page")).toBe("2");
-    expect(requestParams(fetchMock, 0).has("cursor")).toBe(false);
+    expect(requestParams(fetchMock, 0).get("cursor")).toBe("stray-cursor");
   });
 
   it("appends only posts the reader does not already have", async () => {
-    // One post published between two requests slides a page window and
-    // re-serves the previous page's last card as the head of the next.
+    // Dedupe remains a defense against retries or corrupted upstream responses;
+    // a valid v4 snapshot should not normally repeat a card.
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => page([post("2"), post("3")]))
@@ -468,6 +468,37 @@ describe("PostsFeedTabs -- error and retry states", () => {
     );
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(requestParams(fetchMock, 1).get("page")).toBe("2");
+  });
+
+  it("starts a fresh For You snapshot instead of falling back to numeric offsets", async () => {
+    vi.stubGlobal("IntersectionObserver", MockIntersectionObserver);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ error: { code: "INVALID_CURSOR", message: "expired" } }),
+          { status: 400 }
+        )
+      )
+      .mockResolvedValueOnce(page([post("fresh")], false));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <PostsFeedTabs
+        {...member}
+        initialPosts={[post("1")]}
+        initialHasMore
+        initialNextCursor="expired-home-cursor"
+      />
+    );
+
+    await paginate();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(requestParams(fetchMock, 0).get("cursor")).toBe("expired-home-cursor");
+    expect(requestParams(fetchMock, 1).get("page")).toBe("1");
+    expect(requestParams(fetchMock, 1).has("cursor")).toBe(false);
+    await waitFor(() => expect(screen.getByTestId("feed")).toHaveTextContent("fresh"));
+    expect(screen.queryByText("Couldn't load more.")).not.toBeInTheDocument();
   });
 
   it("clears a rejected cursor before retrying the same Following page", async () => {

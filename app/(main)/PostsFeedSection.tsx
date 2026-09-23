@@ -14,9 +14,10 @@ const HOME_PAGE_SIZE = 12;
 /**
  * The first page of Home's feed, rendered on the server.
  *
- * Everything Home reads happens here, inside the page's Suspense boundary: the
- * three viewer reads in lib/feedViewer.ts, then one page of the feed. A failure
- * in either becomes the feed's retryable error state rather than a broken page.
+ * Everything Home reads happens here, inside the page's Suspense boundary: one
+ * bounded viewer-context read, then one page of the feed. Migration-lag
+ * compatibility may use the older viewer reads. A failure in either becomes the
+ * feed's retryable error state rather than a broken page.
  */
 export default async function PostsFeedSection({
   tab,

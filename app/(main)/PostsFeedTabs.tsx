@@ -200,10 +200,10 @@ export default function PostsFeedTabs({
 
   const requestFeedPage = useCallback(
     (tab: HomeFeedTab, page: number, nextCursor: string | null = null) => {
-      // For You pages its fixed ranked window by number. Following continues
-      // from the server's keyset cursor.
-      const cursor = tab === "home" ? null : nextCursor;
-      const requestKey = `${tab}:${page}:${cursor ?? "offset"}`;
+      // Both modes continue from a server cursor now. Following's cursor is a
+      // chronological keyset; For You's is a signed frozen ranking snapshot.
+      const cursor = nextCursor;
+      const requestKey = `${feedSessionIdRef.current}:${tab}:${page}:${cursor ?? "first"}`;
       const existing = inFlightRef.current.get(requestKey);
       if (existing) return existing;
 
@@ -226,8 +226,9 @@ export default function PostsFeedTabs({
       setFeedCache((current) => {
         const previous = current[tab];
 
-        // ID dedupe is a final defense for retries, and for a post published
-        // between two requests sliding a page window.
+        // ID dedupe is now only a retry/corruption defense. A valid For You
+        // snapshot never slides underneath pagination, so normal continuation
+        // should not repeat a card.
         const carried = append ? (previous?.posts ?? []) : [];
         const seen = new Set(carried.map((post) => post.id));
         const added = result.posts.filter((post) => {
@@ -278,6 +279,9 @@ export default function PostsFeedTabs({
       if (showSkeleton) setIsSwitching(true);
       if (showError) setInitialError(false);
       try {
+        // A page-1 reload is a new ranking snapshot and therefore a new feed
+        // session for exposure analytics. Infinite-scroll pages keep it.
+        feedSessionIdRef.current = crypto.randomUUID();
         const result = await requestFeedPage(tab, 1, null);
         writeFeedPage(tab, result, 1, false);
       } catch {
@@ -381,14 +385,28 @@ export default function PostsFeedTabs({
           error instanceof FeedRequestError &&
           error.code === "INVALID_CURSOR"
         ) {
-          // Cursors are intentionally version/context-bound. After a deploy,
-          // clear the rejected cursor so Retry can fall back to the same page
-          // number instead of repeating a permanent 400.
-          setFeedCache((current) => {
-            const entry = current[tab];
-            if (!entry) return current;
-            return { ...current, [tab]: { ...entry, nextCursor: null } };
-          });
+          if (tab === "home") {
+            // A ranked continuation cannot safely fall back to page-number
+            // offsets: doing that is the exact moving-window bug v4 removes.
+            // Start a fresh snapshot instead.
+            const freshRequestId = activeRequestRef.current + 1;
+            activeRequestRef.current = freshRequestId;
+            void reloadFeed("home", {
+              requestId: freshRequestId,
+              showError: true,
+              showSkeleton: false,
+            });
+            setPaginationError(false);
+            return;
+          } else {
+            // Following can still retry the same page without its stale
+            // keyset cursor because chronological ordering is authoritative.
+            setFeedCache((current) => {
+              const entry = current[tab];
+              if (!entry) return current;
+              return { ...current, [tab]: { ...entry, nextCursor: null } };
+            });
+          }
         }
         setPaginationError(true);
       }
@@ -403,6 +421,7 @@ export default function PostsFeedTabs({
     isLoadingMore,
     isSwitching,
     requestFeedPage,
+    reloadFeed,
     writeFeedPage,
   ]);
 

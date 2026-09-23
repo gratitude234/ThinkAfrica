@@ -56,10 +56,11 @@ export default async function HomePage({ searchParams }: PageProps) {
   const supabase = await createClient();
 
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { claims },
+  } = await supabase.auth.getClaims();
+  const userId = typeof claims?.sub === "string" ? claims.sub : null;
 
-  if (!user && guest !== "1") {
+  if (!userId && guest !== "1") {
     redirect("/landing");
   }
 
@@ -71,7 +72,7 @@ export default async function HomePage({ searchParams }: PageProps) {
     redirect(`/explore?type=${encodeURIComponent(type)}`);
   }
 
-  const activeTab = user && tab === "following" ? "following" : "home";
+  const activeTab = userId && tab === "following" ? "following" : "home";
 
   // Older addresses carry parameters Home no longer reads: a timeframe, a
   // subscription source, the retired welcome flag, or a retired tab (Latest,
@@ -94,12 +95,12 @@ export default async function HomePage({ searchParams }: PageProps) {
 
   return (
     <div className="mx-auto w-full max-w-[720px]">
-      {user ? (
+      {userId ? (
         <RetentionEventTracker event="home_viewed" metadata={{ tab: activeTab }} />
       ) : null}
 
       <Suspense fallback={<FeedSkeleton />}>
-        <PostsFeedSection tab={activeTab} userId={user?.id ?? null} />
+        <PostsFeedSection tab={activeTab} userId={userId} />
       </Suspense>
     </div>
   );

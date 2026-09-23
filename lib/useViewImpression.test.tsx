@@ -34,9 +34,9 @@ const exposure: FeedExposure = {
   feedSessionId: "request-1",
   requestId: "request-1",
   algorithmVersion: FEED_ALGORITHM_VERSION,
-  experimentVariant: "ranking_v2",
+  experimentVariant: "ranking_v4",
   surface: "home",
-  candidateSource: "for_you_ranked",
+  candidateSource: "for_you_discovery",
   position: 1,
   page: 1,
   servedAt: "2026-08-18T12:00:00.000Z",
@@ -81,7 +81,7 @@ describe("useViewImpression", () => {
       exposureId: "request-1:1:post-1",
       requestId: "request-1",
       algorithmVersion: FEED_ALGORITHM_VERSION,
-      candidateSource: "for_you_ranked",
+      candidateSource: "for_you_discovery",
       position: 1,
     });
 

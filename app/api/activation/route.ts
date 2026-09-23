@@ -66,14 +66,15 @@ export async function POST(request: Request) {
 
   const supabase = await createClient();
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { claims },
+  } = await supabase.auth.getClaims();
+  const userId = typeof claims?.sub === "string" ? claims.sub : null;
 
-  if (!user && ANONYMOUS_VIEW_EVENTS.has(body.event)) {
+  if (!userId && ANONYMOUS_VIEW_EVENTS.has(body.event)) {
     return NextResponse.json({ ok: true, persisted: false });
   }
 
-  if (!user) {
+  if (!userId) {
     return NextResponse.json(
       { error: "Authentication required for this activation event." },
       { status: 401 }
@@ -83,7 +84,7 @@ export async function POST(request: Request) {
   await recordActivationEvent({
     supabase,
     event: body.event,
-    userId: user.id,
+    userId,
     metadata: body.metadata ?? {},
     source: body.source ?? "client",
     route: body.route ?? null,

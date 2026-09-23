@@ -55,19 +55,9 @@ describe("Supabase feed hydration outage tolerance", () => {
       viewer: { id: null },
     });
 
-    expect(hydration.counts).toEqual([
-      {
-        postId: "post-1",
-        likeCount: 0,
-        bookmarkCount: 0,
-        commentCount: 0,
-        viewerLiked: false,
-        viewerBookmarked: false,
-      },
-    ]);
-    expect(hydration.profiles).toHaveLength(1);
-    // A failed aggregate must not immediately fall back to the raw bookmarks
-    // table during an outage.
-    expect(supabase.from).not.toHaveBeenCalledWith("bookmarks");
+    // The single hydration RPC is optional decoration. An operational failure
+    // must not trigger the six-query compatibility fan-out during an outage.
+    expect(hydration).toEqual({ counts: [], profiles: [] });
+    expect(supabase.from).not.toHaveBeenCalled();
   });
 });

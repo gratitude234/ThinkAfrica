@@ -15,9 +15,15 @@ type Result = { data: unknown; error: unknown };
  * read it was asked for, so the contract below is about what the loader reads
  * rather than how it spells the query.
  */
-function countingClient(tables: Record<string, Result> = {}) {
+function countingClient(
+  tables: Record<string, Result> = {},
+  rpcResult: Result = {
+    data: null,
+    error: { code: "PGRST202", message: "function is not installed in this test" },
+  }
+) {
   const reads: string[] = [];
-  const rpc = vi.fn();
+  const rpc = vi.fn().mockResolvedValue(rpcResult);
   const client = {
     from: vi.fn((table: string) => {
       reads.push(table);
@@ -59,11 +65,7 @@ describe("loadFeedViewer: Home's reader context", () => {
     expect(blocking.getFeedExcludedUserIds).not.toHaveBeenCalled();
   });
 
-  it("reads the chosen topics, the follows and the blocks, and nothing else", async () => {
-    // Home used to fan out to nine parallel queries before its feed started:
-    // featured candidates, subscriptions, the private profile, onboarding
-    // state, suggested people and an activation checklist among them. Three
-    // reads is the whole of it now. A fourth needs a reason.
+  it("falls back to the legacy reads only when the context RPC is not installed", async () => {
     const { client, reads, rpc } = countingClient({
       profiles: { data: { interests: ["Climate", 42] }, error: null },
       follows: {
@@ -85,7 +87,36 @@ describe("loadFeedViewer: Home's reader context", () => {
     expect(blocking.getFeedExcludedUserIds).toHaveBeenCalledWith("user-1", {
       strict: true,
     });
-    expect(rpc).not.toHaveBeenCalled();
+    expect(rpc).toHaveBeenCalledWith("get_feed_viewer_context", {
+      p_user_id: "user-1",
+      p_personalized: true,
+    });
+  });
+
+  it("uses one viewer-context RPC when the migration is installed", async () => {
+    const { client, reads, rpc } = countingClient(
+      {},
+      {
+        data: [
+          {
+            user_interests: ["Climate"],
+            followed_ids: ["writer-1"],
+            excluded_author_ids: ["blocked-1"],
+          },
+        ],
+        error: null,
+      }
+    );
+
+    await expect(loadFeedViewer(client, "user-1")).resolves.toEqual({
+      userId: "user-1",
+      userInterests: ["Climate"],
+      followedIds: ["writer-1"],
+      excludedAuthorIds: ["blocked-1"],
+    });
+    expect(reads).toEqual([]);
+    expect(blocking.getFeedExcludedUserIds).not.toHaveBeenCalled();
+    expect(rpc).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the block list and reads no personal signal when depersonalized", async () => {

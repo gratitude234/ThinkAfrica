@@ -1,4 +1,24 @@
-﻿# ThinkAfrica V2 Focus & Polish Pass
+# 23 September 2026 — Feed v4 production stability
+
+- Kept the v4 scoring and signed snapshot pagination, but stopped fully hydrating the entire 192-post first-page ranking window.
+- Added bounded `get_feed_ranking_metrics`, `hydrate_feed_cards`, and `get_feed_viewer_context` RPCs so the broad ranking path does not fan out into large PostgREST `IN (...)` reads.
+- Full card hydration now runs only for the visible page after ranking.
+- Added a strict chronological first-page fallback for ranked candidate-list failures without weakening block exclusions.
+- Made `proxy.ts` the authenticated dynamic-request refresh boundary, added the global Supabase timeout there, and moved critical Home/feed/activation identity checks from `getUser()` to verified claims.
+- Treat concurrent refresh-token `409` responses as transient instead of confirmed logout.
+- See `FEED_V4_STABILITY_FIX.md` and `supabase/migrations/20260923000001_feed_v4_stability.sql`.
+
+# 23 September 2026 — Feed v4
+
+- Replaced mutable offset pagination in **For You** with an HMAC-signed, compressed snapshot cursor so new publications and impression updates cannot reshuffle later pages.
+- Added hybrid ranking lanes for personalized, fresh, discovery, trending and evergreen publications.
+- Added cold-start exploration for new publications, qualified-read writer/topic affinity, per-reader fatigue and author/topic diversity.
+- Kept **Following** chronological with its existing `(published_at, id)` keyset cursor.
+- Bumped signed exposure attribution to `feed-v4.0.0` / `ranking_v4`.
+- Added regression coverage for new-post page-boundary movement, cursor tampering, snapshot-to-tail continuity and cold-start/diversity behavior.
+- See `FEED_V4_IMPLEMENTATION.md`.
+
+# ThinkAfrica V2 Focus & Polish Pass
 
 ## Phase 1 — Visual Identity Foundation
 - Added `Playfair Display` and `Inter` in `app/layout.tsx` and registered them in `tailwind.config.ts`.

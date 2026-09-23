@@ -347,7 +347,7 @@ describe("post engagement server", () => {
           postId: "post-id",
           slug: "work",
           requestId: "request-verified",
-          candidateSource: "for_you_ranked",
+          candidateSource: "for_you_discovery",
           surface: "home",
         }),
       })

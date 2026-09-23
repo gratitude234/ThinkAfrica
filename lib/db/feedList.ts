@@ -96,6 +96,18 @@ export interface FeedListRepository {
   /** One slice of the feed, newest first, as ids and card fields. */
   listPosts(criteria: FeedListCriteria): Promise<FeedPostRow[]>;
   /**
+   * Resolve an already-selected snapshot of publication ids back to card
+   * fields. The caller restores snapshot order; this query only enforces that
+   * the rows are still published and still visible under the current filter.
+   */
+  listPostsByIds(
+    postIds: readonly string[],
+    criteria: Pick<
+      FeedListCriteria,
+      "contentKind" | "cutoff" | "excludedAuthorIds" | "excludedPostIds"
+    >
+  ): Promise<FeedPostRow[]>;
+  /**
    * Posts crediting any of these people as an accepted author.
    *
    * The feed excludes a blocked person's work, and filtering on
@@ -186,6 +198,30 @@ const CREDITED_POST_IDS_SQL = `
   from public.post_authors a
   where a.accepted_at is not null
     and a.user_id in (select (jsonb_array_elements_text($1::text::jsonb))::uuid)
+`;
+
+const LIST_BY_IDS_SQL = `
+  select
+    p.id, p.title, p.slug, p.excerpt,
+    p.content_kind, to_jsonb(p.tags) as tags,
+    p.created_at, p.published_at, p.view_count, p.impression_count,
+    p.read_count, p.word_count, p.cover_image_url, p.author_id
+  from public.posts p
+  where p.status = 'published'
+    and p.id in (select (jsonb_array_elements_text($1::text::jsonb))::uuid)
+    and ($2::text is null or p.content_kind = $2::text)
+    and ($3::timestamptz is null or p.published_at >= $3::timestamptz)
+    and (
+      $4::text is null
+      or p.author_id is null
+      or p.author_id not in (
+        select (jsonb_array_elements_text($4::text::jsonb))::uuid
+      )
+    )
+    and (
+      $5::text is null
+      or p.id not in (select (jsonb_array_elements_text($5::text::jsonb))::uuid)
+    )
 `;
 
 /** `null` for "do not restrict", never an empty array: an empty `in` list is
@@ -300,6 +336,51 @@ export function createSupabaseFeedListRepository(
       }
       return (data ?? []) as unknown as FeedPostRow[];
     },
+
+    async listPostsByIds(postIds, criteria) {
+      if (postIds.length === 0) return [];
+
+      let query = supabase
+        .from("posts")
+        .select(POST_SELECT)
+        .eq("status", "published")
+        .in("id", [...postIds]);
+
+      if (criteria.contentKind) {
+        query = query.eq("content_kind", criteria.contentKind);
+      }
+      if (criteria.cutoff) {
+        query = query.gte("published_at", criteria.cutoff);
+      }
+      if (criteria.excludedAuthorIds.length > 0) {
+        query = query.not(
+          "author_id",
+          "in",
+          `(${criteria.excludedAuthorIds.join(",")})`
+        );
+      }
+      if (criteria.excludedPostIds.length > 0) {
+        for (let index = 0; index < criteria.excludedPostIds.length; index += 100) {
+          query = query.not(
+            "id",
+            "in",
+            `(${criteria.excludedPostIds.slice(index, index + 100).join(",")})`
+          );
+        }
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        const failure = new Error(
+          `feed snapshot lookup failed: ${error.message}`
+        ) as Error & { code?: string };
+        if (typeof error.code === "string" && error.code) {
+          failure.code = error.code;
+        }
+        throw failure;
+      }
+      return (data ?? []) as unknown as FeedPostRow[];
+    },
   };
 }
 
@@ -331,6 +412,17 @@ export function createPostgresFeedListRepository(
         criteria.cursor?.id ?? null,
         criteria.offset,
         criteria.limit,
+      ]));
+    },
+
+    async listPostsByIds(postIds, criteria) {
+      if (postIds.length === 0) return [];
+      return normaliseRows<FeedPostRow>(await executor.query(LIST_BY_IDS_SQL, [
+        JSON.stringify([...postIds]),
+        criteria.contentKind,
+        criteria.cutoff,
+        listParam(criteria.excludedAuthorIds),
+        listParam(criteria.excludedPostIds),
       ]));
     },
   };

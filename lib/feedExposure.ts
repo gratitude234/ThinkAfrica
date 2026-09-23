@@ -8,12 +8,9 @@ import type {
   FeedTabKey,
 } from "@/lib/feedData";
 
-// v3: the publishing reset (Phase 2F) cut For You down to relevance,
-// engagement and freshness over the newest window, with no evergreen arms,
-// learned affinity or fatigue, and removed the featured lead and the Latest,
-// Subscribed and Topics tabs. Exposures logged under v2 are not comparable
-// with these, which is the entire reason this string exists.
-export const FEED_ALGORITHM_VERSION = "feed-v3.0.0";
+// v4: hybrid candidate lanes + stable snapshot pagination + reader fatigue and
+// qualified-read affinity. Exposures from v3 are intentionally not comparable.
+export const FEED_ALGORITHM_VERSION = "feed-v4.0.0";
 
 export type FeedCandidateSource = FeedCandidateArm | "followed_author";
 
@@ -24,7 +21,7 @@ export interface FeedExposure {
   feedSessionId: string;
   requestId: string;
   algorithmVersion: string;
-  experimentVariant: "ranking_v2";
+  experimentVariant: "ranking_v4";
   surface: FeedTabKey;
   candidateSource: FeedCandidateSource;
   position: number;
@@ -40,7 +37,11 @@ const FEED_EXPOSURE_FUTURE_SKEW_MS = 5 * 60 * 1000;
 const SAFE_EXPOSURE_ID = /^[A-Za-z0-9:_-]{1,256}$/;
 const SAFE_POST_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const CANDIDATE_SOURCES = new Set<FeedCandidateSource>([
-  "for_you_ranked",
+  "for_you_personalized",
+  "for_you_fresh",
+  "for_you_discovery",
+  "for_you_trending",
+  "for_you_evergreen",
   "for_you_tail",
   "followed_author",
 ]);
@@ -99,7 +100,7 @@ function parseUnsignedExposure(value: unknown): UnsignedFeedExposure | null {
     typeof source.requestId !== "string" ||
     !SAFE_EXPOSURE_ID.test(source.requestId) ||
     source.algorithmVersion !== FEED_ALGORITHM_VERSION ||
-    source.experimentVariant !== "ranking_v2" ||
+    source.experimentVariant !== "ranking_v4" ||
     !EXPOSURE_SURFACES.has(source.surface as FeedTabKey) ||
     !CANDIDATE_SOURCES.has(source.candidateSource as FeedCandidateSource) ||
     typeof source.position !== "number" ||
@@ -122,7 +123,7 @@ function parseUnsignedExposure(value: unknown): UnsignedFeedExposure | null {
     feedSessionId: source.feedSessionId,
     requestId: source.requestId,
     algorithmVersion: FEED_ALGORITHM_VERSION,
-    experimentVariant: "ranking_v2",
+    experimentVariant: "ranking_v4",
     surface: source.surface as FeedTabKey,
     candidateSource: source.candidateSource as FeedCandidateSource,
     position: source.position,
@@ -176,7 +177,9 @@ function getCandidateSource(
   rankedWindow: number
 ): FeedCandidateSource {
   if (tab === "following") return "followed_author";
-  return (page - 1) * pageSize < rankedWindow ? "for_you_ranked" : "for_you_tail";
+  return (page - 1) * pageSize < rankedWindow
+    ? "for_you_discovery"
+    : "for_you_tail";
 }
 
 function resolveCandidateSource(
@@ -239,7 +242,7 @@ export function prepareFeedPageForClient(
         feedSessionId,
         requestId,
         algorithmVersion: FEED_ALGORITHM_VERSION,
-        experimentVariant: "ranking_v2",
+        experimentVariant: "ranking_v4",
         surface: options.tab,
         candidateSource: resolveCandidateSource(post, fallbackCandidateSource),
         position,

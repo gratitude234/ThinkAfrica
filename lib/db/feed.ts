@@ -5,12 +5,15 @@ import "server-only";
  *
  * ## What is here and why
  *
- * `lib/feedData.ts` hydrates every list of posts the same way: given some post
- * ids and their author ids, fetch three aggregates, the author profiles, and
- * the viewer's own likes and bookmarks. That is six PostgREST round trips, and
- * it runs for every page of Home and of the Explore shelves.
+ * Feed v4 has two deliberately different read shapes:
  *
- * One statement replaces all six.
+ * - broad ranking hydration: only the three counters the scorer needs;
+ * - narrow rendered-card hydration: counters, author profile and viewer state
+ *   only after the visible page has been selected.
+ *
+ * PostgreSQL answers each shape in one statement. Supabase prefers one bounded
+ * RPC per shape and keeps the old PostgREST reads only as migration-lag
+ * compatibility.
  *
  * The publishing reset, Phase 2F, removed the reference count and the accepted
  * co-author list from this hydration, and the second lookup that resolved
@@ -83,13 +86,32 @@ export interface FeedHydration {
   profiles: FeedAuthorProfile[];
 }
 
+export interface FeedRankingCount {
+  postId: string;
+  likeCount: number;
+  bookmarkCount: number;
+  commentCount: number;
+}
+
 export interface FeedRepository {
-  /** Six PostgREST round trips in one statement. */
+  /** Full card hydration after the feed has selected the posts it will render. */
   hydrate(input: {
     postIds: readonly string[];
     authorIds: readonly string[];
     viewer: FeedViewer;
   }): Promise<FeedHydration>;
+  /**
+   * Only the global/per-viewer counters the ranking formula needs.
+   *
+   * Keeping this separate from `hydrate` is deliberate: the first For You
+   * page ranks a broad candidate window, but only a small page of those
+   * candidates is ever rendered. Pulling author chrome and viewer button state
+   * for the whole ranking window was the production fan-out bug.
+   */
+  rankingCounts(input: {
+    postIds: readonly string[];
+    viewer: FeedViewer;
+  }): Promise<FeedRankingCount[]>;
   readonly backend: "supabase" | "postgres";
 }
 
@@ -168,6 +190,37 @@ const HYDRATE_SQL = `
     ), '[]'::jsonb) as profiles
 `;
 
+
+/**
+ * Ranking-only hydration. This intentionally does not touch profiles, viewer
+ * likes/bookmarks, or any other card chrome. The broad For You candidate set
+ * needs these three counters and nothing else.
+ */
+const RANKING_COUNTS_SQL = `
+  with ids as (
+    select value::uuid as id
+    from jsonb_array_elements_text($1::text::jsonb) as value
+  )
+  select
+    i.id as post_id,
+    coalesce(
+      (select lc.like_count from public.post_like_counts lc where lc.post_id = i.id),
+      0
+    ) as like_count,
+    coalesce(
+      (select bc.bookmark_count from public.post_bookmark_counts bc where bc.post_id = i.id),
+      (select count(*) from public.bookmarks b where b.post_id = i.id),
+      0
+    ) as bookmark_count,
+    (
+      select count(*)
+      from public.comments c
+      where c.post_id = i.id
+        and ${commentVisibleSql("c", "$2")}
+    ) as comment_count
+  from ids i
+`;
+
 /**
  * A database error is an error, not an empty list.
  *
@@ -241,18 +294,52 @@ export function createPostgresFeedRepository(
         profiles: toArray<FeedAuthorProfile>(row?.profiles),
       };
     },
+
+    async rankingCounts({ postIds, viewer }) {
+      const ids = [...new Set(postIds)];
+      if (ids.length === 0) return [];
+
+      const result = await executor.query<Record<string, unknown>>(
+        RANKING_COUNTS_SQL,
+        [JSON.stringify(ids), viewer.id]
+      );
+
+      return result.map((entry) => ({
+        postId: String(entry.post_id),
+        likeCount: toNumber(entry.like_count),
+        bookmarkCount: toNumber(entry.bookmark_count),
+        commentCount: toNumber(entry.comment_count),
+      }));
+    },
   };
 }
 
 // ── Supabase ─────────────────────────────────────────────────────────
 
 /**
- * The existing behaviour, gathered behind the same interface.
- *
- * Kept so the parity harness can compare like with like, and so the default
- * path is unchanged while the migration is inert. The six calls are the six
- * calls `lib/feedData.ts` makes.
+ * Supabase implementation. The new RPCs are the normal path; the legacy
+ * PostgREST reads remain only so code and database can be deployed in either
+ * order without a hard outage.
  */
+const missingFeedRpcWarnings = new Set<string>();
+
+function errorCode(error: unknown): string | undefined {
+  const source = error as { code?: unknown; cause?: unknown } | null;
+  if (typeof source?.code === "string" && source.code) return source.code;
+  const cause = source?.cause as { code?: unknown } | null | undefined;
+  return typeof cause?.code === "string" && cause.code ? cause.code : undefined;
+}
+
+function isMissingRpc(error: unknown): boolean {
+  return ["PGRST202", "42883"].includes(errorCode(error) ?? "");
+}
+
+function warnMissingRpcOnce(name: string, error: unknown) {
+  if (missingFeedRpcWarnings.has(name)) return;
+  missingFeedRpcWarnings.add(name);
+  console.warn(`[feed] ${name} is not installed yet; using the compatibility path`, error);
+}
+
 export function createSupabaseFeedRepository(
   supabase: SupabaseClient
 ): FeedRepository {
@@ -264,6 +351,51 @@ export function createSupabaseFeedRepository(
       const authors = [...new Set(authorIds)];
       if (ids.length === 0 && authors.length === 0) {
         return { counts: [], profiles: [] };
+      }
+
+      // Preferred path: one bounded RPC for the posts that actually made the
+      // page. It preserves the viewer's RLS because the function is SECURITY
+      // INVOKER. The compatibility path below remains for migration lag.
+      if (ids.length > 0 && typeof supabase.rpc === "function") {
+        const result = await supabase.rpc("hydrate_feed_cards", {
+          p_post_ids: ids,
+        });
+        if (!result.error && Array.isArray(result.data)) {
+          const counts: FeedPostCounts[] = [];
+          const profilesById = new Map<string, FeedAuthorProfile>();
+          for (const row of result.data as Array<Record<string, unknown>>) {
+            const postId = typeof row.post_id === "string" ? row.post_id : "";
+            if (!postId) continue;
+            counts.push({
+              postId,
+              likeCount: toNumber(row.like_count),
+              bookmarkCount: toNumber(row.bookmark_count),
+              commentCount: toNumber(row.comment_count),
+              viewerLiked: row.viewer_liked === true,
+              viewerBookmarked: row.viewer_bookmarked === true,
+            });
+            const authorId = typeof row.author_id === "string" ? row.author_id : "";
+            const username = typeof row.username === "string" ? row.username : "";
+            if (authorId && username && !profilesById.has(authorId)) {
+              profilesById.set(authorId, {
+                id: authorId,
+                username,
+                full_name: typeof row.full_name === "string" ? row.full_name : null,
+                avatar_url: typeof row.avatar_url === "string" ? row.avatar_url : null,
+              });
+            }
+          }
+          return { counts, profiles: [...profilesById.values()] };
+        }
+        if (result.error && isMissingRpc(result.error)) {
+          warnMissingRpcOnce("hydrate_feed_cards", result.error);
+        } else if (result.error) {
+          console.warn(
+            "[feed-hydration] hydrate_feed_cards unavailable; skipping optional card decoration",
+            result.error
+          );
+          return { counts: [], profiles: [] };
+        }
       }
 
       const {
@@ -375,6 +507,78 @@ export function createSupabaseFeedRepository(
         })),
         profiles: profileRows,
       };
+    },
+
+    async rankingCounts({ postIds }) {
+      const ids = [...new Set(postIds)];
+      if (ids.length === 0) return [];
+
+      // The new RPC sends the candidate ids in the request body instead of
+      // building several very large `in.(...)` URLs. It also executes the
+      // three ranking counters next to the data in one statement.
+      if (typeof supabase.rpc === "function") {
+        const result = await supabase.rpc("get_feed_ranking_metrics", {
+          p_post_ids: ids,
+        });
+        if (!result.error && Array.isArray(result.data)) {
+          return (result.data as Array<Record<string, unknown>>)
+            .map((row) => ({
+              postId: typeof row.post_id === "string" ? row.post_id : "",
+              likeCount: toNumber(row.like_count),
+              bookmarkCount: toNumber(row.bookmark_count),
+              commentCount: toNumber(row.comment_count),
+            }))
+            .filter((row) => Boolean(row.postId));
+        }
+        if (result.error && isMissingRpc(result.error)) {
+          warnMissingRpcOnce("get_feed_ranking_metrics", result.error);
+        } else if (result.error) {
+          console.warn(
+            "[feed-ranking] get_feed_ranking_metrics unavailable; ranking with zero counters",
+            result.error
+          );
+          return ids.map((postId) => ({
+            postId,
+            likeCount: 0,
+            bookmarkCount: 0,
+            commentCount: 0,
+          }));
+        }
+      }
+
+      // Compatibility path while the migration is being applied. Only the
+      // three ranking counters are requested; author chrome and viewer button
+      // state are intentionally deferred until after the top page is selected.
+      const {
+        getBookmarkCountsByPostId,
+        getLikeCountsByPostId,
+        getVisibleCommentCountsByPostId,
+      } = await import("@/lib/postCounts");
+
+      const [likes, bookmarks, comments] = await Promise.allSettled([
+        getLikeCountsByPostId(supabase as never, ids),
+        getBookmarkCountsByPostId(supabase as never, ids),
+        getVisibleCommentCountsByPostId(supabase as never, ids),
+      ]);
+
+      const read = (
+        result: PromiseSettledResult<Record<string, number>>,
+        label: string
+      ): Record<string, number> => {
+        if (result.status === "fulfilled") return result.value;
+        console.warn(`[feed-ranking] ${label} unavailable; ranking with zeroes`, result.reason);
+        return {};
+      };
+
+      const likeCounts = read(likes, "like counts");
+      const bookmarkCounts = read(bookmarks, "bookmark counts");
+      const commentCounts = read(comments, "comment counts");
+      return ids.map((postId) => ({
+        postId,
+        likeCount: likeCounts[postId] ?? 0,
+        bookmarkCount: bookmarkCounts[postId] ?? 0,
+        commentCount: commentCounts[postId] ?? 0,
+      }));
     },
   };
 }

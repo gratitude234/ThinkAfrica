@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import PostCardImpression from "@/components/post/PostCardImpression";
 import type { PostCardData } from "@/components/post/PostCard";
@@ -37,12 +37,14 @@ function buildFeedUrl(
   tab: ExploreFeedTab,
   primary: ExplorePrimaryFilter,
   page: number,
-  cursor: string | null
+  cursor: string | null,
+  feedSessionId: string
 ) {
   const params = new URLSearchParams();
   params.set("tab", "home");
   params.set("page", String(page));
   params.set("pageSize", String(PAGE_SIZE));
+  params.set("session", feedSessionId);
   if (primary !== "all") params.set("type", primary);
   if (tab === "trending") {
     params.set("timeframe", "week");
@@ -69,6 +71,9 @@ export default function ExploreFeed({
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
+  const feedSessionIdRef = useRef(
+    initialPosts[0]?.feed_exposure?.feedSessionId ?? crypto.randomUUID()
+  );
 
   const loadMore = useCallback(async () => {
     if (loading || !hasMore) return;
@@ -77,14 +82,36 @@ export default function ExploreFeed({
     const nextPage = page + 1;
 
     try {
-      const response = await fetch(buildFeedUrl(tab, primary, nextPage, cursor), {
-        cache: "no-store",
-      });
-      if (!response.ok) throw new Error("Feed request failed");
+      const response = await fetch(
+        buildFeedUrl(tab, primary, nextPage, cursor, feedSessionIdRef.current),
+        { cache: "no-store" }
+      );
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as
+          | { error?: { code?: unknown } }
+          | null;
+        if (payload?.error?.code === "INVALID_CURSOR") {
+          // Ranked snapshots intentionally expire. Never resume with a page
+          // number alone, because that reintroduces the moving-window bug.
+          feedSessionIdRef.current = crypto.randomUUID();
+          const freshResponse = await fetch(
+            buildFeedUrl(tab, primary, 1, null, feedSessionIdRef.current),
+            { cache: "no-store" }
+          );
+          if (!freshResponse.ok) throw new Error("Feed request failed");
+          const fresh = (await freshResponse.json()) as FeedResponse;
+          setPosts(fresh.posts);
+          setHasMore(fresh.hasMore);
+          setCursor(fresh.nextCursor ?? null);
+          setPage(1);
+          return;
+        }
+        throw new Error("Feed request failed");
+      }
       const data = (await response.json()) as FeedResponse;
 
-      // The ranked window can overlap between pages, so identity is enforced
-      // here rather than trusting the server never to repeat a card.
+      // Snapshot continuation should never overlap. Keep id de-duplication as
+      // a retry/corruption defense rather than as normal pagination logic.
       setPosts((current) => {
         const seen = new Set(current.map((post) => post.id));
         return [...current, ...data.posts.filter((post) => !seen.has(post.id))];

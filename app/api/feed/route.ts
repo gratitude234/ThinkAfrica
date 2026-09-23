@@ -86,10 +86,11 @@ export async function GET(request: NextRequest) {
         : undefined;
 
     const {
-      data: { user },
-    } = await supabase.auth.getUser();
+      data: { claims },
+    } = await supabase.auth.getClaims();
+    const userId = typeof claims?.sub === "string" ? claims.sub : null;
 
-    const viewer = await loadFeedViewer(supabase, user?.id ?? null, {
+    const viewer = await loadFeedViewer(supabase, userId, {
       personalized: isPersonalized(params.get("personalized")),
     });
 

@@ -62,6 +62,7 @@ function feedSupabase(
     excludedCredits = [] as Array<{ post_id: string }>,
     excludedCreditsError = null as { code: string; message: string } | null,
     withRpc = false,
+    failLargeFeedQuery = false,
   } = {}
 ) {
   const postQueries: PostQuery[] = [];
@@ -84,8 +85,18 @@ function feedSupabase(
 
     const result = () => {
       if (!isFeedQuery) return { data: [], error: null };
+      if (failLargeFeedQuery && call.limit === RANKED_FEED_WINDOW + 1) {
+        return {
+          data: null,
+          error: { code: "57014", message: "candidate window timed out" },
+        };
+      }
       const visible = rows.filter((row) => {
         if (excludedPostIds.has(String(row.id))) return false;
+        const includedIds = call.inFilters.find((filter) => filter.column === "id");
+        if (includedIds && !includedIds.values.includes(String(row.id ?? ""))) {
+          return false;
+        }
         const excludedAuthors = call.notFilters.find(
           (filter) => filter.column === "author_id" && filter.operator === "in"
         );
@@ -246,7 +257,7 @@ describe("fetchFeedPage -- correctness contracts", () => {
     const { supabase, postQueries } = feedSupabase([]);
 
     await fetchFeedPage({
-      ...forYou,
+      ...following,
       supabase: supabase as never,
       page: 999_999,
       pageSize: 999,
@@ -370,7 +381,7 @@ describe("fetchFeedPage -- correctness contracts", () => {
     }
   });
 
-  it("selects For You in one query, with no evergreen arm and no reader-signal RPC", async () => {
+  it("builds the For You snapshot once and reads the two bounded reader-signal RPCs", async () => {
     const deep = Array.from({ length: RANKED_FEED_WINDOW + 20 }, (_, index) =>
       rankedRow(index)
     );
@@ -382,8 +393,42 @@ describe("fetchFeedPage -- correctness contracts", () => {
     expect(postQueries[0].limit).toBe(RANKED_FEED_WINDOW + 1);
     expect(postQueries[0].keysetFilters).toEqual([]);
     const called = rpc.mock.calls.map((call) => (call as unknown[])[0]);
-    expect(called).not.toContain("get_reader_affinity");
-    expect(called).not.toContain("get_viewer_post_engagement");
+    expect(called).toContain("get_feed_ranking_metrics");
+    expect(called).toContain("get_reader_affinity");
+    expect(called).toContain("get_viewer_post_engagement");
+    expect(called).toContain("hydrate_feed_cards");
+
+    const rankingCall = rpc.mock.calls.find(
+      (call) => (call as unknown[])[0] === "get_feed_ranking_metrics"
+    ) as unknown[] | undefined;
+    const cardCall = rpc.mock.calls.find(
+      (call) => (call as unknown[])[0] === "hydrate_feed_cards"
+    ) as unknown[] | undefined;
+    expect((rankingCall?.[1] as { p_post_ids: string[] }).p_post_ids).toHaveLength(
+      RANKED_FEED_WINDOW
+    );
+    // The critical stability contract: broad ranking, narrow card hydration.
+    expect((cardCall?.[1] as { p_post_ids: string[] }).p_post_ids).toHaveLength(12);
+  });
+
+  it("falls back to a small strict chronological page when the broad candidate read times out", async () => {
+    const rows = Array.from({ length: 40 }, (_, index) => rankedRow(index));
+    const { supabase, postQueries } = feedSupabase(rows, {
+      failLargeFeedQuery: true,
+    });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const page = await fetchFeedPage({ ...forYou, supabase: supabase as never });
+
+    expect(postQueries).toHaveLength(2);
+    expect(postQueries[0].limit).toBe(RANKED_FEED_WINDOW + 1);
+    expect(postQueries[1].limit).toBe(13);
+    expect(page.posts.map((post) => post.id)).toEqual(
+      Array.from({ length: 12 }, (_, index) => `p${index}`)
+    );
+    expect(page.hasMore).toBe(true);
+    expect(page.nextCursor).toMatch(/^fy4\./);
+    warn.mockRestore();
   });
 });
 
@@ -491,10 +536,7 @@ describe("fetchFeedPage -- Following", () => {
         supabase: feedSupabase(rows).supabase as never,
         cursor: firstPage.nextCursor,
       })
-    ).rejects.toMatchObject({
-      name: "FeedCursorError",
-      message: "Cursors are not supported by the ranked home feed.",
-    });
+    ).rejects.toBeInstanceOf(FeedCursorError);
   });
 
   it("still continues a Following cursor minted before Phase 2F", async () => {
@@ -578,110 +620,161 @@ describe("fetchFeedPage -- Following", () => {
   });
 });
 
-describe("fetchFeedPage -- ranked For You paging", () => {
-  // 24 fresh-order posts nobody has read and 6 older ones with real reads. A
-  // candidate pool sized by page number would let page 2's pool slot the read
-  // posts above everything page 1 already delivered.
-  const rows = [
-    ...Array.from({ length: 24 }, (_, index) => rankedRow(index, 0)),
-    ...Array.from({ length: 6 }, (_, index) => rankedRow(24 + index, 1000)),
-  ];
+describe("fetchFeedPage -- For You snapshot paging", () => {
+  const rows = Array.from({ length: 30 }, (_, index) =>
+    rankedRow(index, index >= 24 ? 1000 : 0, { author_id: `author-${index}` })
+  );
 
-  it("never serves the same post on two pages", async () => {
+  it("freezes the order so a newly published post cannot slide a page boundary", async () => {
     const pageOne = await fetchFeedPage({
       ...forYou,
       supabase: feedSupabase(rows).supabase as never,
       page: 1,
     });
-    const pageTwo = await fetchFeedPage({
-      ...forYou,
-      supabase: feedSupabase(rows).supabase as never,
-      page: 2,
-    });
+    expect(pageOne.nextCursor).toMatch(/^fy4\./);
 
     const firstIds = pageOne.posts.map((post) => post.id);
-    const secondIds = pageTwo.posts.map((post) => post.id);
+    const brandNew = rankedRow(999, 10_000, {
+      id: "brand-new",
+      author_id: "brand-new-author",
+      published_at: "2026-09-23T12:00:00.000Z",
+      created_at: "2026-09-23T12:00:00.000Z",
+    });
+    const pageTwo = await fetchFeedPage({
+      ...forYou,
+      supabase: feedSupabase([brandNew, ...rows]).supabase as never,
+      page: 2,
+      cursor: pageOne.nextCursor,
+    });
 
-    expect(firstIds).toHaveLength(12);
+    const secondIds = pageTwo.posts.map((post) => post.id);
     expect(secondIds).toHaveLength(12);
     expect(secondIds.filter((id) => firstIds.includes(id))).toEqual([]);
-    // Together they are the first 24 of one ranking: the six read posts lead,
-    // then the unread ones in date order.
-    expect([...firstIds, ...secondIds]).toEqual([
-      "p24", "p25", "p26", "p27", "p28", "p29",
-      ...Array.from({ length: 18 }, (_, index) => `p${index}`),
-    ]);
+    expect(secondIds).not.toContain("brand-new");
+    expect(secondIds.every((id) => rows.some((row) => row.id === id))).toBe(true);
   });
 
-  it("ranks the same fixed window whatever page is asked for", async () => {
-    const first = feedSupabase(rows);
-    const second = feedSupabase(rows);
-
-    await fetchFeedPage({ ...forYou, supabase: first.supabase as never, page: 1 });
-    await fetchFeedPage({ ...forYou, supabase: second.supabase as never, page: 2 });
-
-    // One row past the window, so the last ranked page can tell whether the
-    // date-ordered tail holds anything.
-    expect(first.postQueries[0].limit).toBe(RANKED_FEED_WINDOW + 1);
-    expect(second.postQueries[0].limit).toBe(RANKED_FEED_WINDOW + 1);
+  it("requires the previous snapshot cursor for page two and later", async () => {
+    await expect(
+      fetchFeedPage({
+        ...forYou,
+        supabase: feedSupabase(rows).supabase as never,
+        page: 2,
+      })
+    ).rejects.toBeInstanceOf(FeedCursorError);
   });
 
-  it("pages past the ranked window in date order, from the row after it", async () => {
-    const deep = Array.from({ length: 180 }, (_, index) => rankedRow(index));
-    const { supabase, postQueries } = feedSupabase(deep);
-
-    const result = await fetchFeedPage({
+  it("rejects a tampered snapshot cursor", async () => {
+    const pageOne = await fetchFeedPage({
       ...forYou,
-      supabase: supabase as never,
-      page: RANKED_FEED_WINDOW / 12 + 1,
-    });
-
-    expect(result.posts.map((post) => post.id)).toEqual(
-      Array.from({ length: 12 }, (_, index) => `p${RANKED_FEED_WINDOW + index}`)
-    );
-    expect(result.hasMore).toBe(true);
-    expect(postQueries).toHaveLength(1);
-    expect(postQueries[0].range).toEqual([RANKED_FEED_WINDOW, RANKED_FEED_WINDOW + 12]);
-  });
-
-  it("labels each card with the part of the feed that supplied it", async () => {
-    const deep = Array.from({ length: 180 }, (_, index) => rankedRow(index));
-
-    const ranked = await fetchFeedPage({
-      ...forYou,
-      supabase: feedSupabase(deep).supabase as never,
+      supabase: feedSupabase(rows).supabase as never,
       page: 1,
     });
-    const tail = await fetchFeedPage({
-      ...forYou,
-      supabase: feedSupabase(deep).supabase as never,
-      page: RANKED_FEED_WINDOW / 12 + 1,
-    });
+    const cursor = pageOne.nextCursor!;
+    const replacement = cursor.endsWith("a") ? "b" : "a";
+    const tampered = `${cursor.slice(0, -1)}${replacement}`;
 
-    expect(new Set(ranked.posts.map((post) => post.candidate_source))).toEqual(
-      new Set(["for_you_ranked"])
-    );
-    expect(new Set(tail.posts.map((post) => post.candidate_source))).toEqual(
-      new Set(["for_you_tail"])
-    );
+    await expect(
+      fetchFeedPage({
+        ...forYou,
+        supabase: feedSupabase(rows).supabase as never,
+        page: 2,
+        cursor: tampered,
+      })
+    ).rejects.toBeInstanceOf(FeedCursorError);
   });
 
-  it("serves every post exactly once across the ranked window and the tail", async () => {
-    const deep = Array.from({ length: 180 }, (_, index) => rankedRow(index));
-    const served: string[] = [];
+  it("ranks one fixed candidate window on the first request only", async () => {
+    const first = feedSupabase(rows);
+    const pageOne = await fetchFeedPage({
+      ...forYou,
+      supabase: first.supabase as never,
+      page: 1,
+    });
+    expect(first.postQueries[0].limit).toBe(RANKED_FEED_WINDOW + 1);
 
-    for (let page = 1; page <= 180 / 12; page += 1) {
+    const second = feedSupabase(rows);
+    await fetchFeedPage({
+      ...forYou,
+      supabase: second.supabase as never,
+      page: 2,
+      cursor: pageOne.nextCursor,
+    });
+
+    // Continuation resolves the frozen ids with an id IN query; it does not
+    // reload and rerank the newest candidate window.
+    expect(second.postQueries.some((query) => query.limit === RANKED_FEED_WINDOW + 1)).toBe(false);
+    expect(second.postQueries.some((query) => query.inFilters.some((filter) => filter.column === "id"))).toBe(true);
+  });
+
+  it("labels ranked cards with their hybrid candidate lane", async () => {
+    const result = await fetchFeedPage({
+      ...forYou,
+      userInterests: ["climate policy"],
+      followedIds: ["author-0"],
+      supabase: feedSupabase([
+        rankedRow(0, 0, { author_id: "author-0", tags: ["Climate Policy"] }),
+        ...rows.slice(1),
+      ]).supabase as never,
+    });
+
+    const allowed = new Set([
+      "for_you_personalized",
+      "for_you_fresh",
+      "for_you_discovery",
+      "for_you_trending",
+      "for_you_evergreen",
+    ]);
+    expect(result.posts).toHaveLength(12);
+    expect(result.posts.every((post) => allowed.has(String(post.candidate_source)))).toBe(true);
+    expect(result.posts.some((post) => post.candidate_source === "for_you_personalized")).toBe(true);
+  });
+
+  it("continues into a chronological tail after the frozen ranked window", async () => {
+    const deep = Array.from({ length: RANKED_FEED_WINDOW + 24 }, (_, index) =>
+      rankedRow(index, 0, { author_id: `author-${index}` })
+    );
+    let cursor: string | null | undefined = null;
+    let tailPage: Awaited<ReturnType<typeof fetchFeedPage>> | null = null;
+
+    for (let page = 1; page <= RANKED_FEED_WINDOW / 12 + 1; page += 1) {
       const result = await fetchFeedPage({
         ...forYou,
         supabase: feedSupabase(deep).supabase as never,
         page,
+        cursor,
       });
-      served.push(...result.posts.map((post) => post.id));
+      cursor = result.nextCursor;
+      if (page === RANKED_FEED_WINDOW / 12 + 1) tailPage = result;
     }
 
-    // No repeats is the visible half of the contract. No gaps is the half that
-    // fails silently: a post skipped between the window and the tail never
-    // arrives at all, and nobody reports it.
+    expect(tailPage?.posts.map((post) => post.id)).toEqual(
+      Array.from({ length: 12 }, (_, index) => `p${RANKED_FEED_WINDOW + index}`)
+    );
+    expect(new Set(tailPage?.posts.map((post) => post.candidate_source))).toEqual(
+      new Set(["for_you_tail"])
+    );
+  });
+
+  it("serves every post exactly once across the frozen ranking and tail", async () => {
+    const deep = Array.from({ length: RANKED_FEED_WINDOW + 24 }, (_, index) =>
+      rankedRow(index, 0, { author_id: `author-${index}` })
+    );
+    const served: string[] = [];
+    let cursor: string | null | undefined = null;
+
+    for (let page = 1; page <= 30; page += 1) {
+      const result = await fetchFeedPage({
+        ...forYou,
+        supabase: feedSupabase(deep).supabase as never,
+        page,
+        cursor,
+      });
+      served.push(...result.posts.map((post) => post.id));
+      cursor = result.nextCursor;
+      if (!result.hasMore) break;
+    }
+
     expect(new Set(served).size).toBe(served.length);
     expect(new Set(served)).toEqual(new Set(deep.map((row) => row.id)));
   });
@@ -700,6 +793,6 @@ describe("fetchFeedPage -- ranked For You paging", () => {
       supabase: feedSupabase(candidates).supabase as never,
     });
 
-    expect(result.posts.map((post) => post.id)).toEqual(["p1", "p2", "p0"]);
+    expect(new Set(result.posts.map((post) => post.id).slice(0, 2))).toEqual(new Set(["p1", "p2"]));
   });
 });

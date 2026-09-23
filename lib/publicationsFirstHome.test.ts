@@ -232,7 +232,7 @@ describe("publications-first Home: what Home reads", () => {
     );
   });
 
-  it("loads the feed through the three viewer reads and one page of the feed", () => {
+  it("loads the feed through one bounded viewer-context RPC and one page of the feed", () => {
     const section = codeOf("app/(main)/PostsFeedSection.tsx");
     expect(section).not.toMatch(/\.from\(|\.rpc\(/);
     expect(section).toContain("loadFeedViewer(");
@@ -243,8 +243,10 @@ describe("publications-first Home: what Home reads", () => {
     expect(route).toContain("loadFeedViewer(");
 
     const viewer = codeOf("lib/feedViewer.ts");
+    // Two direct reads remain only as migration-lag compatibility; production
+    // prefers the single get_feed_viewer_context RPC.
     expect(viewer.match(/\.from\(/g) ?? []).toHaveLength(2);
-    expect(viewer).not.toMatch(/\.rpc\(/);
+    expect(viewer).toContain('rpc("get_feed_viewer_context"');
 
     const layout = codeOf("app/(main)/layout.tsx");
     expect(layout.match(/\.from\(/g) ?? []).toHaveLength(1);

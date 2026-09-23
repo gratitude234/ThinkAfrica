@@ -6,12 +6,9 @@ import { FeedDataError } from "@/lib/feedData";
 /**
  * Everything the feed needs to know about who is reading.
  *
- * Three reads, and only three: the topics the member chose, the writers they
- * follow, and who is on either side of a block. Before the publishing reset
- * (Phase 2F) Home issued nine parallel queries before its feed even started,
- * for a sidebar, a featured lead, banners, subscription tabs, activation and
- * retention. The Home feed and `/api/feed` both load their reader through
- * this, and lib/feedViewer.test.ts pins what it reads.
+ * The preferred path is one bounded RPC that returns interests, follows and
+ * both directions of the block graph. The compatibility path remains for the
+ * deployment window before the matching migration reaches production.
  */
 export interface FeedViewerContext {
   userId: string | null;
@@ -22,6 +19,29 @@ export interface FeedViewerContext {
 
 interface FeedViewerClient {
   from: (table: string) => any;
+  rpc?: (
+    fn: string,
+    params?: Record<string, unknown>
+  ) => PromiseLike<{ data: unknown; error?: unknown }>;
+}
+
+let warnedMissingContextRpc = false;
+
+function errorCode(error: unknown): string | undefined {
+  const source = error as { code?: unknown; cause?: unknown } | null;
+  if (typeof source?.code === "string" && source.code) return source.code;
+  const cause = source?.cause as { code?: unknown } | null | undefined;
+  return typeof cause?.code === "string" && cause.code ? cause.code : undefined;
+}
+
+function isMissingContextRpc(error: unknown): boolean {
+  return ["PGRST202", "42883"].includes(errorCode(error) ?? "");
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string" && Boolean(entry))
+    : [];
 }
 
 export function anonymousFeedViewer(): FeedViewerContext {
@@ -35,9 +55,40 @@ export async function loadFeedViewer(
 ): Promise<FeedViewerContext> {
   if (!userId) return anonymousFeedViewer();
 
-  // A depersonalized request, Explore's Trending shelf, keeps the block list
-  // and reads nothing else, so its later pages rank exactly like the
-  // anonymous first page. Blocking is never waived.
+  // One request replaces the old profile + follows + service-role block fan-out.
+  // The function itself is strict about identity and sees both directions of a
+  // block, so using it does not weaken trust-and-safety.
+  if (typeof supabase.rpc === "function") {
+    const result = await supabase.rpc("get_feed_viewer_context", {
+      p_user_id: userId,
+      p_personalized: personalized,
+    });
+
+    if (!result.error && Array.isArray(result.data) && result.data.length > 0) {
+      const row = result.data[0] as Record<string, unknown>;
+      return {
+        userId: personalized ? userId : null,
+        userInterests: personalized ? stringArray(row.user_interests) : [],
+        followedIds: personalized ? stringArray(row.followed_ids) : [],
+        excludedAuthorIds: stringArray(row.excluded_author_ids),
+      };
+    }
+
+    if (result.error && isMissingContextRpc(result.error)) {
+      if (!warnedMissingContextRpc) {
+        warnedMissingContextRpc = true;
+        console.warn(
+          "[feed-viewer] get_feed_viewer_context is not installed yet; using compatibility reads",
+          result.error
+        );
+      }
+    } else if (result.error) {
+      throw new FeedDataError("load feed viewer context", result.error);
+    }
+  }
+
+  // Compatibility path for migration lag. A depersonalized request keeps the
+  // strict block list and reads nothing else.
   if (!personalized) {
     return {
       ...anonymousFeedViewer(),

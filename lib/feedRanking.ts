@@ -1,71 +1,120 @@
 import type { PostCardData } from "@/components/post/PostCard";
 
 /**
- * The For You ranking, kept deliberately small.
+ * Indegenius For You v4.
  *
- * Until the publishing reset (Phase 2F) this was a five-feature model with
- * learned reader affinity, per-viewer fatigue, an exploration lane, a
- * same-university bonus and an evidence feature built on citation ids and
- * formal review. Most of those inputs came from products that no longer exist,
- * and the rest made the feed hard to explain. What is left is three things a
- * reader can reason about:
+ * Ranking is deliberately split into two jobs:
+ *   1. score publications using bounded, explainable reader/content signals;
+ *   2. compose each screen from soft candidate lanes so fresh/discovery work
+ *      cannot be starved by already-popular publications.
  *
- *   - relevance: whether they follow the writer, and whether the post carries
- *     a topic they chose;
- *   - engagement: how often the people it was shown to read, liked or saved it;
- *   - freshness: how recently it was published.
- *
- * Blocked writers never reach this function: lib/feedData.ts excludes them in
- * the query. Following is reverse-chronological and does not pass through here
- * at all.
+ * Pagination stability is handled in lib/feedData.ts. The order produced here
+ * is frozen into the first page's snapshot cursor and is never recomputed for
+ * later pages in the same feed session.
  */
+
+export interface ViewerPostEngagementSignal {
+  impressions: number;
+  hasRead: boolean;
+}
 
 export interface RankingContext {
   userId: string | null;
   followedIds: Set<string>;
-  /** The topics the reader chose, as stored. Compared case-insensitively. */
+  /** The topics the reader explicitly chose, compared case-insensitively. */
   userInterests: string[];
+  /** Learned from qualified reads over the recent affinity window, normalized 0..1. */
+  authorAffinity?: Map<string, number>;
+  /** Learned from qualified reads over the recent affinity window, normalized 0..1. */
+  topicAffinity?: Map<string, number>;
+  /** Per-viewer exposure/read history used only as a fatigue/novelty signal. */
+  viewerEngagement?: Map<string, ViewerPostEngagementSignal>;
+  /** Freezes all time-based scoring for one feed snapshot. */
+  snapshotAt?: string | number | Date;
 }
 
 export type RankablePost = PostCardData;
 
-/** How the three features combine into a 0..100 score. */
+export type HybridCandidateSource =
+  | "for_you_personalized"
+  | "for_you_fresh"
+  | "for_you_discovery"
+  | "for_you_trending"
+  | "for_you_evergreen";
+
+/** v4 weights. Fresh content also has a guaranteed lane; freshness is not its only chance. */
 export const SCORE_WEIGHTS = {
-  relevance: 0.35,
-  engagement: 0.3,
-  freshness: 0.35,
+  relevance: 0.3,
+  satisfaction: 0.25,
+  freshness: 0.2,
+  writerAffinity: 0.1,
+  novelty: 0.1,
+  exploration: 0.05,
 } as const;
 
-/** Following a writer says more than sharing a topic with them. */
+/** Following has its own chronological tab, so topics carry more weight here. */
 export const RELEVANCE_WEIGHTS = {
-  followedAuthor: 0.6,
-  topic: 0.4,
+  followedAuthor: 0.35,
+  topic: 0.65,
 } as const;
 
 /**
- * A finished read is the strongest signal a post was worth the time, a save
- * the next, a like the lightest. Views are not here: a view says the headline
- * worked, not that the piece did.
+ * Qualified reads and saves are stronger than lightweight reactions.
+ * All rates are normalized against exposure and Bayesian-smoothed below.
  */
-export const ENGAGEMENT_WEIGHTS = {
+export const SATISFACTION_WEIGHTS = {
   reads: 0.45,
-  likes: 0.3,
-  bookmarks: 0.25,
+  bookmarks: 0.3,
+  comments: 0.15,
+  likes: 0.1,
 } as const;
 
-/** A post loses half its freshness every day and a half. */
-export const FRESHNESS_HALF_LIFE_HOURS = 36;
+/** A publication loses half of its freshness every two days. */
+export const FRESHNESS_HALF_LIFE_HOURS = 48;
 
 /**
- * How much exposure a post is assumed to have had before its action rate is
- * taken at face value. Without it, one like on a post nobody has been shown
- * saturates the feature, and two friends can move a post as far as a real
- * audience can.
+ * Exposure assumed before observed rates are trusted. This prevents one early
+ * action from making a nearly-unseen publication look universally loved.
  */
-export const PRIOR_EXPOSURES = 100;
+export const PRIOR_EXPOSURES = 75;
+
+/** New publications stay eligible for the exploration lane until this many exposures. */
+export const EXPLORATION_IMPRESSION_BUDGET = 100;
+export const FRESH_LANE_HOURS = 48;
+export const TRENDING_LANE_HOURS = 7 * 24;
+export const EVERGREEN_MIN_AGE_HOURS = 7 * 24;
 
 export const DIVERSITY_WINDOW_SIZE = 12;
 export const MAX_POSTS_PER_AUTHOR_PER_WINDOW = 2;
+/** Soft topic cap so one interest cannot monopolize an entire screen. */
+export const MAX_POSTS_PER_TOPIC_PER_WINDOW = 4;
+
+/** Soft target mix for each 12-card window. Any empty lane is backfilled by score. */
+export const FEED_LANE_TARGETS: ReadonlyArray<
+  readonly [HybridCandidateSource, number]
+> = [
+  ["for_you_personalized", 4],
+  ["for_you_fresh", 3],
+  ["for_you_discovery", 2],
+  ["for_you_trending", 1],
+  ["for_you_evergreen", 1],
+] as const;
+
+/** Interleaves the lanes instead of rendering four personalized cards, then three fresh, etc. */
+const FEED_LANE_SCHEDULE: ReadonlyArray<HybridCandidateSource | null> = [
+  "for_you_personalized",
+  "for_you_fresh",
+  "for_you_personalized",
+  "for_you_discovery",
+  "for_you_personalized",
+  "for_you_fresh",
+  "for_you_trending",
+  "for_you_personalized",
+  "for_you_discovery",
+  "for_you_fresh",
+  "for_you_evergreen",
+  null,
+];
 
 function nonNegativeFinite(value: number | null | undefined): number {
   return typeof value === "number" && Number.isFinite(value)
@@ -73,10 +122,13 @@ function nonNegativeFinite(value: number | null | undefined): number {
     : 0;
 }
 
+function bounded01(value: number | null | undefined): number {
+  return Math.max(0, Math.min(1, nonNegativeFinite(value)));
+}
+
 /**
- * A bounded action rate. Impressions only ever appear in the denominator, so
- * being shown more can never raise a post's score by itself, and the
- * exponential gives each further action less weight than the one before.
+ * Bounded action rate with a prior. Impressions only ever appear in the
+ * denominator, so simply being shown more cannot increase satisfaction.
  */
 function boundedActionRate(
   actions: number | null | undefined,
@@ -94,55 +146,134 @@ function normalizeTopic(value: string): string {
   return value.trim().toLocaleLowerCase("en");
 }
 
+function snapshotMs(ctx: RankingContext): number {
+  const raw = ctx.snapshotAt ?? Date.now();
+  const value = raw instanceof Date ? raw.getTime() : typeof raw === "number" ? raw : Date.parse(raw);
+  return Number.isFinite(value) ? value : Date.now();
+}
+
+function ageHours(post: RankablePost, ctx: RankingContext): number {
+  const publishedAtMs = Date.parse(post.published_at ?? post.created_at);
+  if (!Number.isFinite(publishedAtMs)) return Number.POSITIVE_INFINITY;
+  return Math.max(0, (snapshotMs(ctx) - publishedAtMs) / 3_600_000);
+}
+
+function explicitTopicMatch(post: RankablePost, ctx: RankingContext): boolean {
+  const interests = new Set(ctx.userInterests.map(normalizeTopic).filter(Boolean));
+  return (
+    interests.size > 0 &&
+    (post.tags ?? []).some((tag) => interests.has(normalizeTopic(tag)))
+  );
+}
+
 function getRelevance(post: RankablePost, ctx: RankingContext): number {
   const authorId = post.author_id ?? "";
-  const interests = new Set(
-    ctx.userInterests.map(normalizeTopic).filter(Boolean)
-  );
-  const topicMatch =
-    interests.size > 0 &&
-    (post.tags ?? []).some((tag) => interests.has(normalizeTopic(tag)));
-
-  let relevance = topicMatch ? RELEVANCE_WEIGHTS.topic : 0;
+  let relevance = explicitTopicMatch(post, ctx) ? RELEVANCE_WEIGHTS.topic : 0;
   if (authorId && ctx.followedIds.has(authorId)) {
     relevance += RELEVANCE_WEIGHTS.followedAuthor;
   }
   return Math.min(1, relevance);
 }
 
-function getEngagement(post: RankablePost): number {
+function getSatisfaction(post: RankablePost): number {
   const impressions = nonNegativeFinite(post.impression_count);
   return (
-    boundedActionRate(post.read_count, impressions, 0.25) *
-      ENGAGEMENT_WEIGHTS.reads +
-    boundedActionRate(post.like_count, impressions, 0.06) *
-      ENGAGEMENT_WEIGHTS.likes +
-    boundedActionRate(post.bookmark_count, impressions, 0.025) *
-      ENGAGEMENT_WEIGHTS.bookmarks
+    boundedActionRate(post.read_count, impressions, 0.22) *
+      SATISFACTION_WEIGHTS.reads +
+    boundedActionRate(post.bookmark_count, impressions, 0.035) *
+      SATISFACTION_WEIGHTS.bookmarks +
+    boundedActionRate(post.comment_count, impressions, 0.025) *
+      SATISFACTION_WEIGHTS.comments +
+    boundedActionRate(post.like_count, impressions, 0.07) *
+      SATISFACTION_WEIGHTS.likes
   );
 }
 
-function getFreshness(post: RankablePost): number {
-  const publishedAtMs = Date.parse(post.published_at ?? post.created_at);
-  if (!Number.isFinite(publishedAtMs)) return 0;
-
-  const ageHours = Math.max(0, (Date.now() - publishedAtMs) / 3_600_000);
-  return Math.pow(0.5, ageHours / FRESHNESS_HALF_LIFE_HOURS);
+function getFreshness(post: RankablePost, ctx: RankingContext): number {
+  const hours = ageHours(post, ctx);
+  if (!Number.isFinite(hours)) return 0;
+  return Math.pow(0.5, hours / FRESHNESS_HALF_LIFE_HOURS);
 }
 
-/** A 0..100 score from three independent, bounded features. */
-export function scorePost(post: RankablePost, ctx: RankingContext): number {
-  return (
+function getWriterAffinity(post: RankablePost, ctx: RankingContext): number {
+  const authorId = post.author_id?.trim();
+  const author = authorId ? bounded01(ctx.authorAffinity?.get(authorId)) : 0;
+  let topic = 0;
+  for (const tag of post.tags ?? []) {
+    topic = Math.max(topic, bounded01(ctx.topicAffinity?.get(normalizeTopic(tag))));
+  }
+  // A learned writer relationship is stronger than a learned topic relationship.
+  return Math.min(1, author * 0.65 + topic * 0.35);
+}
+
+function getNovelty(post: RankablePost, ctx: RankingContext): number {
+  const signal = ctx.viewerEngagement?.get(post.id);
+  if (!signal) return 1;
+  if (signal.hasRead) return 0.15;
+  if (signal.impressions <= 0) return 1;
+  if (signal.impressions === 1) return 0.8;
+  if (signal.impressions === 2) return 0.55;
+  return 0.3;
+}
+
+function getExploration(post: RankablePost, ctx: RankingContext): number {
+  const hours = ageHours(post, ctx);
+  if (!Number.isFinite(hours) || hours > FRESH_LANE_HOURS) return 0;
+  const impressions = nonNegativeFinite(post.impression_count);
+  if (impressions >= EXPLORATION_IMPRESSION_BUDGET) return 0;
+
+  const exposureNeed = 1 - impressions / EXPLORATION_IMPRESSION_BUDGET;
+  return bounded01(exposureNeed * getFreshness(post, ctx));
+}
+
+export interface FeedScoreBreakdown {
+  relevance: number;
+  satisfaction: number;
+  freshness: number;
+  writerAffinity: number;
+  novelty: number;
+  exploration: number;
+  total: number;
+}
+
+export function scorePostBreakdown(
+  post: RankablePost,
+  ctx: RankingContext
+): FeedScoreBreakdown {
+  const relevance = getRelevance(post, ctx);
+  const satisfaction = getSatisfaction(post);
+  const freshness = getFreshness(post, ctx);
+  const writerAffinity = getWriterAffinity(post, ctx);
+  const novelty = getNovelty(post, ctx);
+  const exploration = getExploration(post, ctx);
+  const total =
     100 *
-    (getRelevance(post, ctx) * SCORE_WEIGHTS.relevance +
-      getEngagement(post) * SCORE_WEIGHTS.engagement +
-      getFreshness(post) * SCORE_WEIGHTS.freshness)
-  );
+    (relevance * SCORE_WEIGHTS.relevance +
+      satisfaction * SCORE_WEIGHTS.satisfaction +
+      freshness * SCORE_WEIGHTS.freshness +
+      writerAffinity * SCORE_WEIGHTS.writerAffinity +
+      novelty * SCORE_WEIGHTS.novelty +
+      exploration * SCORE_WEIGHTS.exploration);
+
+  return {
+    relevance,
+    satisfaction,
+    freshness,
+    writerAffinity,
+    novelty,
+    exploration,
+    total,
+  };
+}
+
+export function scorePost(post: RankablePost, ctx: RankingContext): number {
+  return scorePostBreakdown(post, ctx).total;
 }
 
 interface ScoredPost<T extends RankablePost> {
   post: T;
   score: number;
+  breakdown: FeedScoreBreakdown;
 }
 
 function publishedAtMs(post: RankablePost): number {
@@ -155,40 +286,183 @@ function compareIds(left: string, right: string): number {
   return left < right ? -1 : 1;
 }
 
+function sortScored<T extends RankablePost>(items: Array<ScoredPost<T>>) {
+  return items.sort((left, right) => {
+    if (right.score !== left.score) return right.score - left.score;
+    const dateDifference = publishedAtMs(right.post) - publishedAtMs(left.post);
+    if (dateDifference !== 0) return dateDifference;
+    return compareIds(left.post.id, right.post.id);
+  });
+}
+
+function isFresh<T extends RankablePost>(candidate: ScoredPost<T>, ctx: RankingContext) {
+  return (
+    ageHours(candidate.post, ctx) <= FRESH_LANE_HOURS &&
+    nonNegativeFinite(candidate.post.impression_count) < EXPLORATION_IMPRESSION_BUDGET
+  );
+}
+
+function isPersonalized<T extends RankablePost>(candidate: ScoredPost<T>) {
+  return candidate.breakdown.relevance > 0 || candidate.breakdown.writerAffinity >= 0.15;
+}
+
+function isTrending<T extends RankablePost>(candidate: ScoredPost<T>, ctx: RankingContext) {
+  return (
+    ageHours(candidate.post, ctx) <= TRENDING_LANE_HOURS &&
+    candidate.breakdown.satisfaction >= 0.18
+  );
+}
+
+function isEvergreen<T extends RankablePost>(candidate: ScoredPost<T>, ctx: RankingContext) {
+  return (
+    ageHours(candidate.post, ctx) >= EVERGREEN_MIN_AGE_HOURS &&
+    candidate.breakdown.satisfaction >= 0.18
+  );
+}
+
+function isDiscovery<T extends RankablePost>(candidate: ScoredPost<T>, ctx: RankingContext) {
+  const authorId = candidate.post.author_id?.trim();
+  const viewerSignal = ctx.viewerEngagement?.get(candidate.post.id);
+  return (
+    (!authorId || !ctx.followedIds.has(authorId)) &&
+    !viewerSignal?.hasRead &&
+    candidate.breakdown.novelty >= 0.55
+  );
+}
+
+function matchesLane<T extends RankablePost>(
+  candidate: ScoredPost<T>,
+  source: HybridCandidateSource,
+  ctx: RankingContext
+): boolean {
+  switch (source) {
+    case "for_you_fresh":
+      return isFresh(candidate, ctx);
+    case "for_you_discovery":
+      return isDiscovery(candidate, ctx);
+    case "for_you_trending":
+      return isTrending(candidate, ctx);
+    case "for_you_evergreen":
+      return isEvergreen(candidate, ctx);
+    case "for_you_personalized":
+      return isPersonalized(candidate);
+  }
+}
+
+function inferredSource<T extends RankablePost>(
+  candidate: ScoredPost<T>,
+  ctx: RankingContext
+): HybridCandidateSource {
+  if (isFresh(candidate, ctx)) return "for_you_fresh";
+  if (isPersonalized(candidate)) return "for_you_personalized";
+  if (isTrending(candidate, ctx)) return "for_you_trending";
+  if (isEvergreen(candidate, ctx)) return "for_you_evergreen";
+  return "for_you_discovery";
+}
+
+function authorKey(post: RankablePost): string {
+  return post.author_id?.trim() || `post:${post.id}`;
+}
+
+function topicKey(post: RankablePost): string {
+  const topic = (post.tags ?? []).map(normalizeTopic).find(Boolean);
+  // Untagged publications should not suppress one another as though "untagged"
+  // were a topic. Give each one a private diversity key instead.
+  return topic || `post:${post.id}`;
+}
+
 /**
- * Keeps one prolific writer from filling a screen: at most two posts per
- * author in each block of twelve. It is a preference rather than a filter.
- * When inventory cannot satisfy it, the next highest-scoring post is used, so
- * no post is ever dropped.
+ * Pick one candidate while respecting author diversity and avoiding the same
+ * writer twice in a row. The constraints are preferences: if inventory is too
+ * thin, the caller eventually falls back to the highest-scoring remaining row.
  */
-function diversify<T extends RankablePost>(
-  sorted: Array<ScoredPost<T>>
-): Array<ScoredPost<T>> {
+function findEligibleIndex<T extends RankablePost>(
+  remaining: Array<ScoredPost<T>>,
+  authorCounts: Map<string, number>,
+  topicCounts: Map<string, number>,
+  previousAuthor: string | null,
+  predicate: (candidate: ScoredPost<T>) => boolean
+): number {
+  const strict = remaining.findIndex((candidate) => {
+    const key = authorKey(candidate.post);
+    const topic = topicKey(candidate.post);
+    return (
+      predicate(candidate) &&
+      (authorCounts.get(key) ?? 0) < MAX_POSTS_PER_AUTHOR_PER_WINDOW &&
+      (topicCounts.get(topic) ?? 0) < MAX_POSTS_PER_TOPIC_PER_WINDOW &&
+      key !== previousAuthor
+    );
+  });
+  if (strict >= 0) return strict;
+
+  return remaining.findIndex((candidate) => {
+    const key = authorKey(candidate.post);
+    const topic = topicKey(candidate.post);
+    return (
+      predicate(candidate) &&
+      (authorCounts.get(key) ?? 0) < MAX_POSTS_PER_AUTHOR_PER_WINDOW &&
+      (topicCounts.get(topic) ?? 0) < MAX_POSTS_PER_TOPIC_PER_WINDOW
+    );
+  });
+}
+
+/**
+ * Soft-lane feed composition. In a healthy inventory each 12-card screen aims
+ * for 4 personalized, 3 fresh, 2 discovery, 1 trending and 1 evergreen card;
+ * the final slot (and every unavailable lane) is filled by overall score.
+ */
+function composeHybridFeed<T extends RankablePost>(
+  sorted: Array<ScoredPost<T>>,
+  ctx: RankingContext
+): T[] {
   const remaining = [...sorted];
-  const result: Array<ScoredPost<T>> = [];
-  let authorCounts = new Map<string, number>();
+  const result: T[] = [];
 
   while (remaining.length > 0) {
-    if (result.length % DIVERSITY_WINDOW_SIZE === 0) {
-      authorCounts = new Map();
+    const authorCounts = new Map<string, number>();
+    const topicCounts = new Map<string, number>();
+    let previousAuthor: string | null = null;
+    let placedInWindow = 0;
+
+    const place = (index: number, source: HybridCandidateSource) => {
+      const [candidate] = remaining.splice(index, 1);
+      const key = authorKey(candidate.post);
+      authorCounts.set(key, (authorCounts.get(key) ?? 0) + 1);
+      const topic = topicKey(candidate.post);
+      topicCounts.set(topic, (topicCounts.get(topic) ?? 0) + 1);
+      previousAuthor = key;
+      result.push({
+        ...candidate.post,
+        score: candidate.score,
+        candidate_source: source,
+      });
+      placedInWindow += 1;
+    };
+
+    for (const source of FEED_LANE_SCHEDULE) {
+      if (!source || remaining.length === 0) continue;
+      const index = findEligibleIndex(
+        remaining,
+        authorCounts,
+        topicCounts,
+        previousAuthor,
+        (candidate) => matchesLane(candidate, source, ctx)
+      );
+      if (index >= 0) place(index, source);
     }
 
-    // A post with no author is its own key rather than grouped with every
-    // other one, which is the least surprising fallback for malformed rows.
-    const authorKey = (candidate: ScoredPost<T>) =>
-      candidate.post.author_id?.trim() || `post:${candidate.post.id}`;
-
-    let nextIndex = remaining.findIndex(
-      (candidate) =>
-        (authorCounts.get(authorKey(candidate)) ?? 0) <
-        MAX_POSTS_PER_AUTHOR_PER_WINDOW
-    );
-    if (nextIndex < 0) nextIndex = 0;
-
-    const [next] = remaining.splice(nextIndex, 1);
-    const key = authorKey(next);
-    authorCounts.set(key, (authorCounts.get(key) ?? 0) + 1);
-    result.push(next);
+    while (placedInWindow < DIVERSITY_WINDOW_SIZE && remaining.length > 0) {
+      let index = findEligibleIndex(
+        remaining,
+        authorCounts,
+        topicCounts,
+        previousAuthor,
+        () => true
+      );
+      if (index < 0) index = 0;
+      const candidate = remaining[index];
+      place(index, inferredSource(candidate, ctx));
+    }
   }
 
   return result;
@@ -198,16 +472,13 @@ export function rankPosts<T extends RankablePost>(
   posts: T[],
   ctx: RankingContext
 ): T[] {
-  const scored = posts
-    .map((post) => ({ post, score: scorePost(post, ctx) }))
-    .sort((left, right) => {
-      if (right.score !== left.score) return right.score - left.score;
+  const scored = sortScored(
+    posts.map((post) => ({
+      post,
+      score: scorePost(post, ctx),
+      breakdown: scorePostBreakdown(post, ctx),
+    }))
+  );
 
-      const dateDifference = publishedAtMs(right.post) - publishedAtMs(left.post);
-      if (dateDifference !== 0) return dateDifference;
-
-      return compareIds(left.post.id, right.post.id);
-    });
-
-  return diversify(scored).map(({ post, score }) => ({ ...post, score }));
+  return composeHybridFeed(scored, ctx);
 }
