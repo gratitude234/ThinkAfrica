@@ -134,7 +134,7 @@ export async function proxy(request: NextRequest) {
         return supabaseResponse;
       }
     } else {
-      claims = (result.data.claims ?? null) as Record<string, unknown> | null;
+      claims = (result.data?.claims ?? null) as Record<string, unknown> | null;
     }
   } catch (error) {
     if (isRetryableAuthFailure(error)) {

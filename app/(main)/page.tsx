@@ -55,9 +55,8 @@ export default async function HomePage({ searchParams }: PageProps) {
   const { guest, tab, type, timeframe, source, welcome } = await searchParams;
   const supabase = await createClient();
 
-  const {
-    data: { claims },
-  } = await supabase.auth.getClaims();
+  const claimsResult = await supabase.auth.getClaims();
+  const claims = claimsResult.data?.claims ?? null;
   const userId = typeof claims?.sub === "string" ? claims.sub : null;
 
   if (!userId && guest !== "1") {

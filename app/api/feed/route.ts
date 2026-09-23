@@ -85,9 +85,8 @@ export async function GET(request: NextRequest) {
         ? requestedFeedSessionId
         : undefined;
 
-    const {
-      data: { claims },
-    } = await supabase.auth.getClaims();
+    const claimsResult = await supabase.auth.getClaims();
+    const claims = claimsResult.data?.claims ?? null;
     const userId = typeof claims?.sub === "string" ? claims.sub : null;
 
     const viewer = await loadFeedViewer(supabase, userId, {

@@ -65,9 +65,8 @@ export async function POST(request: Request) {
   }
 
   const supabase = await createClient();
-  const {
-    data: { claims },
-  } = await supabase.auth.getClaims();
+  const claimsResult = await supabase.auth.getClaims();
+  const claims = claimsResult.data?.claims ?? null;
   const userId = typeof claims?.sub === "string" ? claims.sub : null;
 
   if (!userId && ANONYMOUS_VIEW_EVENTS.has(body.event)) {
