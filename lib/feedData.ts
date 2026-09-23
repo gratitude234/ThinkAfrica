@@ -209,9 +209,10 @@ function getCursorContext(
 }
 
 function canonicalTimestamp(value: unknown): string | null {
-  if (typeof value !== "string" || !Number.isFinite(Date.parse(value))) return null;
-  const canonical = new Date(value).toISOString();
-  return canonical === value ? canonical : null;
+  if (typeof value !== "string") return null;
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return null;
+  return new Date(timestamp).toISOString();
 }
 
 function getCursorSigningSecret(): string {

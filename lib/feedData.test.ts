@@ -411,6 +411,27 @@ describe("fetchFeedPage -- correctness contracts", () => {
     expect((cardCall?.[1] as { p_post_ids: string[] }).p_post_ids).toHaveLength(12);
   });
 
+  it("accepts PostgREST +00:00 timestamps when minting the For You continuation cursor", async () => {
+    const rows = Array.from({ length: RANKED_FEED_WINDOW + 1 }, (_, index) => {
+      const row = rankedRow(index);
+      return {
+        ...row,
+        published_at: String(row.published_at).replace(".000Z", "+00:00"),
+        created_at: String(row.created_at).replace(".000Z", "+00:00"),
+      };
+    });
+
+    const page = await fetchFeedPage({
+      ...forYou,
+      supabase: feedSupabase(rows).supabase as never,
+      pageSize: 12,
+    });
+
+    expect(page.posts).toHaveLength(12);
+    expect(page.hasMore).toBe(true);
+    expect(page.nextCursor).toMatch(/^fy4\./);
+  });
+
   it("falls back to a small strict chronological page when the broad candidate read times out", async () => {
     const rows = Array.from({ length: 40 }, (_, index) => rankedRow(index));
     const { supabase, postQueries } = feedSupabase(rows, {
@@ -458,6 +479,39 @@ describe("fetchFeedPage -- Following", () => {
     expect(secondPage.hasMore).toBe(false);
     expect(secondPage.nextCursor).toBeNull();
     expect(second.postQueries[0].keysetFilters).toHaveLength(1);
+  });
+
+  it("accepts PostgREST +00:00 timestamps in Following cursors and normalizes them", async () => {
+    const rows = Array.from({ length: 3 }, (_, index) => {
+      const row = rankedRow(index);
+      return {
+        ...row,
+        published_at: String(row.published_at).replace(".000Z", "+00:00"),
+        created_at: String(row.created_at).replace(".000Z", "+00:00"),
+      };
+    });
+
+    const firstPage = await fetchFeedPage({
+      ...following,
+      supabase: feedSupabase(rows).supabase as never,
+      pageSize: 2,
+    });
+
+    expect(firstPage.nextCursor).toEqual(expect.any(String));
+
+    const payload = JSON.parse(
+      Buffer.from(firstPage.nextCursor!, "base64url").toString("utf8")
+    ) as { publishedAt: string };
+    expect(payload.publishedAt).toMatch(/\.000Z$/);
+
+    const secondPage = await fetchFeedPage({
+      ...following,
+      supabase: feedSupabase(rows).supabase as never,
+      pageSize: 2,
+      cursor: firstPage.nextCursor,
+    });
+
+    expect(secondPage.posts.map((post) => post.id)).toEqual(["p2"]);
   });
 
   it("uses id to continue safely when published_at values tie", async () => {
