@@ -1,3 +1,12 @@
+# 24 September 2026 — Feed viewer-context resilience
+
+- Added a first-class feed viewer-context repository with Supabase RPC and direct PostgreSQL implementations.
+- Made viewer context part of the existing `feed` read-migration domain so a direct-SQL feed no longer keeps a hidden PostgREST dependency.
+- Added an explicit `FEED_VIEWER_POSTGRES_FAILOVER=1` transport escape hatch for verified production-safe `DATABASE_URL` targets; transient Supabase timeouts can fail over without weakening block exclusions.
+- Kept missing-RPC compatibility reads for migration lag and preserved fail-closed block handling.
+- Extended the live feed parity suite to compare Supabase RPC and direct PostgreSQL viewer context, including depersonalized block exclusions.
+- Reworded the Home error state so backend outages are not misreported as the reader's internet connection.
+
 # 24 September 2026 — Home feed switcher UX polish
 
 - Rebuilt the Home `For You` / `Following` control as a balanced 50/50 switcher instead of a left-clustered, horizontally scrollable tab row.

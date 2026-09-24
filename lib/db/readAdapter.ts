@@ -14,6 +14,11 @@ import {
   type FeedRepository,
 } from "@/lib/db/feed";
 import {
+  createPostgresFeedViewerRepository,
+  createSupabaseFeedViewerRepository,
+  type FeedViewerRepository,
+} from "@/lib/db/feedViewer";
+import {
   createPostgresComposerRepository,
   createSupabaseComposerRepository,
   type ComposerRepository,
@@ -178,6 +183,29 @@ export function feedRepository(
   return isReadDomainMigrated("feed")
     ? createPostgresFeedRepository(resolvePostgresExecutor())
     : createSupabaseFeedRepository(viewerClient ?? reader);
+}
+
+/**
+ * The feed's viewer context shares the `feed` domain with candidate selection
+ * and hydration. Before this repository existed, enabling the direct-SQL feed
+ * still left Home dependent on `get_feed_viewer_context` over PostgREST, which
+ * meant one gateway timeout could blank the whole page.
+ */
+export function feedViewerRepository(
+  supabase: SupabaseClient
+): FeedViewerRepository {
+  return isReadDomainMigrated("feed")
+    ? createPostgresFeedViewerRepository(resolvePostgresExecutor())
+    : createSupabaseFeedViewerRepository(supabase);
+}
+
+/**
+ * Explicit alternate transport used only by the viewer-context failover. It is
+ * intentionally not automatic for the rest of the feed: DATABASE_URL may point
+ * at a migration target that is not yet safe to serve production reads.
+ */
+export function postgresFeedViewerRepository(): FeedViewerRepository {
+  return createPostgresFeedViewerRepository(resolvePostgresExecutor());
 }
 
 /**

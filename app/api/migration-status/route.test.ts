@@ -49,6 +49,7 @@ describe("the migration status endpoint", () => {
   it("reports nothing migrated when the flag is unset, and does not probe", async () => {
     process.env.ADMIN_SECRET = "the-secret";
     delete process.env.READ_MIGRATED_DOMAINS;
+    delete process.env.FEED_VIEWER_POSTGRES_FAILOVER;
     delete process.env.DATABASE_URL;
 
     const response = await call({ "x-internal-secret": "the-secret" });
@@ -60,6 +61,21 @@ describe("the migration status endpoint", () => {
     // Resolving the executor without DATABASE_URL throws by design, so the
     // probe must not run merely because someone asked for status.
     expect(body.database.probed).toBe(false);
+  });
+
+  it("reports the feed viewer failover flag from the running deployment", async () => {
+    process.env.ADMIN_SECRET = "the-secret";
+    process.env.FEED_VIEWER_POSTGRES_FAILOVER = "1";
+    delete process.env.READ_MIGRATED_DOMAINS;
+    delete process.env.DATABASE_URL;
+
+    const body = await (await call({ "x-internal-secret": "the-secret" })).json();
+    expect(body.flags.feedViewerPostgresFailover).toBe("1");
+    expect(body.migratedCount).toBe(0);
+    // Arming the failover makes the direct database a live dependency, so the
+    // status endpoint probes it even though no whole read domain has moved.
+    expect(body.database.probed).toBe(true);
+    expect(body.database.ok).toBe(false);
   });
 
   it("reports a domain as migrated once the flag names it", async () => {

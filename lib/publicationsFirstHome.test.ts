@@ -243,10 +243,15 @@ describe("publications-first Home: what Home reads", () => {
     expect(route).toContain("loadFeedViewer(");
 
     const viewer = codeOf("lib/feedViewer.ts");
-    // Two direct reads remain only as migration-lag compatibility; production
-    // prefers the single get_feed_viewer_context RPC.
+    // Two direct reads remain only as migration-lag compatibility. The bounded
+    // RPC/direct-SQL implementations now live behind the feed repository.
     expect(viewer.match(/\.from\(/g) ?? []).toHaveLength(2);
-    expect(viewer).toContain('rpc("get_feed_viewer_context"');
+    expect(viewer).toContain("feedViewerRepository(");
+
+    const viewerRepository = codeOf("lib/db/feedViewer.ts");
+    expect(viewerRepository).toContain('rpc("get_feed_viewer_context"');
+    expect(viewerRepository).toContain("public.user_blocks");
+    expect(viewerRepository).toContain("public.follows");
 
     const layout = codeOf("app/(main)/layout.tsx");
     expect(layout.match(/\.from\(/g) ?? []).toHaveLength(1);

@@ -15,6 +15,14 @@ PostgREST while staying on the same Supabase database. Phase D moves the
 *database* to Neon. Those are different cutovers and the evidence for one does
 not transfer to the other.
 
+**Feed viewer failover.** `FEED_VIEWER_POSTGRES_FAILOVER=1` is an emergency
+transport fallback for the small signed-in viewer-context read only. Leave it
+unset unless `DATABASE_URL` has been verified as a production-safe target. It
+is not a substitute for the `feed` domain cutover: once
+`READ_MIGRATED_DOMAINS` includes `feed`, viewer context follows that domain and
+uses PostgreSQL as its normal transport together with feed listing/hydration.
+
+
 ---
 
 ## Step 0. Restore local database access

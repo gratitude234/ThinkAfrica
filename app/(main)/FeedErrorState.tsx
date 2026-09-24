@@ -19,7 +19,7 @@ export default function FeedErrorState({ onRetry }: { onRetry: () => void }) {
         />
       </svg>
       <h2 className="text-base font-semibold text-ink">Couldn&apos;t load your feed</h2>
-      <p className="mt-1 text-sm text-ink-muted">Check your connection and try again.</p>
+      <p className="mt-1 text-sm text-ink-muted">We&apos;re having trouble loading publications right now. Please try again.</p>
       <button
         type="button"
         onClick={onRetry}

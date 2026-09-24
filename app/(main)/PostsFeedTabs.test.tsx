@@ -487,7 +487,7 @@ describe("PostsFeedTabs -- error and retry states", () => {
     await waitFor(() =>
       expect(screen.getByText("Couldn't load your feed")).toBeInTheDocument()
     );
-    expect(screen.getByText("Check your connection and try again.")).toBeInTheDocument();
+    expect(screen.getByText("We're having trouble loading publications right now. Please try again.")).toBeInTheDocument();
     expect(screen.queryByTestId("feed")).not.toBeInTheDocument();
 
     await act(async () => {

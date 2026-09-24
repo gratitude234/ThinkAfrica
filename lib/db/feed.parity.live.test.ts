@@ -36,12 +36,16 @@ const { createSupabaseFeedListRepository, createPostgresFeedListRepository } =
   await import("@/lib/db/feedList");
 const { createSupabaseFeedRepository, createPostgresFeedRepository } =
   await import("@/lib/db/feed");
+const { createSupabaseFeedViewerRepository, createPostgresFeedViewerRepository } =
+  await import("@/lib/db/feedViewer");
 const { adaptDriver } = await import("@/lib/db/postgres/executor");
 
 import { canonical, differences } from "@/lib/db/parityDiff";
 
 import type { FeedListCriteria, FeedListRepository } from "@/lib/db/feedList";
 import type { FeedRepository } from "@/lib/db/feed";
+import type { FeedViewerRepository } from "@/lib/db/feedViewer";
+import type { SqlExecutor } from "@/lib/db/postgres/executor";
 
 vi.setConfig({ testTimeout: 180_000 });
 
@@ -62,6 +66,9 @@ describe.skipIf(!enabled)("feed: PostgREST vs PostgreSQL, same database", () => 
   let listSql: FeedListRepository;
   let hydrateRest: FeedRepository;
   let hydrateSql: FeedRepository;
+  let viewerRest: FeedViewerRepository;
+  let viewerSql: FeedViewerRepository;
+  let executor: SqlExecutor;
 
   async function open() {
     const { default: postgres } = await import("postgres");
@@ -84,9 +91,11 @@ describe.skipIf(!enabled)("feed: PostgREST vs PostgreSQL, same database", () => 
     hydrateRest = createSupabaseFeedRepository(client);
 
     sql = await open();
-    const executor = adaptDriver(sql as never);
+    executor = adaptDriver(sql as never);
     listSql = createPostgresFeedListRepository(executor);
     hydrateSql = createPostgresFeedRepository(executor);
+    viewerRest = createSupabaseFeedViewerRepository(client);
+    viewerSql = createPostgresFeedViewerRepository(executor);
   }, 180_000);
 
   afterAll(async () => {
@@ -107,7 +116,6 @@ describe.skipIf(!enabled)("feed: PostgREST vs PostgreSQL, same database", () => 
   });
 
   it("agrees with a content kind, a cutoff and a limit", async () => {
-    const executor = adaptDriver(sql as never);
     const [kind] = await executor.query<{ content_kind: string }>(
       `select content_kind from public.posts
        where status = 'published' and content_kind is not null limit 1`
@@ -129,7 +137,6 @@ describe.skipIf(!enabled)("feed: PostgREST vs PostgreSQL, same database", () => 
   });
 
   it("agrees on the following tab's author restriction", async () => {
-    const executor = adaptDriver(sql as never);
     const authors = await executor.query<{ id: string }>(
       `select author_id::text as id from public.posts
        where status = 'published' and author_id is not null
@@ -184,7 +191,6 @@ describe.skipIf(!enabled)("feed: PostgREST vs PostgreSQL, same database", () => 
   });
 
   it("agrees on the excluded-credit lookup", async () => {
-    const executor = adaptDriver(sql as never);
     const authors = await executor.query<{ id: string }>(
       `select a.user_id::text as id from public.post_authors a
        where a.accepted_at is not null group by a.user_id limit 5`
@@ -198,6 +204,71 @@ describe.skipIf(!enabled)("feed: PostgREST vs PostgreSQL, same database", () => 
     ]);
 
     expect(canonical([...rest].sort())).toBe(canonical([...direct].sort()));
+  });
+
+  it("agrees on signed-in viewer context, including both block directions", async () => {
+    const members = await executor.query<{ id: string }>(
+      `select p.id::text as id
+       from public.profiles p
+       order by
+         (select count(*) from public.follows f where f.follower_id = p.id) desc,
+         (select count(*) from public.user_blocks b
+          where b.blocker_id = p.id or b.blocked_id = p.id) desc,
+         p.id
+       limit 5`
+    );
+
+    const mismatches: string[] = [];
+    for (const member of members) {
+      const [rest, direct] = await Promise.all([
+        viewerRest.load({ userId: member.id, personalized: true }),
+        viewerSql.load({ userId: member.id, personalized: true }),
+      ]);
+
+      const normalize = (value: Awaited<ReturnType<FeedViewerRepository["load"]>>) => ({
+        userInterests: [...value.userInterests],
+        followedIds: [...value.followedIds].sort(),
+        excludedAuthorIds: [...value.excludedAuthorIds].sort(),
+      });
+
+      if (canonical(normalize(rest)) !== canonical(normalize(direct))) {
+        // Avoid printing real relationship ids from production. A mismatch is
+        // identified by sample position and collection sizes only.
+        mismatches.push(
+          `sample ${members.indexOf(member)}: interests ${rest.userInterests.length}/${direct.userInterests.length}, ` +
+            `follows ${rest.followedIds.length}/${direct.followedIds.length}, ` +
+            `blocks ${rest.excludedAuthorIds.length}/${direct.excludedAuthorIds.length}`
+        );
+      }
+    }
+
+    expect(mismatches).toEqual([]);
+  });
+
+  it("keeps the same block exclusions when viewer personalization is disabled", async () => {
+    const [member] = await executor.query<{ id: string }>(
+      `select p.id::text as id
+       from public.profiles p
+       order by
+         (select count(*) from public.user_blocks b
+          where b.blocker_id = p.id or b.blocked_id = p.id) desc,
+         p.id
+       limit 1`
+    );
+    if (!member) return;
+
+    const [rest, direct] = await Promise.all([
+      viewerRest.load({ userId: member.id, personalized: false }),
+      viewerSql.load({ userId: member.id, personalized: false }),
+    ]);
+
+    expect(rest.userInterests).toEqual([]);
+    expect(rest.followedIds).toEqual([]);
+    expect(direct.userInterests).toEqual([]);
+    expect(direct.followedIds).toEqual([]);
+    expect([...rest.excludedAuthorIds].sort()).toEqual(
+      [...direct.excludedAuthorIds].sort()
+    );
   });
 
   it("agrees on the hydration for a real page of posts", async () => {

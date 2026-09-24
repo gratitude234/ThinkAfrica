@@ -52,22 +52,28 @@ export async function GET(request: NextRequest) {
     isReadDomainMigrated(domain)
   );
 
+  const feedViewerFailoverEnabled =
+    process.env.FEED_VIEWER_POSTGRES_FAILOVER === "1";
   const flags = {
     readMigratedDomains: process.env.READ_MIGRATED_DOMAINS ?? null,
+    feedViewerPostgresFailover: process.env.FEED_VIEWER_POSTGRES_FAILOVER ?? null,
     writeDatabaseAdapter: process.env.WRITE_DATABASE_ADAPTER ?? null,
     authAdapter: process.env.AUTH_ADAPTER ?? null,
     databaseAdapter: process.env.DATABASE_ADAPTER ?? null,
     writeFrozen: safely(() => isWriteFrozen()),
   };
 
-  // The live half. Only attempted when something is actually migrated, because
-  // resolving the executor with no DATABASE_URL throws by design.
+  // The live half. A direct database probe is required when at least one read
+  // domain is migrated OR the feed viewer emergency failover is armed. In both
+  // cases an invalid DATABASE_URL would turn a recovery path into another
+  // outage, so the status endpoint must make that visible before traffic does.
+  const postgresNeeded = migrated.length > 0 || feedViewerFailoverEnabled;
   let database: Record<string, unknown> = {
     probed: false,
-    reason: migrated.length === 0 ? "no migrated domains" : undefined,
+    reason: postgresNeeded ? undefined : "no PostgreSQL read path enabled",
   };
 
-  if (migrated.length > 0) {
+  if (postgresNeeded) {
     const started = Date.now();
     try {
       const executor = resolvePostgresExecutor();
