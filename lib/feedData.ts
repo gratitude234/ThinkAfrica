@@ -21,7 +21,7 @@ import type { HomeFeedTab } from "@/lib/homeFeedTabs";
  * - Following is a simple reverse-chronological keyset feed.
  * - For You is ranked once, then frozen into a signed snapshot cursor. Later
  *   pages resolve those exact ids instead of re-ranking a moving data set.
- * - v4.2 may reserve a small number of continuation-page slots for unseen
+ * - v4.2+ may reserve a small number of continuation-page slots for recent unread
  *   publications created after the snapshot. Those cards do not mutate or
  *   reorder the frozen sequence; the continuation simply consumes fewer of
  *   its ids and resumes them later.
@@ -920,7 +920,7 @@ async function loadLiveViewerEngagement(
     });
     if (response.error || !Array.isArray(response.data)) {
       console.warn(
-        "[feed-live-fresh] viewer exposure state unavailable; treating new publications as unseen"
+        "[feed-live-fresh] viewer exposure state unavailable; treating new publications as unread"
       );
       return result;
     }
@@ -934,7 +934,7 @@ async function loadLiveViewerEngagement(
     }
   } catch (error) {
     console.warn(
-      "[feed-live-fresh] viewer exposure lookup failed; treating new publications as unseen",
+      "[feed-live-fresh] viewer exposure lookup failed; treating new publications as unread",
       error
     );
   }
@@ -1025,15 +1025,15 @@ async function refreshLiveFreshState(
     eligibleWindow.map((row) => String(row.id ?? "")).filter(Boolean),
     snapshot.snapshotAt
   );
-  const unseen = eligibleWindow.filter((row) => {
+  const unread = eligibleWindow.filter((row) => {
     const signal = engagement.get(String(row.id ?? ""));
-    return !signal?.hasRead && (signal?.impressions ?? 0) <= 0;
+    return !signal?.hasRead;
   });
 
   // The live layer has one job: fair first circulation. Prefer publications
   // with the least global exposure, then the older item inside this very small
   // post-snapshot interval so a steady stream cannot starve its predecessors.
-  unseen.sort((left, right) => {
+  unread.sort((left, right) => {
     const leftImpressions = Math.max(0, Number(left.impression_count) || 0);
     const rightImpressions = Math.max(0, Number(right.impression_count) || 0);
     if (leftImpressions !== rightImpressions) {
@@ -1045,7 +1045,7 @@ async function refreshLiveFreshState(
   });
 
   const pendingSet = new Set(pending);
-  for (const row of unseen) {
+  for (const row of unread) {
     const id = String(row.id ?? "");
     if (!id || pendingSet.has(id)) continue;
     pending.push(id);
@@ -1505,6 +1505,6 @@ const fetchCachedPublicFeedPage = unstable_cache(
       null
     );
   },
-  ["public-feed-page-v4-2"],
+  ["public-feed-page-v4-3"],
   { revalidate: 30, tags: ["feed", "public-feed"] }
 );

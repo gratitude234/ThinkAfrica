@@ -249,6 +249,33 @@ describe("rankPosts", () => {
     );
   });
 
+  it("puts protected fresh content at the top when recent inventory exists", () => {
+    const fresh = post({
+      id: "just-published",
+      author_id: "new-author",
+      published_at: hoursAgo(1),
+      created_at: hoursAgo(1),
+      impression_count: 0,
+    });
+    const oldWinners = Array.from({ length: 12 }, (_, index) =>
+      post({
+        id: `month-old-${index}`,
+        author_id: `month-old-author-${index}`,
+        published_at: hoursAgo(24 * 30 + index),
+        created_at: hoursAgo(24 * 30 + index),
+        impression_count: 20_000,
+        read_count: 12_000,
+        bookmark_count: 4_000,
+        comment_count: 2_000,
+        like_count: 8_000,
+      })
+    );
+
+    const ranked = rankPosts([...oldWinners, fresh], anonymous);
+    expect(ranked[0].id).toBe(fresh.id);
+    expect(ranked[0].candidate_source).toBe("for_you_fresh");
+  });
+
   it("protects five unseen recent publications in a twelve-card screen when inventory allows", () => {
     const oldWinners = Array.from({ length: 12 }, (_, index) =>
       post({
@@ -282,7 +309,55 @@ describe("rankPosts", () => {
     }
   });
 
-  it("does not spend protected fresh slots on content this reader has already seen", () => {
+  it("keeps unread recent work protected after lightweight impressions", () => {
+    const recent = Array.from({ length: 5 }, (_, index) =>
+      post({
+        id: `recent-${index}`,
+        author_id: `recent-author-${index}`,
+        published_at: hoursAgo(index + 1),
+        created_at: hoursAgo(index + 1),
+        impression_count: 40 + index,
+      })
+    );
+    const oldWinners = Array.from({ length: 12 }, (_, index) =>
+      post({
+        id: `old-winner-${index}`,
+        author_id: `old-winner-author-${index}`,
+        published_at: hoursAgo(24 * 30 + index),
+        created_at: hoursAgo(24 * 30 + index),
+        impression_count: 10_000,
+        read_count: 6_000,
+        bookmark_count: 2_000,
+        comment_count: 1_000,
+        like_count: 4_000,
+      })
+    );
+    const ctx: RankingContext = {
+      ...anonymous,
+      userId: "reader",
+      viewerEngagement: new Map(
+        recent.map((candidate, index) => [
+          candidate.id,
+          { impressions: index + 1, hasRead: false },
+        ])
+      ),
+    };
+
+    const firstScreen = rankPosts([...oldWinners, ...recent], ctx).slice(
+      0,
+      DIVERSITY_WINDOW_SIZE
+    );
+    const protectedFresh = firstScreen.filter(
+      (item) => item.candidate_source === "for_you_fresh"
+    );
+
+    expect(protectedFresh).toHaveLength(5);
+    for (const candidate of recent) {
+      expect(protectedFresh.map((item) => item.id)).toContain(candidate.id);
+    }
+  });
+
+  it("does not spend protected fresh slots on content this reader has already read", () => {
     const alreadySeen = post({
       id: "seen-fresh",
       author_id: "seen-author",

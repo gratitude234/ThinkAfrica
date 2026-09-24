@@ -1,6 +1,6 @@
-# Indegenius Feed v4.2
+# Indegenius Feed v4.3
 
-Implemented 23 September 2026; new-content distribution foundation and live-session freshness updated 24 September 2026.
+Implemented 23 September 2026; fresh-first reservation and live-session freshness updated 24 September 2026.
 
 ## Why this exists
 
@@ -14,7 +14,7 @@ Feed v4 removes that failure mode and adds a small, explainable hybrid recommend
 
 Page 1 ranks the candidate set once. The remaining ordered publication ids and their candidate lanes are stored in a signed, deflate-compressed cursor (`fy4...`). Page 2+ resolves those exact ids instead of re-ranking a moving data set.
 
-v4.2 adds a bounded live-fresh layer without changing that rule. Continuation requests may reserve up to two positions for unseen publications created after the snapshot began; the page simply consumes fewer frozen ids. The frozen ids retain their exact relative order and resume on the next request. A resumable scan watermark and pending queue prevent publication bursts from being silently skipped.
+v4.2 added a bounded live-fresh layer without changing that rule. v4.3 keeps that layer and hardens page-1/window new-content reservation. Continuation requests may reserve up to two positions for recent unread publications created after the snapshot began; the page simply consumes fewer frozen ids. The frozen ids retain their exact relative order and resume on the next request. A resumable scan watermark and pending queue prevent publication bursts from being silently skipped.
 
 - Cursor context is bound to tab, content filter and timeframe.
 - Cursor payload is HMAC-signed and rejects tampering.
@@ -37,21 +37,21 @@ The v4 score is bounded to 0-100 and uses:
 
 Satisfaction is exposure-normalized and Bayesian-smoothed. Qualified reads and saves carry more weight than lightweight reactions.
 
-### 3. Protected new-content distribution
+### 3. Fresh-first new-content reservation
 
-New content is now a distribution guarantee, not just a scoring bonus. When enough inventory exists, five of every 12 For You positions (41.7%) are reserved for publications that are both recent and unseen by that reader.
+New content is a selection-stage distribution guarantee, not a scoring bonus. Before personalized, discovery, trending or evergreen ranking can fill a 12-card window, the composer reserves up to five positions (41.7%) for eligible recent publications. Older high-performing inventory cannot steal those reserved positions.
 
 The protection window is 72 hours:
 
-- 0-24h: strongest support;
-- 24-48h: still strongly protected;
-- 48-72h: support tapers so sustained quality/relevance can take over.
+- 0-24h: highest reservation priority;
+- 24-48h: second priority;
+- 48-72h: third priority before normal ranking takes over after 72h.
 
-Within the protected fresh lane, circulation comes before popularity. Publications below the initial 30-impression test audience are served before already well-exposed fresh winners. Among comparable candidates, lower exposure is preferred first, then recency/reader fit/early satisfaction.
+A publication remains eligible for protected distribution until the reader records a qualified read. Lightweight viewport impressions do not remove protection; they only order the fresh pool so less-exposed work is tried first. This avoids interpreting a brief scroll-past as consumption.
 
-A recent publication the reader has already seen or qualified-read cannot consume a protected fresh slot while unseen recent inventory exists. It may still rank through the normal personalized/trending/backfill paths.
+Within each age tier, circulation comes before popularity: lower reader exposure is preferred, then publications below the initial 30-impression test audience, then lower global exposure. Reader fit, early satisfaction and recency are tie-breakers.
 
-Exploration no longer falls off at a hard 100-impression cliff. Full test-audience support lasts through the initial 30 impressions, then fades gradually to zero at 250 impressions.
+Exploration still fades gradually rather than falling off a hard cliff: full test-audience support lasts through the initial 30 global impressions, then fades to zero at 250 impressions.
 
 ### 4. Reader signals
 
@@ -62,9 +62,9 @@ Existing bounded reader-signal RPCs are reused:
 
 Both are fail-soft: the feed remains available if either signal lookup fails.
 
-### 5. Soft lane composition and diversity
+### 5. Fresh-first composition and diversity
 
-Each 12-card window aims for an interleaved mix of 5 fresh, 3 personalized, 2 discovery, 1 trending and 1 evergreen publication. Unavailable lanes are backfilled by overall score. Fresh candidates are reserved for the fresh lane during lane composition so another lane cannot silently consume the protected allocation.
+Each 12-card window first reserves up to 5 eligible fresh publications, then interleaves them with 3 personalized, 2 discovery, 1 trending and 1 evergreen target positions. Unavailable non-fresh lanes are backfilled by overall score. Fresh reservation happens before those normal lanes, so older winners cannot consume the protected allocation.
 
 Diversity preferences:
 
@@ -74,7 +74,7 @@ Diversity preferences:
 
 ## Exposure analytics
 
-The exposure algorithm version is now `feed-v4.2.0` and the experiment variant remains `ranking_v4`. Hybrid candidate sources are recorded on signed exposure metadata:
+The exposure algorithm version is now `feed-v4.3.0` and the experiment variant remains `ranking_v4`. Hybrid candidate sources are recorded on signed exposure metadata:
 
 - `for_you_personalized`
 - `for_you_fresh`
@@ -102,11 +102,11 @@ A dedicated `FEED_CURSOR_SIGNING_SECRET` may be supplied. If absent, the server 
 - `.env.example`
 - associated feed/exposure/impression tests
 
-See `FEED_V4_2_LIVE_SESSION_FRESHNESS.md` for the live continuation contract.
+See `FEED_V4_2_LIVE_SESSION_FRESHNESS.md` for the live continuation contract and `FEED_V4_3_FRESH_FIRST_RESERVATION.md` for the current fresh-first contract.
 
 ## Verification note
 
-The ranking module was syntax/type-checked in isolation with the available TypeScript compiler and executed with runtime assertions covering the new-content guarantee, reader-aware fresh protection and gradual exploration fade. The environment could not complete `npm ci` because the package registry/cache was unavailable, so run the normal repository checks in a fully provisioned environment before deployment:
+The ranking module was syntax/type-checked in isolation with the available TypeScript compiler and executed with runtime assertions covering hard fresh-first reservation, lightweight-impression retention, qualified-read consumption and gradual exploration fade. The environment could not complete `npm ci` because the package registry/cache was unavailable, so run the normal repository checks in a fully provisioned environment before deployment:
 
 ```bash
 npm ci

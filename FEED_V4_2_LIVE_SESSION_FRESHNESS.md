@@ -2,6 +2,8 @@
 
 Implemented 24 September 2026.
 
+> **v4.3 note:** the live-session transport remains current, but the reader-consumption rule was tightened in v4.3. Lightweight impressions no longer disqualify a recent publication; a qualified read is the hard exclusion signal. See `FEED_V4_3_FRESH_FIRST_RESERVATION.md`.
+
 ## Product rule
 
 A reader should not have to restart Home before a publication created during the current session has any chance to appear.

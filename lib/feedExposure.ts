@@ -8,10 +8,10 @@ import type {
   FeedTabKey,
 } from "@/lib/feedData";
 
-// v4.2: v4.1 new-content protection plus live-session fresh injection on top
+// v4.3: hard fresh-first reservation plus live-session fresh injection on top
 // of the stable snapshot. Exposures from earlier ranking versions are kept
 // distinct so product analytics can compare the change cleanly.
-export const FEED_ALGORITHM_VERSION = "feed-v4.2.0";
+export const FEED_ALGORITHM_VERSION = "feed-v4.3.0";
 
 export type FeedCandidateSource = FeedCandidateArm | "followed_author";
 

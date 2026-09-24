@@ -80,13 +80,20 @@ export const PRIOR_EXPOSURES = 75;
 
 /**
  * New-content distribution is a product guarantee, not merely a score boost.
- * Every unseen publication receives strong protection while it is building its
+ * Every recent unread publication receives strong protection while it is building its
  * first audience, then that support fades gradually instead of falling off a
  * hard impression cliff.
  */
 export const INITIAL_DISTRIBUTION_IMPRESSIONS = 30;
 export const EXPLORATION_FADE_OUT_IMPRESSIONS = 250;
 export const NEW_CONTENT_PROTECTION_HOURS = 72;
+/**
+ * Lightweight viewport impressions do not remove new-content protection. They
+ * only order the fresh pool so lower-exposure work is tried first. Until we have a
+ * stronger explicit-dismissal signal, a qualified read is the hard consumption
+ * signal for the protected fresh allocation.
+ */
+export const PROTECTED_FRESH_SLOTS_PER_WINDOW = 5;
 /** Backward-compatible name used by older tests/docs. */
 export const FRESH_LANE_HOURS = NEW_CONTENT_PROTECTION_HOURS;
 export const TRENDING_LANE_HOURS = 7 * 24;
@@ -109,8 +116,8 @@ export const FEED_LANE_TARGETS: ReadonlyArray<
 ] as const;
 
 /**
- * Five protected fresh slots out of twelve (41.7%) whenever enough unseen
- * recent inventory exists. Fresh cards are deliberately spread through the
+ * Five protected fresh slots out of twelve (41.7%) whenever enough recent,
+ * not-yet-qualified-read inventory exists. Fresh cards are deliberately spread through the
  * screen rather than stacked in one chronological block.
  */
 const FEED_LANE_SCHEDULE: ReadonlyArray<HybridCandidateSource | null> = [
@@ -335,9 +342,18 @@ function isFresh<T extends RankablePost>(candidate: ScoredPost<T>, ctx: RankingC
   const viewerSignal = ctx.viewerEngagement?.get(candidate.post.id);
   return (
     ageHours(candidate.post, ctx) < NEW_CONTENT_PROTECTION_HOURS &&
-    !viewerSignal?.hasRead &&
-    (viewerSignal?.impressions ?? 0) <= 0
+    !viewerSignal?.hasRead
   );
+}
+
+function freshAgeTier(post: RankablePost, ctx: RankingContext): number {
+  const hours = ageHours(post, ctx);
+  if (!Number.isFinite(hours) || hours < 0 || hours >= NEW_CONTENT_PROTECTION_HOURS) {
+    return 0;
+  }
+  if (hours <= 24) return 3;
+  if (hours <= 48) return 2;
+  return 1;
 }
 
 /**
@@ -352,15 +368,27 @@ function compareFreshDistribution<T extends RankablePost>(
   right: ScoredPost<T>,
   ctx: RankingContext
 ): number {
+  const leftTier = freshAgeTier(left.post, ctx);
+  const rightTier = freshAgeTier(right.post, ctx);
+  if (leftTier !== rightTier) return rightTier - leftTier;
+
+  const leftViewerImpressions =
+    ctx.viewerEngagement?.get(left.post.id)?.impressions ?? 0;
+  const rightViewerImpressions =
+    ctx.viewerEngagement?.get(right.post.id)?.impressions ?? 0;
+  if (leftViewerImpressions !== rightViewerImpressions) {
+    return leftViewerImpressions - rightViewerImpressions;
+  }
+
   const leftImpressions = nonNegativeFinite(left.post.impression_count);
   const rightImpressions = nonNegativeFinite(right.post.impression_count);
   const leftInitial = leftImpressions < INITIAL_DISTRIBUTION_IMPRESSIONS ? 1 : 0;
   const rightInitial = rightImpressions < INITIAL_DISTRIBUTION_IMPRESSIONS ? 1 : 0;
   if (leftInitial !== rightInitial) return rightInitial - leftInitial;
 
-  // Within the test stage, distribute the least-seen work first. This is what
-  // prevents a newly published writer from being buried by a fresh winner that
-  // already received plenty of opportunity.
+  // Within the same age tier and viewer-exposure state, distribute the
+  // least-seen work first. This prevents a fresh winner that already received
+  // plenty of opportunity from starving another new publication.
   if (leftImpressions !== rightImpressions) return leftImpressions - rightImpressions;
 
   const ageSupportDifference =
@@ -450,6 +478,66 @@ function topicKey(post: RankablePost): string {
 }
 
 /**
+ * Reserve new-content inventory before the normal ranking lanes get a vote.
+ *
+ * The author/topic caps are preferences here, not vetoes: if five legitimate
+ * recent publications exist, five are reserved. This is the core anti-burial
+ * guarantee. The schedule later spreads those reserved cards through the
+ * twelve-card window.
+ */
+function reserveFreshCandidates<T extends RankablePost>(
+  remaining: Array<ScoredPost<T>>,
+  ctx: RankingContext,
+  limit: number
+): Set<string> {
+  const pool = remaining
+    .filter((candidate) => isFresh(candidate, ctx))
+    .sort((left, right) => compareFreshDistribution(left, right, ctx));
+  if (pool.length === 0 || limit <= 0) return new Set();
+
+  const selected: ScoredPost<T>[] = [];
+  const selectedIds = new Set<string>();
+  const authorCounts = new Map<string, number>();
+  const topicCounts = new Map<string, number>();
+
+  const take = (candidate: ScoredPost<T>) => {
+    if (selectedIds.has(candidate.post.id) || selected.length >= limit) return;
+    selected.push(candidate);
+    selectedIds.add(candidate.post.id);
+    const author = authorKey(candidate.post);
+    const topic = topicKey(candidate.post);
+    authorCounts.set(author, (authorCounts.get(author) ?? 0) + 1);
+    topicCounts.set(topic, (topicCounts.get(topic) ?? 0) + 1);
+  };
+
+  // First pass: preserve normal screen diversity when there is enough fresh
+  // inventory to do so.
+  for (const candidate of pool) {
+    const author = authorKey(candidate.post);
+    const topic = topicKey(candidate.post);
+    if (
+      (authorCounts.get(author) ?? 0) < MAX_POSTS_PER_AUTHOR_PER_WINDOW &&
+      (topicCounts.get(topic) ?? 0) < MAX_POSTS_PER_TOPIC_PER_WINDOW
+    ) {
+      take(candidate);
+    }
+    if (selected.length >= limit) break;
+  }
+
+  // Second pass: the freshness guarantee outranks diversity. If inventory is
+  // concentrated in one writer/topic, fill the protected allocation rather
+  // than silently handing those slots back to old winners.
+  if (selected.length < limit) {
+    for (const candidate of pool) {
+      take(candidate);
+      if (selected.length >= limit) break;
+    }
+  }
+
+  return selectedIds;
+}
+
+/**
  * Pick one candidate while respecting author diversity and avoiding the same
  * writer twice in a row. The constraints are preferences: if inventory is too
  * thin, the caller eventually falls back to the highest-scoring remaining row.
@@ -485,9 +573,10 @@ function findEligibleIndex<T extends RankablePost>(
 }
 
 /**
- * Soft-lane feed composition. In healthy inventory each 12-card screen protects
- * five slots for unseen recent work, then mixes personalized, discovery,
- * trending and evergreen content. Any unavailable lane is backfilled by score.
+ * Fresh-first hybrid composition. Each twelve-card window reserves up to five
+ * recent, not-yet-consumed publications *before* personalized/trending/evergreen
+ * ranking can fill anything. This is a hard circulation guarantee, not a score
+ * bonus. Normal ranking controls the remaining slots.
  */
 function composeHybridFeed<T extends RankablePost>(
   sorted: Array<ScoredPost<T>>,
@@ -502,8 +591,17 @@ function composeHybridFeed<T extends RankablePost>(
     let previousAuthor: string | null = null;
     let placedInWindow = 0;
 
+    // This is intentionally computed before any normal lane is filled. A high
+    // score on an older publication cannot steal a reserved new-content slot.
+    const reservedFreshIds = reserveFreshCandidates(
+      remaining,
+      ctx,
+      Math.min(PROTECTED_FRESH_SLOTS_PER_WINDOW, DIVERSITY_WINDOW_SIZE)
+    );
+
     const place = (index: number, source: HybridCandidateSource) => {
       const [candidate] = remaining.splice(index, 1);
+      reservedFreshIds.delete(candidate.post.id);
       const key = authorKey(candidate.post);
       authorCounts.set(key, (authorCounts.get(key) ?? 0) + 1);
       const topic = topicKey(candidate.post);
@@ -520,25 +618,59 @@ function composeHybridFeed<T extends RankablePost>(
     for (const source of FEED_LANE_SCHEDULE) {
       if (!source || remaining.length === 0) continue;
 
-      // Fresh distribution uses its own fair-circulation ordering. The global
-      // score still controls every other lane and all backfill slots.
-      let laneView = remaining;
       if (source === "for_you_fresh") {
-        laneView = [...remaining].sort((left, right) =>
-          compareFreshDistribution(left, right, ctx)
+        const laneView = [...remaining]
+          .filter((candidate) => reservedFreshIds.has(candidate.post.id))
+          .sort((left, right) => compareFreshDistribution(left, right, ctx));
+        if (laneView.length === 0) continue;
+
+        // Reserved fresh slots must be filled. Prefer diversity, then relax it
+        // rather than surrendering a new-content slot to older inventory.
+        let eligibleIndex = findEligibleIndex(
+          laneView,
+          authorCounts,
+          topicCounts,
+          previousAuthor,
+          () => true
         );
+        if (eligibleIndex < 0) eligibleIndex = 0;
+        const selectedId = laneView[eligibleIndex].post.id;
+        const index = remaining.findIndex(
+          (candidate) => candidate.post.id === selectedId
+        );
+        if (index >= 0) place(index, source);
+        continue;
       }
+
       const eligibleIndex = findEligibleIndex(
-        laneView,
+        remaining,
         authorCounts,
         topicCounts,
         previousAuthor,
-        (candidate) => matchesLane(candidate, source, ctx)
+        (candidate) =>
+          !reservedFreshIds.has(candidate.post.id) &&
+          matchesLane(candidate, source, ctx)
       );
-      if (eligibleIndex < 0) continue;
-      const selectedId = laneView[eligibleIndex].post.id;
-      const index = remaining.findIndex((candidate) => candidate.post.id === selectedId);
-      if (index >= 0) place(index, source);
+      if (eligibleIndex >= 0) place(eligibleIndex, source);
+    }
+
+    // Defensive guarantee: if a future schedule change removes/changes a fresh
+    // position, reserved new publications are still placed before score backfill.
+    while (
+      reservedFreshIds.size > 0 &&
+      placedInWindow < DIVERSITY_WINDOW_SIZE &&
+      remaining.length > 0
+    ) {
+      const laneView = [...remaining]
+        .filter((candidate) => reservedFreshIds.has(candidate.post.id))
+        .sort((left, right) => compareFreshDistribution(left, right, ctx));
+      if (laneView.length === 0) break;
+      const selectedId = laneView[0].post.id;
+      const index = remaining.findIndex(
+        (candidate) => candidate.post.id === selectedId
+      );
+      if (index < 0) break;
+      place(index, "for_you_fresh");
     }
 
     while (placedInWindow < DIVERSITY_WINDOW_SIZE && remaining.length > 0) {

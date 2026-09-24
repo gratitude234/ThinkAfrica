@@ -1,3 +1,14 @@
+# 24 September 2026 — Feed v4.3 fresh-first reservation
+
+- Changed fresh content from a soft lane preference into a selection-stage reservation: up to 5 of every 12 For You positions are reserved before older personalized/trending/evergreen winners can compete for the rest.
+- Kept the protection window at 72 hours with 0-24h, 24-48h and 48-72h priority tiers.
+- Stopped treating a lightweight viewport impression as consumption. Recent unread work remains eligible for protected distribution; a qualified read is now the hard per-reader consumption signal.
+- Ordered protected inventory by age tier, reader exposure, initial test-audience need and global exposure before reader-fit/quality tie-breakers.
+- Kept diversity as a preference without allowing it to silently surrender protected new-content positions to older inventory.
+- Aligned the v4.2 live-session layer with the same qualified-read consumption rule.
+- Bumped exposure attribution to `feed-v4.3.0` and the anonymous first-page cache key to v4.3.
+- Added regression coverage for the production symptom where recent unread publications had prior lightweight impressions but were still buried by month-old winners.
+
 # 24 September 2026 — Feed v4.2 live-session freshness
 
 - Kept the v4 signed snapshot as the authoritative pagination sequence, but added a bounded live-fresh layer for publications created after `snapshotAt`.
