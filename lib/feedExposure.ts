@@ -8,9 +8,10 @@ import type {
   FeedTabKey,
 } from "@/lib/feedData";
 
-// v4: hybrid candidate lanes + stable snapshot pagination + reader fatigue and
-// qualified-read affinity. Exposures from v3 are intentionally not comparable.
-export const FEED_ALGORITHM_VERSION = "feed-v4.1.0";
+// v4.2: v4.1 new-content protection plus live-session fresh injection on top
+// of the stable snapshot. Exposures from earlier ranking versions are kept
+// distinct so product analytics can compare the change cleanly.
+export const FEED_ALGORITHM_VERSION = "feed-v4.2.0";
 
 export type FeedCandidateSource = FeedCandidateArm | "followed_author";
 
@@ -42,6 +43,7 @@ const CANDIDATE_SOURCES = new Set<FeedCandidateSource>([
   "for_you_discovery",
   "for_you_trending",
   "for_you_evergreen",
+  "for_you_live_fresh",
   "for_you_tail",
   "followed_author",
 ]);

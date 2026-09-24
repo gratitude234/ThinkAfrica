@@ -1,6 +1,6 @@
-# Indegenius Feed v4.1
+# Indegenius Feed v4.2
 
-Implemented 23 September 2026; new-content distribution foundation updated 24 September 2026.
+Implemented 23 September 2026; new-content distribution foundation and live-session freshness updated 24 September 2026.
 
 ## Why this exists
 
@@ -13,6 +13,8 @@ Feed v4 removes that failure mode and adds a small, explainable hybrid recommend
 ### 1. Stable snapshot pagination
 
 Page 1 ranks the candidate set once. The remaining ordered publication ids and their candidate lanes are stored in a signed, deflate-compressed cursor (`fy4...`). Page 2+ resolves those exact ids instead of re-ranking a moving data set.
+
+v4.2 adds a bounded live-fresh layer without changing that rule. Continuation requests may reserve up to two positions for unseen publications created after the snapshot began; the page simply consumes fewer frozen ids. The frozen ids retain their exact relative order and resume on the next request. A resumable scan watermark and pending queue prevent publication bursts from being silently skipped.
 
 - Cursor context is bound to tab, content filter and timeframe.
 - Cursor payload is HMAC-signed and rejects tampering.
@@ -72,13 +74,14 @@ Diversity preferences:
 
 ## Exposure analytics
 
-The exposure algorithm version is now `feed-v4.1.0` and the experiment variant remains `ranking_v4`. Hybrid candidate sources are recorded on signed exposure metadata:
+The exposure algorithm version is now `feed-v4.2.0` and the experiment variant remains `ranking_v4`. Hybrid candidate sources are recorded on signed exposure metadata:
 
 - `for_you_personalized`
 - `for_you_fresh`
 - `for_you_discovery`
 - `for_you_trending`
 - `for_you_evergreen`
+- `for_you_live_fresh`
 - `for_you_tail`
 - `followed_author`
 
@@ -98,6 +101,8 @@ A dedicated `FEED_CURSOR_SIGNING_SECRET` may be supplied. If absent, the server 
 - `app/(main)/explore/ExploreFeed.tsx`
 - `.env.example`
 - associated feed/exposure/impression tests
+
+See `FEED_V4_2_LIVE_SESSION_FRESHNESS.md` for the live continuation contract.
 
 ## Verification note
 

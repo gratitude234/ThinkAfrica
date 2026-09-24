@@ -1,3 +1,15 @@
+# 24 September 2026 — Feed v4.2 live-session freshness
+
+- Kept the v4 signed snapshot as the authoritative pagination sequence, but added a bounded live-fresh layer for publications created after `snapshotAt`.
+- Continuation pages can now inject up to 2 unseen post-snapshot publications into a 12-card page while consuming fewer frozen ids, so the original snapshot order never shifts and no frozen card is skipped.
+- Added a resumable live scan watermark and bounded pending queue. Publication bursts are drained over later pages rather than dropping everything beyond the first small batch.
+- Live-fresh circulation prefers lower global exposure first and marks these cards as `for_you_live_fresh` for signed exposure attribution.
+- Viewer exposure/read history prevents already-consumed post-snapshot work from using live-fresh slots when the signal is available.
+- Live freshness is fail-soft: scan or live-card lookup failures fall back to the original frozen continuation instead of failing the feed.
+- Guest continuation pages now bypass the anonymous 30-second feed cache so post-snapshot publications are actually discoverable during an active session; only guest page 1 remains cached.
+- Existing v4.1 Home cursors are accepted for their remaining one-hour lifetime and upgraded in memory to the v4.2 cursor shape.
+- Bumped exposure attribution to `feed-v4.2.0` and public first-page cache key to v4.2.
+
 # 24 September 2026 — Feed v4.1 new-content distribution foundation
 
 - Made new-content circulation a first-class feed rule instead of relying on a freshness score alone.

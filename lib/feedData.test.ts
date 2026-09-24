@@ -7,6 +7,8 @@ vi.mock("@/lib/supabase/admin", () => ({
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   FeedCursorError,
+  LIVE_FRESH_SCAN_BATCH,
+  LIVE_FRESH_SLOTS_PER_PAGE,
   MAX_FEED_PAGE,
   MAX_FEED_PAGE_SIZE,
   RANKED_FEED_WINDOW,
@@ -20,6 +22,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllEnvs();
   vi.mocked(createAdminClient).mockReset();
 });
@@ -46,6 +49,7 @@ interface PostQuery {
   range: [number, number] | null;
   orders: Array<{ column: string; options: unknown }>;
   keysetFilters: string[];
+  publishedAtCutoff: string | null;
   inFilters: Array<{ column: string; values: unknown[] }>;
   notFilters: Array<{ column: string; operator: string; value: unknown }>;
 }
@@ -79,6 +83,7 @@ function feedSupabase(
       range: null,
       orders: [],
       keysetFilters: [],
+      publishedAtCutoff: null,
       inFilters: [],
       notFilters: [],
     };
@@ -124,6 +129,12 @@ function feedSupabase(
           ) {
             return false;
           }
+        }
+        if (
+          call.publishedAtCutoff &&
+          String(row.published_at ?? "") < call.publishedAtCutoff
+        ) {
+          return false;
         }
         return true;
       });
@@ -180,13 +191,19 @@ function feedSupabase(
         }
         return builder;
       }),
+      gte: vi.fn((column: string, value: unknown) => {
+        if (column === "published_at" && typeof value === "string") {
+          call.publishedAtCutoff = value;
+        }
+        return builder;
+      }),
       then: (
         onFulfilled: (value: unknown) => unknown,
         onRejected?: (reason: unknown) => unknown
       ) => Promise.resolve(result()).then(onFulfilled, onRejected),
     };
 
-    for (const method of ["eq", "neq", "is", "lt", "lte", "gt", "gte"]) {
+    for (const method of ["eq", "neq", "is", "lt", "lte", "gt"]) {
       builder[method] = vi.fn(() => builder);
     }
     return builder;
@@ -679,20 +696,31 @@ describe("fetchFeedPage -- For You snapshot paging", () => {
     rankedRow(index, index >= 24 ? 1000 : 0, { author_id: `author-${index}` })
   );
 
-  it("freezes the order so a newly published post cannot slide a page boundary", async () => {
+  it("injects a post published after snapshot creation without moving the frozen sequence", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-24T00:00:00.000Z"));
+
     const pageOne = await fetchFeedPage({
       ...forYou,
       supabase: feedSupabase(rows).supabase as never,
       page: 1,
     });
     expect(pageOne.nextCursor).toMatch(/^fy4\./);
-
     const firstIds = pageOne.posts.map((post) => post.id);
-    const brandNew = rankedRow(999, 10_000, {
+
+    vi.setSystemTime(new Date("2026-09-24T00:05:00.000Z"));
+    const stableOnly = await fetchFeedPage({
+      ...forYou,
+      supabase: feedSupabase(rows).supabase as never,
+      page: 2,
+      cursor: pageOne.nextCursor,
+    });
+    const brandNew = rankedRow(999, 0, {
       id: "brand-new",
       author_id: "brand-new-author",
-      published_at: "2026-09-23T12:00:00.000Z",
-      created_at: "2026-09-23T12:00:00.000Z",
+      published_at: "2026-09-24T00:03:00.000Z",
+      created_at: "2026-09-24T00:03:00.000Z",
+      impression_count: 0,
     });
     const pageTwo = await fetchFeedPage({
       ...forYou,
@@ -704,8 +732,96 @@ describe("fetchFeedPage -- For You snapshot paging", () => {
     const secondIds = pageTwo.posts.map((post) => post.id);
     expect(secondIds).toHaveLength(12);
     expect(secondIds.filter((id) => firstIds.includes(id))).toEqual([]);
-    expect(secondIds).not.toContain("brand-new");
-    expect(secondIds.every((id) => rows.some((row) => row.id === id))).toBe(true);
+    expect(secondIds).toContain("brand-new");
+    expect(
+      pageTwo.posts.find((post) => post.id === "brand-new")?.candidate_source
+    ).toBe("for_you_live_fresh");
+    expect(secondIds.filter((id) => id !== "brand-new")).toEqual(
+      stableOnly.posts.slice(0, 11).map((post) => post.id)
+    );
+  });
+
+  it("never injects the same live publication twice in one snapshot session", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-24T00:00:00.000Z"));
+    const deep = Array.from({ length: 60 }, (_, index) =>
+      rankedRow(index, 0, { author_id: `author-${index}` })
+    );
+    const pageOne = await fetchFeedPage({
+      ...forYou,
+      supabase: feedSupabase(deep).supabase as never,
+      page: 1,
+    });
+
+    vi.setSystemTime(new Date("2026-09-24T00:05:00.000Z"));
+    const live = rankedRow(999, 0, {
+      id: "live-once",
+      author_id: "live-author",
+      published_at: "2026-09-24T00:03:00.000Z",
+      created_at: "2026-09-24T00:03:00.000Z",
+    });
+    const pageTwo = await fetchFeedPage({
+      ...forYou,
+      supabase: feedSupabase([live, ...deep]).supabase as never,
+      page: 2,
+      cursor: pageOne.nextCursor,
+    });
+    expect(pageTwo.posts.map((post) => post.id)).toContain("live-once");
+
+    vi.setSystemTime(new Date("2026-09-24T00:10:00.000Z"));
+    const pageThree = await fetchFeedPage({
+      ...forYou,
+      supabase: feedSupabase([live, ...deep]).supabase as never,
+      page: 3,
+      cursor: pageTwo.nextCursor,
+    });
+    expect(pageThree.posts.map((post) => post.id)).not.toContain("live-once");
+  });
+
+  it("drains a publication burst across continuation pages without skipping ids", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-24T00:00:00.000Z"));
+    const deep = Array.from({ length: RANKED_FEED_WINDOW + 24 }, (_, index) =>
+      rankedRow(index, 0, { author_id: `author-${index}` })
+    );
+    const pageOne = await fetchFeedPage({
+      ...forYou,
+      supabase: feedSupabase(deep).supabase as never,
+      page: 1,
+    });
+
+    const liveRows = Array.from({ length: LIVE_FRESH_SCAN_BATCH + 6 }, (_, index) => {
+      const second = LIVE_FRESH_SCAN_BATCH + 6 - index;
+      return rankedRow(500 + index, 0, {
+        id: `live-${second}`,
+        author_id: `live-author-${second}`,
+        published_at: `2026-09-24T00:00:${String(second).padStart(2, "0")}.000Z`,
+        created_at: `2026-09-24T00:00:${String(second).padStart(2, "0")}.000Z`,
+        impression_count: 0,
+      });
+    });
+    vi.setSystemTime(new Date("2026-09-24T00:05:00.000Z"));
+
+    const seenLive: string[] = [];
+    let cursor = pageOne.nextCursor;
+    for (let page = 2; page <= 16; page += 1) {
+      const result = await fetchFeedPage({
+        ...forYou,
+        supabase: feedSupabase([...liveRows, ...deep]).supabase as never,
+        page,
+        cursor,
+      });
+      seenLive.push(
+        ...result.posts
+          .filter((post) => post.candidate_source === "for_you_live_fresh")
+          .map((post) => post.id)
+      );
+      cursor = result.nextCursor;
+    }
+
+    expect(seenLive).toHaveLength((16 - 1) * LIVE_FRESH_SLOTS_PER_PAGE);
+    expect(new Set(seenLive).size).toBe(seenLive.length);
+    expect(new Set(seenLive)).toEqual(new Set(liveRows.map((row) => String(row.id))));
   });
 
   it("requires the previous snapshot cursor for page two and later", async () => {

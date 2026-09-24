@@ -21,6 +21,10 @@ import type { HomeFeedTab } from "@/lib/homeFeedTabs";
  * - Following is a simple reverse-chronological keyset feed.
  * - For You is ranked once, then frozen into a signed snapshot cursor. Later
  *   pages resolve those exact ids instead of re-ranking a moving data set.
+ * - v4.2 may reserve a small number of continuation-page slots for unseen
+ *   publications created after the snapshot. Those cards do not mutate or
+ *   reorder the frozen sequence; the continuation simply consumes fewer of
+ *   its ids and resumes them later.
  */
 export type FeedTabKey = HomeFeedTab;
 export type FeedTimeframe = "all" | "week" | "month";
@@ -157,7 +161,10 @@ export const RANKED_FEED_WINDOW = 192;
 export const MAX_FEED_PAGE = 100;
 export const MAX_FEED_PAGE_SIZE = 30;
 
-export type FeedCandidateArm = HybridCandidateSource | "for_you_tail";
+export type FeedCandidateArm =
+  | HybridCandidateSource
+  | "for_you_live_fresh"
+  | "for_you_tail";
 
 interface FeedCursorContext {
   tab: FeedTabKey;
@@ -175,7 +182,8 @@ interface FollowingCursorPayload extends FeedCursorContext, FeedCursorPosition {
   tab: "following";
 }
 
-const HOME_CURSOR_VERSION = 2;
+const LEGACY_HOME_CURSOR_VERSION = 2;
+const HOME_CURSOR_VERSION = 3;
 const FOLLOWING_CURSOR_VERSION = 1;
 const MAX_CURSOR_LENGTH = 12_000;
 const MAX_CURSOR_JSON_BYTES = 64 * 1024;
@@ -185,15 +193,42 @@ const HOME_CURSOR_PREFIX = "fy4";
 const HOME_CURSOR_MAX_AGE_MS = 60 * 60 * 1000;
 const HOME_CURSOR_FUTURE_SKEW_MS = 5 * 60 * 1000;
 
+/**
+ * Live-session freshness is intentionally small and bounded. The frozen v4
+ * snapshot still owns the session; this layer only makes room for work that
+ * did not exist when that snapshot was created.
+ *
+ * Two live cards in a 12-card continuation page is enough to make Home feel
+ * alive without turning infinite scroll into a moving target. A bounded
+ * pending queue plus resumable scan means bursts are drained over later pages
+ * rather than silently skipped.
+ */
+export const LIVE_FRESH_SLOTS_PER_PAGE = 2;
+export const LIVE_FRESH_SCAN_BATCH = 24;
+export const LIVE_FRESH_PENDING_MAX = 48;
+
 type ArmCode = "p" | "f" | "d" | "t" | "e";
 type SnapshotCursorItem = [id: string, source: ArmCode];
 
+interface LiveFreshScanState {
+  /** Upper edge of the burst currently being drained. */
+  upperAt: string;
+  /** Newest-first keyset cursor within that burst. */
+  cursor: FeedCursorPosition | null;
+}
+
 interface HomeCursorPayload extends FeedCursorContext {
-  version: 2;
+  version: 3;
   tab: "home";
   snapshotAt: string;
   remaining: SnapshotCursorItem[];
   tail: FeedCursorPosition | null;
+  /** Everything published up to this timestamp has been considered for live injection. */
+  liveCheckedAt: string;
+  /** Eligible post ids discovered after snapshotAt but not yet injected. */
+  livePending: string[];
+  /** Non-null only while a large publication burst is being drained. */
+  liveScan: LiveFreshScanState | null;
 }
 
 type DecodedFeedCursor =
@@ -213,6 +248,19 @@ function canonicalTimestamp(value: unknown): string | null {
   const timestamp = Date.parse(value);
   if (!Number.isFinite(timestamp)) return null;
   return new Date(timestamp).toISOString();
+}
+
+function latestPublishedAt(
+  rows: Array<Record<string, unknown>>,
+  fallback: string
+): string {
+  let latestMs = Date.parse(fallback);
+  for (const row of rows) {
+    const value = canonicalTimestamp(row.published_at);
+    if (!value) continue;
+    latestMs = Math.max(latestMs, Date.parse(value));
+  }
+  return new Date(latestMs).toISOString();
 }
 
 function getCursorSigningSecret(): string {
@@ -330,13 +378,18 @@ function decodeHomeCursor(
   try {
     const compressed = Buffer.from(encoded, "base64url");
     const json = inflateRawSync(compressed, { maxOutputLength: MAX_CURSOR_JSON_BYTES }).toString("utf8");
-    const payload = JSON.parse(json) as Partial<HomeCursorPayload>;
+    const payload = JSON.parse(json) as Record<string, unknown>;
     const snapshotAt = canonicalTimestamp(payload.snapshotAt);
     const snapshotAtMs = snapshotAt ? Date.parse(snapshotAt) : NaN;
     const now = Date.now();
-    const tailPublishedAt = payload.tail ? canonicalTimestamp(payload.tail.publishedAt) : null;
+    const rawTail =
+      payload.tail && typeof payload.tail === "object" && !Array.isArray(payload.tail)
+        ? (payload.tail as Record<string, unknown>)
+        : null;
+    const tailPublishedAt = rawTail ? canonicalTimestamp(rawTail.publishedAt) : null;
+    const version = Number(payload.version);
     if (
-      payload.version !== HOME_CURSOR_VERSION ||
+      (version !== LEGACY_HOME_CURSOR_VERSION && version !== HOME_CURSOR_VERSION) ||
       payload.tab !== "home" ||
       expectedContext.tab !== "home" ||
       payload.type !== expectedContext.type ||
@@ -347,10 +400,10 @@ function decodeHomeCursor(
       !Array.isArray(payload.remaining) ||
       payload.remaining.length > RANKED_FEED_WINDOW ||
       (payload.tail !== null &&
-        (!payload.tail ||
+        (!rawTail ||
           !tailPublishedAt ||
-          typeof payload.tail.id !== "string" ||
-          !SAFE_CURSOR_ID.test(payload.tail.id)))
+          typeof rawTail.id !== "string" ||
+          !SAFE_CURSOR_ID.test(rawTail.id)))
     ) {
       throw new FeedCursorError();
     }
@@ -369,16 +422,89 @@ function decodeHomeCursor(
       remaining.push([item[0], item[1]]);
     }
 
+    // v4.1 cursors only lived for one hour, so accepting them during rollout
+    // is cheap and avoids breaking an already-open Home tab. They upgrade in
+    // memory to the live-fresh v3 shape on the next response.
+    let liveCheckedAt = snapshotAt;
+    let livePending: string[] = [];
+    let liveScan: LiveFreshScanState | null = null;
+
+    if (version === HOME_CURSOR_VERSION) {
+      const checkedAt = canonicalTimestamp(payload.liveCheckedAt);
+      const checkedAtMs = checkedAt ? Date.parse(checkedAt) : NaN;
+      if (
+        !checkedAt ||
+        checkedAtMs < snapshotAtMs ||
+        checkedAtMs > now + HOME_CURSOR_FUTURE_SKEW_MS ||
+        !Array.isArray(payload.livePending) ||
+        payload.livePending.length > LIVE_FRESH_PENDING_MAX
+      ) {
+        throw new FeedCursorError();
+      }
+      const pending: string[] = [];
+      for (const id of payload.livePending) {
+        if (typeof id !== "string" || !SAFE_CURSOR_ID.test(id)) {
+          throw new FeedCursorError();
+        }
+        pending.push(id);
+      }
+      liveCheckedAt = checkedAt;
+      livePending = Array.from(new Set(pending));
+
+      if (payload.liveScan !== null) {
+        if (
+          !payload.liveScan ||
+          typeof payload.liveScan !== "object" ||
+          Array.isArray(payload.liveScan)
+        ) {
+          throw new FeedCursorError();
+        }
+        const rawScan = payload.liveScan as Record<string, unknown>;
+        const upperAt = canonicalTimestamp(rawScan.upperAt);
+        const upperAtMs = upperAt ? Date.parse(upperAt) : NaN;
+        const rawScanCursor =
+          rawScan.cursor &&
+          typeof rawScan.cursor === "object" &&
+          !Array.isArray(rawScan.cursor)
+            ? (rawScan.cursor as Record<string, unknown>)
+            : null;
+        const scanPublishedAt = rawScanCursor
+          ? canonicalTimestamp(rawScanCursor.publishedAt)
+          : null;
+        if (
+          !upperAt ||
+          upperAtMs < checkedAtMs ||
+          upperAtMs > now + HOME_CURSOR_FUTURE_SKEW_MS ||
+          (rawScan.cursor !== null &&
+            (!rawScanCursor ||
+              !scanPublishedAt ||
+              typeof rawScanCursor.id !== "string" ||
+              !SAFE_CURSOR_ID.test(rawScanCursor.id)))
+        ) {
+          throw new FeedCursorError();
+        }
+        liveScan = {
+          upperAt,
+          cursor: rawScanCursor
+            ? { publishedAt: scanPublishedAt!, id: rawScanCursor.id as string }
+            : null,
+        };
+      }
+    }
+
     return {
       version: HOME_CURSOR_VERSION,
       tab: "home",
-      type: payload.type,
-      timeframe: payload.timeframe,
+      type: expectedContext.type,
+      timeframe: expectedContext.timeframe,
       snapshotAt,
       remaining,
-      tail: payload.tail
-        ? { publishedAt: tailPublishedAt!, id: payload.tail.id }
+      tail: rawTail
+        ? { publishedAt: tailPublishedAt!, id: rawTail.id as string }
         : null,
+      liveCheckedAt,
+      livePending,
+      liveScan,
     };
   } catch (error) {
     if (error instanceof FeedCursorError) throw error;
@@ -721,9 +847,17 @@ function makeHomeCursor(
   context: FeedCursorContext,
   snapshotAt: string,
   remaining: SnapshotCursorItem[],
-  tail: FeedCursorPosition | null
+  tail: FeedCursorPosition | null,
+  liveState: Pick<HomeCursorPayload, "liveCheckedAt" | "livePending" | "liveScan">
 ): string | null {
-  if (remaining.length === 0 && !tail) return null;
+  if (
+    remaining.length === 0 &&
+    !tail &&
+    liveState.livePending.length === 0 &&
+    !liveState.liveScan
+  ) {
+    return null;
+  }
   return encodeHomeCursor({
     version: HOME_CURSOR_VERSION,
     tab: "home",
@@ -732,6 +866,9 @@ function makeHomeCursor(
     snapshotAt,
     remaining,
     tail,
+    liveCheckedAt: liveState.liveCheckedAt,
+    livePending: liveState.livePending,
+    liveScan: liveState.liveScan,
   });
 }
 
@@ -764,6 +901,245 @@ async function consumeChronologicalTail(
   };
 }
 
+async function loadLiveViewerEngagement(
+  reader: FeedSupabaseClient,
+  viewerId: string | null,
+  postIds: string[],
+  since: string
+): Promise<Map<string, ViewerPostEngagementSignal>> {
+  const result = new Map<string, ViewerPostEngagementSignal>();
+  if (!viewerId || postIds.length === 0 || typeof reader.rpc !== "function") {
+    return result;
+  }
+
+  try {
+    const response = await reader.rpc("get_viewer_post_engagement", {
+      p_user_id: viewerId,
+      p_post_ids: postIds,
+      p_since: since,
+    });
+    if (response.error || !Array.isArray(response.data)) {
+      console.warn(
+        "[feed-live-fresh] viewer exposure state unavailable; treating new publications as unseen"
+      );
+      return result;
+    }
+    for (const row of response.data as Array<Record<string, unknown>>) {
+      const postId = typeof row.post_id === "string" ? row.post_id : "";
+      if (!postId) continue;
+      result.set(postId, {
+        impressions: Math.max(0, Number(row.impressions) || 0),
+        hasRead: row.has_read === true,
+      });
+    }
+  } catch (error) {
+    console.warn(
+      "[feed-live-fresh] viewer exposure lookup failed; treating new publications as unseen",
+      error
+    );
+  }
+  return result;
+}
+
+function liveFreshPublishedAt(row: Record<string, unknown>): number {
+  const value = canonicalTimestamp(row.published_at);
+  return value ? Date.parse(value) : 0;
+}
+
+/**
+ * Continue discovering publications created after the original snapshot.
+ *
+ * The scan is resumable: if more rows arrive than the bounded pending queue can
+ * hold, the cursor records where the newest-first scan stopped. We do not move
+ * `liveCheckedAt` until that burst is fully drained, so no publication can be
+ * skipped merely because many were published between two scroll requests.
+ */
+async function refreshLiveFreshState(
+  reader: FeedSupabaseClient,
+  viewerId: string | null,
+  snapshot: HomeCursorPayload,
+  selection: Pick<
+    FeedListCriteria,
+    "contentKind" | "excludedAuthorIds" | "excludedPostIds"
+  >
+): Promise<Pick<HomeCursorPayload, "liveCheckedAt" | "livePending" | "liveScan">> {
+  const pending = [...snapshot.livePending];
+  if (pending.length >= LIVE_FRESH_PENDING_MAX) {
+    return {
+      liveCheckedAt: snapshot.liveCheckedAt,
+      livePending: pending,
+      liveScan: snapshot.liveScan,
+    };
+  }
+
+  const capacity = Math.min(
+    LIVE_FRESH_SCAN_BATCH,
+    LIVE_FRESH_PENDING_MAX - pending.length
+  );
+  if (capacity <= 0) {
+    return {
+      liveCheckedAt: snapshot.liveCheckedAt,
+      livePending: pending,
+      liveScan: snapshot.liveScan,
+    };
+  }
+
+  const activeScan = snapshot.liveScan;
+  const upperAt = activeScan?.upperAt ?? new Date().toISOString();
+  let raw: Array<Record<string, unknown>>;
+  try {
+    raw = await listFeedPosts(reader, "scan live fresh publications", {
+      contentKind: selection.contentKind,
+      cutoff: snapshot.liveCheckedAt,
+      excludedAuthorIds: selection.excludedAuthorIds,
+      excludedPostIds: selection.excludedPostIds,
+      cursor: activeScan?.cursor ?? null,
+      limit: capacity + 1,
+    });
+  } catch (error) {
+    if (!(error instanceof FeedDataError)) throw error;
+    console.warn(
+      "[feed-live-fresh] live scan unavailable; continuing frozen snapshot without injection",
+      error
+    );
+    return {
+      liveCheckedAt: snapshot.liveCheckedAt,
+      livePending: pending,
+      liveScan: snapshot.liveScan,
+    };
+  }
+
+  const checkedAtMs = Date.parse(snapshot.liveCheckedAt);
+  const upperAtMs = Date.parse(upperAt);
+  const scanned = raw.slice(0, capacity);
+  const eligibleWindow = scanned.filter((row) => {
+    const publishedAt = liveFreshPublishedAt(row);
+    // Strictly newer than the fully-scanned watermark. Rows newer than the
+    // burst's upper edge raced this request and will be picked up next time.
+    return publishedAt > checkedAtMs && publishedAt <= upperAtMs;
+  });
+
+  const engagement = await loadLiveViewerEngagement(
+    reader,
+    viewerId,
+    eligibleWindow.map((row) => String(row.id ?? "")).filter(Boolean),
+    snapshot.snapshotAt
+  );
+  const unseen = eligibleWindow.filter((row) => {
+    const signal = engagement.get(String(row.id ?? ""));
+    return !signal?.hasRead && (signal?.impressions ?? 0) <= 0;
+  });
+
+  // The live layer has one job: fair first circulation. Prefer publications
+  // with the least global exposure, then the older item inside this very small
+  // post-snapshot interval so a steady stream cannot starve its predecessors.
+  unseen.sort((left, right) => {
+    const leftImpressions = Math.max(0, Number(left.impression_count) || 0);
+    const rightImpressions = Math.max(0, Number(right.impression_count) || 0);
+    if (leftImpressions !== rightImpressions) {
+      return leftImpressions - rightImpressions;
+    }
+    const dateDifference = liveFreshPublishedAt(left) - liveFreshPublishedAt(right);
+    if (dateDifference !== 0) return dateDifference;
+    return String(left.id ?? "").localeCompare(String(right.id ?? ""));
+  });
+
+  const pendingSet = new Set(pending);
+  for (const row of unseen) {
+    const id = String(row.id ?? "");
+    if (!id || pendingSet.has(id)) continue;
+    pending.push(id);
+    pendingSet.add(id);
+  }
+
+  const hasMoreInBurst = raw.length > capacity && scanned.length > 0;
+  if (hasMoreInBurst) {
+    return {
+      liveCheckedAt: snapshot.liveCheckedAt,
+      livePending: pending,
+      liveScan: {
+        upperAt,
+        cursor: cursorPositionFromRow(scanned[scanned.length - 1]),
+      },
+    };
+  }
+
+  return {
+    liveCheckedAt: upperAt,
+    livePending: pending,
+    liveScan: null,
+  };
+}
+
+async function consumeLiveFresh(
+  reader: FeedSupabaseClient,
+  viewerClient: FeedSupabaseClient | null,
+  viewerId: string | null,
+  pending: string[],
+  selection: Pick<
+    FeedListCriteria,
+    "contentKind" | "cutoff" | "excludedAuthorIds" | "excludedPostIds"
+  >,
+  limit: number
+): Promise<{ posts: PostCardData[]; remainingPending: string[] }> {
+  if (limit <= 0 || pending.length === 0) {
+    return { posts: [], remainingPending: pending };
+  }
+
+  const foundRows: Array<Record<string, unknown>> = [];
+  let consumed = 0;
+  while (foundRows.length < limit && consumed < pending.length) {
+    const needed = limit - foundRows.length;
+    const batch = pending.slice(consumed, consumed + needed);
+    consumed += batch.length;
+    let raw: Array<Record<string, unknown>>;
+    try {
+      raw = await listFeedPostsByIds(
+        reader,
+        "resolve live fresh publications",
+        batch,
+        selection
+      );
+    } catch (error) {
+      if (!(error instanceof FeedDataError)) throw error;
+      console.warn(
+        "[feed-live-fresh] live card lookup unavailable; keeping pending ids for a later page",
+        error
+      );
+      return { posts: [], remainingPending: pending };
+    }
+    const byId = new Map(raw.map((row) => [String(row.id), row]));
+    for (const id of batch) {
+      const row = byId.get(id);
+      if (row) foundRows.push(row);
+    }
+  }
+
+  const posts = (await enrichPosts(reader, foundRows, viewerId, viewerClient)).map(
+    (post) => ({ ...post, candidate_source: "for_you_live_fresh" })
+  );
+  return {
+    posts,
+    remainingPending: pending.slice(consumed),
+  };
+}
+
+function mergeLiveFreshPosts(
+  livePosts: PostCardData[],
+  stablePosts: PostCardData[],
+  pageSize: number
+): PostCardData[] {
+  if (livePosts.length === 0) return stablePosts;
+  if (livePosts.length === 1) return [livePosts[0], ...stablePosts].slice(0, pageSize);
+
+  // Keep the snapshot's relative ordering intact while spreading two live
+  // cards across the page instead of stacking them as a chronological block.
+  const midpoint = Math.max(1, Math.floor(pageSize / 2));
+  const result = [livePosts[0], ...stablePosts];
+  result.splice(Math.min(midpoint, result.length), 0, livePosts[1]);
+  return result.slice(0, pageSize);
+}
+
 async function continueHomeSnapshot(
   reader: FeedSupabaseClient,
   viewerClient: FeedSupabaseClient | null,
@@ -776,15 +1152,32 @@ async function continueHomeSnapshot(
   pageSize: number,
   context: FeedCursorContext
 ): Promise<FeedPageResult> {
+  const liveState = await refreshLiveFreshState(
+    reader,
+    viewerId,
+    snapshot,
+    selection
+  );
+  const liveLimit = Math.min(LIVE_FRESH_SLOTS_PER_PAGE, pageSize);
+  const liveResult = await consumeLiveFresh(
+    reader,
+    viewerClient,
+    viewerId,
+    liveState.livePending,
+    selection,
+    liveLimit
+  );
+
   const remaining = [...snapshot.remaining];
   const foundRows: Array<Record<string, unknown>> = [];
   const sources = new Map<string, HybridCandidateSource>();
   let consumed = 0;
+  const stablePageSize = Math.max(0, pageSize - liveResult.posts.length);
 
   // A snapshotted post can disappear (deleted/unpublished/newly blocked).
   // Consume further ids until this page is full rather than returning holes.
-  while (foundRows.length < pageSize && consumed < remaining.length) {
-    const needed = pageSize - foundRows.length;
+  while (foundRows.length < stablePageSize && consumed < remaining.length) {
+    const needed = stablePageSize - foundRows.length;
     const batch = remaining.slice(consumed, consumed + needed);
     consumed += batch.length;
     const raw = await listFeedPostsByIds(
@@ -810,26 +1203,33 @@ async function continueHomeSnapshot(
     })
   );
 
-  let posts: PostCardData[] = rankedPosts;
+  let stablePosts: PostCardData[] = rankedPosts;
   let nextTail = snapshot.tail;
-  if (posts.length < pageSize && nextRemaining.length === 0 && nextTail) {
+  if (stablePosts.length < stablePageSize && nextRemaining.length === 0 && nextTail) {
     const tailResult = await consumeChronologicalTail(
       reader,
       viewerClient,
       viewerId,
       selection,
       nextTail,
-      pageSize - posts.length
+      stablePageSize - stablePosts.length
     );
-    posts = [...posts, ...tailResult.posts];
+    stablePosts = [...stablePosts, ...tailResult.posts];
     nextTail = tailResult.nextTail;
   }
+
+  const posts = mergeLiveFreshPosts(liveResult.posts, stablePosts, pageSize);
 
   const nextCursor = makeHomeCursor(
     context,
     snapshot.snapshotAt,
     nextRemaining,
-    nextTail
+    nextTail,
+    {
+      liveCheckedAt: liveState.liveCheckedAt,
+      livePending: liveResult.remainingPending,
+      liveScan: liveState.liveScan,
+    }
   );
   return { posts, hasMore: Boolean(nextCursor), nextCursor };
 }
@@ -859,7 +1259,11 @@ async function firstPageChronologicalFallback(
     hasMore && deliveredRows.length > 0
       ? cursorPositionFromRow(deliveredRows[deliveredRows.length - 1])
       : null;
-  const nextCursor = makeHomeCursor(context, snapshotAt, [], tail);
+  const nextCursor = makeHomeCursor(context, snapshotAt, [], tail, {
+    liveCheckedAt: latestPublishedAt(raw, snapshotAt),
+    livePending: [],
+    liveScan: null,
+  });
   return { posts, hasMore: Boolean(nextCursor), nextCursor };
 }
 
@@ -883,6 +1287,8 @@ export async function fetchFeedPage(options: FeedOptions): Promise<FeedPageResul
   const shouldUsePublicCache =
     Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY) &&
     tab === "home" &&
+    page === 1 &&
+    !cursor &&
     !userId &&
     userInterests.length === 0 &&
     followedIds.length === 0 &&
@@ -1038,7 +1444,14 @@ async function fetchFeedPageUncached(
       raw.length > RANKED_FEED_WINDOW && candidateRows.length > 0
         ? cursorPositionFromRow(candidateRows[candidateRows.length - 1])
         : null;
-    const nextCursor = makeHomeCursor(cursorContext, snapshotAt, remaining, tail);
+    const nextCursor = makeHomeCursor(cursorContext, snapshotAt, remaining, tail, {
+      // A publication can commit while the first candidate query is in flight.
+      // Advancing the live watermark through every row that query actually saw
+      // prevents that race from being injected again on page two.
+      liveCheckedAt: latestPublishedAt(raw, snapshotAt),
+      livePending: [],
+      liveScan: null,
+    });
 
     return {
       posts: firstPage,
@@ -1092,6 +1505,6 @@ const fetchCachedPublicFeedPage = unstable_cache(
       null
     );
   },
-  ["public-feed-page-v4-1"],
+  ["public-feed-page-v4-2"],
   { revalidate: 30, tags: ["feed", "public-feed"] }
 );
