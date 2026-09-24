@@ -16,7 +16,7 @@ export const HOME_FEED_TABS = ["home", "following"] as const;
 export type HomeFeedTab = (typeof HOME_FEED_TABS)[number];
 
 export const HOME_FEED_TAB_LABELS: Record<HomeFeedTab, string> = {
-  home: "For you",
+  home: "For You",
   following: "Following",
 };
 

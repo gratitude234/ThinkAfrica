@@ -19,7 +19,7 @@ describe("Home feed modes", () => {
 
   it("are labelled the way a member reads them", () => {
     expect(HOME_FEED_TABS.map((tab) => HOME_FEED_TAB_LABELS[tab])).toEqual([
-      "For you",
+      "For You",
       "Following",
     ]);
   });

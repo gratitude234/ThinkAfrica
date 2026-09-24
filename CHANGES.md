@@ -1,3 +1,14 @@
+# 24 September 2026 — Home feed switcher UX polish
+
+- Rebuilt the Home `For You` / `Following` control as a balanced 50/50 switcher instead of a left-clustered, horizontally scrollable tab row.
+- Made the switcher full-bleed on mobile while keeping publication rows inside the 16px reading gutter, and removed the sticky-state drop shadow in favour of the existing quiet divider.
+- Strengthened the active state with a short centred brand indicator, 48px touch targets, 14px labels, and standardized `For You` capitalization.
+- Added independent per-tab scroll restoration so returning to a cached feed restores the reader's previous position.
+- Stopped automatically refetching a warm cached tab; cached modes switch instantly and only run a background freshness check after 60 seconds or when the app regains focus.
+- Added non-disruptive freshness staging: newly published page-one content is held behind a small status dot and never inserted underneath the reader's current snapshot. Reselecting the active tab at the top applies the staged snapshot; reselecting while deep in the feed first returns to the top.
+- Kept Feed v4.3 ranking, Following chronology, signed cursor pagination, exposure attribution, and feed API contracts unchanged.
+- Updated Home feed regression coverage for equal-width tabs, full-bleed mobile chrome, cache reuse, per-tab scroll restoration, active-tab reselect behavior, freshness staging, and request-race safety.
+
 # 24 September 2026 — Home Feed Screen 02 mockup implementation
 
 - Implemented the approved Home Feed mockup as a presentation-layer pass without changing feed-v4 ranking, cursor, exposure, or live-session freshness logic.

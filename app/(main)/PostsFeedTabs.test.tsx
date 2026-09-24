@@ -45,11 +45,8 @@ class MockIntersectionObserver {
 }
 let observerInstances: MockIntersectionObserver[] = [];
 
-// The component runs two observers: infinite scroll (rootMargin "400px 0px")
-// and the pinned-state watcher on the feed-top marker (a negative top margin
-// matching the nav height). Select by rootMargin rather than by position, and
-// take the newest match: the infinite-scroll effect registers a fresh observer
-// on every cache write, so the earliest match is usually a disconnected one.
+// Infinite scroll re-registers its observer on cache writes, so take the newest
+// observer matching the expected root margin rather than relying on creation order.
 function observerMatching(label: string, predicate: (rootMargin: string) => boolean) {
   const matches = observerInstances.filter((instance) =>
     predicate(instance.options?.rootMargin ?? "")
@@ -66,8 +63,6 @@ function observerMatching(label: string, predicate: (rootMargin: string) => bool
 
 const infiniteScrollObserver = () =>
   observerMatching("infinite-scroll", (m) => m.startsWith("400px"));
-const pinnedStateObserver = () =>
-  observerMatching("pinned-state", (m) => m.startsWith("-"));
 
 function post(id: string): PostCardData {
   return {
@@ -119,18 +114,24 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  Object.defineProperty(window, "scrollY", {
+    configurable: true,
+    writable: true,
+    value: 0,
+  });
 });
 
 describe("PostsFeedTabs -- feed modes", () => {
-  it("offers a member exactly two modes, For you and Following", () => {
+  it("offers a member exactly two modes, For You and Following", () => {
     render(<PostsFeedTabs {...member} />);
 
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
-      "For you",
+      "For You",
       "Following",
     ]);
-    expect(screen.getByRole("tab", { name: "For you" })).toHaveAttribute(
+    expect(screen.getByRole("tab", { name: "For You" })).toHaveAttribute(
       "aria-selected",
       "true"
     );
@@ -164,14 +165,17 @@ describe("PostsFeedTabs -- feed modes", () => {
     expect(requestParams(fetchMock, 0).get("page")).toBe("1");
 
     await act(async () => {
-      fireEvent.click(screen.getByRole("tab", { name: "For you" }));
+      fireEvent.click(screen.getByRole("tab", { name: "For You" }));
     });
 
     expect(window.location.search).toBe("");
-    expect(screen.getByRole("tab", { name: "For you" })).toHaveAttribute(
+    expect(screen.getByRole("tab", { name: "For You" })).toHaveAttribute(
       "aria-selected",
       "true"
     );
+    // Returning to a warm cached tab should be instant, not another page-one
+    // request that throws away the reader's snapshot.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("moves between the two modes with the arrow keys", async () => {
@@ -287,10 +291,6 @@ describe("PostsFeedTabs -- scroll position on tab switch", () => {
     );
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   it("returns a reader who is scrolled into the feed back to the top of it", async () => {
     const scrollTo = vi.fn();
     vi.stubGlobal("scrollTo", scrollTo);
@@ -324,6 +324,63 @@ describe("PostsFeedTabs -- scroll position on tab switch", () => {
     });
 
     expect(scrollTo).not.toHaveBeenCalled();
+  });
+
+  it("restores each cached feed to the reader's previous scroll position", async () => {
+    let scrollY = 1200;
+    Object.defineProperty(window, "scrollY", {
+      configurable: true,
+      get: () => scrollY,
+    });
+    const scrollTo = vi.fn(({ top }: ScrollToOptions) => {
+      scrollY = Number(top ?? 0);
+    });
+    vi.stubGlobal("scrollTo", scrollTo);
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(() => ({
+      top: -scrollY,
+    } as DOMRect));
+
+    const fetchMock = vi.fn(async () => page([post("following")]));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<PostsFeedTabs {...member} initialPosts={[post("home")]} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("tab", { name: "Following" }));
+    });
+    await waitFor(() => expect(screen.getByTestId("feed")).toHaveTextContent("following"));
+
+    scrollY = 700;
+    await act(async () => {
+      fireEvent.click(screen.getByRole("tab", { name: "For You" }));
+    });
+    await waitFor(() =>
+      expect(scrollTo).toHaveBeenLastCalledWith({ top: 1200, behavior: "instant" })
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("tab", { name: "Following" }));
+    });
+    await waitFor(() =>
+      expect(scrollTo).toHaveBeenLastCalledWith({ top: 700, behavior: "instant" })
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("reselecting the active feed scrolls to its top before it refreshes", async () => {
+    const scrollTo = vi.fn();
+    vi.stubGlobal("scrollTo", scrollTo);
+    const fetchMock = vi.fn(async () => page([post("refreshed")]));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<PostsFeedTabs {...member} initialPosts={[post("home")]} />);
+
+    vi.stubGlobal("scrollY", 1800);
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
+      top: -1800,
+    } as DOMRect);
+
+    fireEvent.click(screen.getByRole("tab", { name: "For You" }));
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "instant" });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
@@ -566,9 +623,9 @@ describe("PostsFeedTabs -- error and retry states", () => {
   });
 });
 
-// jsdom has no layout engine and never actually pins a sticky element, so the
-// pinned state is driven through the observer directly and asserted on classes.
-describe("PostsFeedTabs -- pinned tab strip", () => {
+// The switcher is application chrome: full-bleed on mobile, balanced 50/50,
+// and intentionally flat even when sticky.
+describe("PostsFeedTabs -- feed switcher layout", () => {
   beforeEach(() => {
     vi.stubGlobal("IntersectionObserver", MockIntersectionObserver);
   });
@@ -585,60 +642,78 @@ describe("PostsFeedTabs -- pinned tab strip", () => {
     return row;
   }
 
-  function setPinned(isPinned: boolean) {
-    const observer = pinnedStateObserver();
-    act(() => {
-      observer.callback(
-        [{ isIntersecting: !isPinned } as IntersectionObserverEntry],
-        observer as unknown as IntersectionObserver
-      );
-    });
-  }
-
-  it("shows no shadow at rest, and gains one once pinned", () => {
+  it("uses a balanced two-column switcher instead of a scrollable link row", () => {
     const { container } = render(<PostsFeedTabs {...member} />);
+    const row = tabRow(container);
 
-    expect(tabRow(container).className).not.toMatch(/shadow-/);
-    setPinned(true);
-    expect(tabRow(container).className).toMatch(/shadow-/);
-    setPinned(false);
-    expect(tabRow(container).className).not.toMatch(/shadow-/);
+    expect(row).toHaveClass("grid", "grid-cols-2", "border-b", "border-divider");
+    expect(row.className).not.toMatch(/overflow-x-auto|shadow-/);
+    for (const tab of screen.getAllByRole("tab")) {
+      expect(tab).toHaveClass("w-full", "min-h-12", "justify-center");
+    }
   });
 
-  // The border sits in the box at both states so pinning cannot reflow content.
-  it("keeps the border in the box in both states", () => {
-    const { container } = render(<PostsFeedTabs {...member} />);
-
-    expect(tabRow(container)).toHaveClass("border-b", "border-divider");
-    setPinned(true);
-    expect(tabRow(container)).toHaveClass("border-b", "border-divider");
+  it("keeps only a short centered indicator under the active label", () => {
+    render(<PostsFeedTabs {...member} />);
+    const active = screen.getByRole("tab", { name: "For You" });
+    const indicator = active.querySelector("span[aria-hidden='true']:last-child");
+    expect(indicator).toHaveClass("w-10", "bg-emerald-brand");
   });
 
-  // The offset itself is the shared rule's job. A local `sticky top-...` would
-  // freeze the offset at the nav's expanded height and reopen a hole under it.
-  it("defers pinning to the shared chrome rule", () => {
+  it("defers pinning to shared chrome and breaks out of the mobile reading gutter", () => {
     const { container } = render(<PostsFeedTabs {...member} />);
+    const strip = stickyStrip(container);
 
-    expect(stickyStrip(container)).toHaveAttribute("data-app-context-nav");
-    expect(stickyStrip(container)).toHaveAttribute("data-app-chrome-motion");
-    expect(stickyStrip(container)).not.toHaveClass("sticky");
-  });
-
-  it("keeps the strip transparent and paints the tab row full-bleed", () => {
-    const { container } = render(<PostsFeedTabs {...member} />);
-
-    expect(stickyStrip(container)).not.toHaveClass("bg-card");
-    expect(stickyStrip(container)).not.toHaveClass("px-4");
-    expect(stickyStrip(container)).toHaveClass("pointer-events-none");
+    expect(strip).toHaveAttribute("data-app-context-nav");
+    expect(strip).toHaveAttribute("data-app-chrome-motion");
+    expect(strip).toHaveClass("-mx-4", "w-[calc(100%+2rem)]", "md:mx-0", "md:w-full");
+    expect(strip).not.toHaveClass("sticky", "bg-card", "px-4");
     expect(tabRow(container)).toHaveClass("bg-canvas", "pointer-events-auto");
   });
 
   it("has no filter row under the tabs", () => {
     const { container } = render(<PostsFeedTabs {...member} />);
-
     expect(container.querySelector("[data-app-context-expanded]")).toBeNull();
   });
 });
+
+describe("PostsFeedTabs -- non-disruptive freshness", () => {
+  beforeEach(() => vi.stubGlobal("IntersectionObserver", MockIntersectionObserver));
+
+  it("stages newly published content behind a dot instead of replacing the visible snapshot", async () => {
+    let now = Date.now();
+    vi.spyOn(Date, "now").mockImplementation(() => now);
+    const fresh = {
+      ...post("fresh"),
+      created_at: new Date(now + 61_000).toISOString(),
+      published_at: new Date(now + 61_000).toISOString(),
+    };
+    const fetchMock = vi.fn(async () => page([fresh]));
+    vi.stubGlobal("fetch", fetchMock);
+    const { container } = render(
+      <PostsFeedTabs {...member} initialPosts={[post("original")]} />
+    );
+
+    now += 61_000;
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+    });
+
+    await waitFor(() =>
+      expect(container.querySelector("[data-feed-new-indicator]")).not.toBeNull()
+    );
+    expect(screen.getByTestId("feed")).toHaveTextContent("original");
+    expect(screen.getByTestId("feed")).not.toHaveTextContent("fresh");
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("tab", { name: "For You" }));
+    });
+    expect(screen.getByTestId("feed")).toHaveTextContent("fresh");
+    expect(container.querySelector("[data-feed-new-indicator]")).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
 
 
 describe("PostsFeedTabs -- snapshot and retry safety", () => {
@@ -670,13 +745,12 @@ describe("PostsFeedTabs -- snapshot and retry safety", () => {
     vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(r => pending.push(r))));
     render(<PostsFeedTabs {...member} initialPosts={[post("original")]} />);
     fireEvent.click(screen.getByRole("tab", { name: "Following" }));
-    fireEvent.click(screen.getByRole("tab", { name: "For you" }));
+    fireEvent.click(screen.getByRole("tab", { name: "For You" }));
     fireEvent.click(screen.getByRole("tab", { name: "Following" }));
-    await act(async () => pending[2](page([post("new-following")])));
+    await act(async () => pending[1](page([post("new-following")])));
     await act(async () => pending[0](page([post("old-following")])));
     expect(screen.getByTestId("feed")).toHaveTextContent("new-following");
     expect(screen.getByTestId("feed")).not.toHaveTextContent("old-following");
-    await act(async () => pending[1](page([post("new-home")])));
   });
 
   it("discards a late pagination response after refreshing the same tab", async () => {
@@ -684,7 +758,7 @@ describe("PostsFeedTabs -- snapshot and retry safety", () => {
     vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(r => pending.push(r))));
     render(<PostsFeedTabs {...member} initialPosts={[post("original")]} initialHasMore />);
     fireEvent.click(screen.getByRole("button", { name: "Load more" }));
-    fireEvent.click(screen.getByRole("tab", { name: "For you" }));
+    fireEvent.click(screen.getByRole("tab", { name: "For You" }));
     await act(async () => pending[1](page([post("fresh-snapshot")])));
     await act(async () => pending[0](page([post("stale-page")], true, "stale-cursor")));
     expect(screen.getByTestId("feed")).toHaveTextContent("fresh-snapshot");
@@ -692,7 +766,9 @@ describe("PostsFeedTabs -- snapshot and retry safety", () => {
     expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
   });
 
-  it("keeps the cached snapshot's session if its background refresh fails", async () => {
+  it("keeps the cached snapshot's session if its background freshness check fails", async () => {
+    let now = Date.now();
+    vi.spyOn(Date, "now").mockImplementation(() => now);
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(page([post("following")]))
       .mockResolvedValueOnce(new Response("failed", { status: 500 }))
@@ -700,7 +776,9 @@ describe("PostsFeedTabs -- snapshot and retry safety", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<PostsFeedTabs {...member} initialPosts={[post("original")]} initialHasMore initialNextCursor="original-cursor" />);
     await act(async () => fireEvent.click(screen.getByRole("tab", { name: "Following" })));
-    await act(async () => fireEvent.click(screen.getByRole("tab", { name: "For you" })));
+    now += 61_000;
+    await act(async () => fireEvent.click(screen.getByRole("tab", { name: "For You" })));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "Load more" })));
     expect(requestParams(fetchMock, 2).get("cursor")).toBe("original-cursor");
     expect(requestParams(fetchMock, 2).get("session")).not.toBe(requestParams(fetchMock, 1).get("session"));

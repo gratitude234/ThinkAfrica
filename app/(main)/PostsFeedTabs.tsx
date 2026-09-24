@@ -18,6 +18,9 @@ import { useAppChrome } from "./AppChromeProvider";
 
 const EMPTY_POSTS: PostCardData[] = [];
 const PAGE_SIZE = 12;
+const FEED_CACHE_FRESH_MS = 60_000;
+const NEW_POST_CLOCK_SKEW_MS = 5_000;
+const FEED_TOP_TOLERANCE_PX = 24;
 
 const CTA_CLASS =
   "inline-flex min-h-11 items-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0E4B37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2";
@@ -42,6 +45,33 @@ interface FeedCacheEntry extends FeedResponse {
   page: number;
   emptyPageCount: number;
   feedSessionId: string;
+  loadedSuccessfully: boolean;
+  lastCheckedAt: number;
+}
+
+interface FreshFeedCandidate {
+  result: FeedResponse;
+  feedSessionId: string;
+}
+
+function postPublishedAtMs(post: PostCardData) {
+  const value = post.published_at ?? post.created_at;
+  const parsed = value ? Date.parse(value) : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function containsNewlyPublishedPosts(
+  current: FeedCacheEntry,
+  incoming: PostCardData[]
+) {
+  if (incoming.length === 0) return false;
+  const existingIds = new Set(current.posts.map((post) => post.id));
+  const publishedAfter = current.lastCheckedAt - NEW_POST_CLOCK_SKEW_MS;
+
+  return incoming.some(
+    (post) =>
+      !existingIds.has(post.id) && postPublishedAtMs(post) >= publishedAfter
+  );
 }
 
 function buildFeedUrl(tab: HomeFeedTab) {
@@ -145,8 +175,13 @@ export default function PostsFeedTabs({
       page: 1,
       feedSessionId: initialSessionId,
       emptyPageCount: initialPosts.length === 0 ? 1 : 0,
+      loadedSuccessfully: !initialLoadFailed,
+      lastCheckedAt: Date.now(),
     },
   }));
+  const [pendingFresh, setPendingFresh] = useState<
+    Partial<Record<HomeFeedTab, FreshFeedCandidate>>
+  >({});
   const [isSwitching, setIsSwitching] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   // Two distinct failure modes: initialError replaces the panel with a
@@ -155,16 +190,20 @@ export default function PostsFeedTabs({
   // adds a compact inline retry banner at the bottom.
   const [initialError, setInitialError] = useState(initialLoadFailed);
   const [paginationError, setPaginationError] = useState(false);
-  const [isPinned, setIsPinned] = useState(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const feedTopRef = useRef<HTMLDivElement | null>(null);
   const stripRef = useRef<HTMLDivElement | null>(null);
   const refreshVersionsRef = useRef<Record<HomeFeedTab, number>>({ home: 0, following: 0 });
+  const freshCheckVersionsRef = useRef<Record<HomeFeedTab, number>>({ home: 0, following: 0 });
+  const freshCheckPendingRef = useRef<Record<HomeFeedTab, boolean>>({ home: false, following: false });
   const refreshPendingRef = useRef(false);
   const paginationPendingRef = useRef(false);
   const inFlightRef = useRef(new Map<string, Promise<FeedResponse>>());
   const activeRequestRef = useRef(0);
   const loadMoreRequestRef = useRef(0);
+  const feedCacheRef = useRef(feedCache);
+  const scrollPositionsRef = useRef<Record<HomeFeedTab, number>>({ home: 0, following: 0 });
+  const pendingScrollRestoreRef = useRef<{ tab: HomeFeedTab; top: number } | null>(null);
 
   const tabs = visibleHomeFeedTabs(Boolean(currentUserId));
   // A guest has For You alone, and one mode is not presented as a choice.
@@ -175,6 +214,10 @@ export default function PostsFeedTabs({
   useStickySubnav(stripRef, feedTopRef);
 
   useEffect(() => {
+    feedCacheRef.current = feedCache;
+  }, [feedCache]);
+
+  useEffect(() => {
     const incomingFeedSessionId =
       initialPosts[0]?.feed_exposure?.feedSessionId;
     // Invalidate work from the previous server-rendered snapshot.
@@ -182,6 +225,10 @@ export default function PostsFeedTabs({
     loadMoreRequestRef.current += 1;
     refreshVersionsRef.current.home += 1;
     refreshVersionsRef.current.following += 1;
+    freshCheckVersionsRef.current.home += 1;
+    freshCheckVersionsRef.current.following += 1;
+    freshCheckPendingRef.current.home = false;
+    freshCheckPendingRef.current.following = false;
     refreshPendingRef.current = false;
     paginationPendingRef.current = false;
     setActiveTab(initialTab);
@@ -194,8 +241,13 @@ export default function PostsFeedTabs({
         page: 1,
         feedSessionId: incomingFeedSessionId ?? initialSessionId,
         emptyPageCount: initialPosts.length === 0 ? 1 : 0,
+        loadedSuccessfully: !initialLoadFailed,
+        lastCheckedAt: Date.now(),
       },
     }));
+    setPendingFresh({});
+    scrollPositionsRef.current = { home: 0, following: 0 };
+    pendingScrollRestoreRef.current = null;
     setIsSwitching(false);
     setIsLoadingMore(false);
     setInitialError(initialLoadFailed);
@@ -279,6 +331,10 @@ export default function PostsFeedTabs({
             page,
             feedSessionId,
             emptyPageCount,
+            loadedSuccessfully: true,
+            lastCheckedAt: append
+              ? (previous?.lastCheckedAt ?? Date.now())
+              : Date.now(),
           },
         };
       });
@@ -298,6 +354,7 @@ export default function PostsFeedTabs({
       }
     ) => {
       const version = ++refreshVersionsRef.current[tab];
+      freshCheckVersionsRef.current[tab] += 1;
       refreshPendingRef.current = true;
       setIsSwitching(true);
       if (showError) setInitialError(false);
@@ -308,6 +365,10 @@ export default function PostsFeedTabs({
         const result = await requestFeedPage(tab, 1, feedSessionId, null);
         if (refreshVersionsRef.current[tab] === version) {
           writeFeedPage(tab, result, 1, false, feedSessionId);
+          setPendingFresh((current) => {
+            if (!current[tab]) return current;
+            return { ...current, [tab]: undefined };
+          });
         }
       } catch {
         if (activeRequestRef.current === requestId && showError) {
@@ -323,55 +384,195 @@ export default function PostsFeedTabs({
     [requestFeedPage, writeFeedPage]
   );
 
-  // Switching tabs swaps the entire list underneath a scroll position that was
-  // meaningful for the old one. Snap back to the top of the feed, but only when
-  // the reader is already below it, so switching from the top of the page never
-  // yanks the viewport.
-  const scrollFeedToTop = useCallback(() => {
+  const feedTopTarget = useCallback(() => {
     const anchor = feedTopRef.current;
-    if (!anchor || typeof window === "undefined") return;
-
-    // The measured height, not the live offset. This scroll always moves
-    // upward, and an upward scroll is exactly what brings the nav back -- so by
-    // the time the tab's new cards are on screen there is a full nav bar at the
-    // top again, and the marker has to land below it.
-    revealChrome({ immediate: true });
-    const target = Math.max(
+    if (!anchor || typeof window === "undefined") return 0;
+    return Math.max(
       window.scrollY + anchor.getBoundingClientRect().top - navHeight,
       0
     );
-    if (window.scrollY <= target) return;
-    // "instant", not "auto". Per CSSOM View, "auto" defers to the computed
-    // scroll-behavior, and globals.css sets `html { scroll-behavior: smooth }`
-    // for everyone who has not asked for reduced motion, so "auto" animated
-    // the reader back up past every card they were trying to leave.
+  }, [navHeight]);
+
+  // Re-selecting the active mode acts like a native feed tab: first return to
+  // the top; once already there, refresh. The explicit "instant" behavior
+  // avoids inheriting the site's smooth-scroll CSS for a large upward jump.
+  const scrollFeedToTop = useCallback(() => {
+    if (typeof window === "undefined") return false;
+    revealChrome({ immediate: true });
+    const target = feedTopTarget();
+    if (window.scrollY <= target + FEED_TOP_TOLERANCE_PX) return false;
     window.scrollTo({ top: target, behavior: "instant" });
-  }, [navHeight, revealChrome]);
+    return true;
+  }, [feedTopTarget, revealChrome]);
+
+  const checkForFreshContent = useCallback(
+    async (tab: HomeFeedTab, entry?: FeedCacheEntry) => {
+      const cached = entry ?? feedCacheRef.current[tab];
+      if (!cached?.loadedSuccessfully) return;
+      if (pendingFresh[tab]) return;
+      if (Date.now() - cached.lastCheckedAt < FEED_CACHE_FRESH_MS) return;
+      if (freshCheckPendingRef.current[tab]) return;
+
+      freshCheckPendingRef.current[tab] = true;
+      const version = ++freshCheckVersionsRef.current[tab];
+      const sourceSessionId = cached.feedSessionId;
+      const feedSessionId = crypto.randomUUID();
+
+      try {
+        const result = await requestFeedPage(tab, 1, feedSessionId, null);
+        const latest = feedCacheRef.current[tab];
+        if (
+          freshCheckVersionsRef.current[tab] !== version ||
+          !latest ||
+          latest.feedSessionId !== sourceSessionId
+        ) {
+          return;
+        }
+
+        if (containsNewlyPublishedPosts(latest, result.posts)) {
+          setPendingFresh((current) => ({
+            ...current,
+            [tab]: { result, feedSessionId },
+          }));
+        } else {
+          setFeedCache((current) => {
+            const currentEntry = current[tab];
+            if (!currentEntry || currentEntry.feedSessionId !== sourceSessionId) {
+              return current;
+            }
+            return {
+              ...current,
+              [tab]: { ...currentEntry, lastCheckedAt: Date.now() },
+            };
+          });
+        }
+      } catch {
+        // Freshness checks are deliberately fail-soft. The reader already has
+        // a valid snapshot, so a background check must never replace it with an
+        // error state or interrupt pagination.
+      } finally {
+        freshCheckPendingRef.current[tab] = false;
+      }
+    },
+    [pendingFresh, requestFeedPage]
+  );
+
+  const applyPendingFresh = useCallback(
+    (tab: HomeFeedTab) => {
+      const candidate = pendingFresh[tab];
+      if (!candidate) return false;
+
+      activeRequestRef.current += 1;
+      loadMoreRequestRef.current += 1;
+      refreshVersionsRef.current[tab] += 1;
+      freshCheckVersionsRef.current[tab] += 1;
+      refreshPendingRef.current = false;
+      paginationPendingRef.current = false;
+      setInitialError(false);
+      setPaginationError(false);
+      setIsLoadingMore(false);
+      setIsSwitching(false);
+      writeFeedPage(tab, candidate.result, 1, false, candidate.feedSessionId);
+      setPendingFresh((current) => ({ ...current, [tab]: undefined }));
+      scrollFeedToTop();
+      return true;
+    },
+    [pendingFresh, scrollFeedToTop, writeFeedPage]
+  );
+
+  // Restoring a cached mode happens after React has committed that mode's list,
+  // so the browser is not asked to scroll against the previous tab's height.
+  useEffect(() => {
+    const pending = pendingScrollRestoreRef.current;
+    if (!pending || pending.tab !== activeTab || typeof window === "undefined") {
+      return;
+    }
+    pendingScrollRestoreRef.current = null;
+    if (Math.abs(window.scrollY - pending.top) <= 1) return;
+    window.scrollTo({ top: pending.top, behavior: "instant" });
+  }, [activeTab]);
+
+  // When the app regains attention, stale cached tabs get a cheap page-one
+  // freshness check. New content is staged behind a dot instead of being
+  // inserted under the reader and shifting the current snapshot.
+  useEffect(() => {
+    const checkActive = () => {
+      const entry = feedCacheRef.current[activeTab];
+      if (entry) void checkForFreshContent(activeTab, entry);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") checkActive();
+    };
+
+    window.addEventListener("focus", checkActive);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", checkActive);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [activeTab, checkForFreshContent]);
 
   const selectTab = useCallback(
     (nextTab: HomeFeedTab) => {
-      const hasCachedFeed = Boolean(feedCache[nextTab]);
+      if (typeof window === "undefined") return;
+
+      if (nextTab === activeTab) {
+        if (scrollFeedToTop()) return;
+        if (applyPendingFresh(nextTab)) return;
+
+        const requestId = activeRequestRef.current + 1;
+        activeRequestRef.current = requestId;
+        loadMoreRequestRef.current += 1;
+        paginationPendingRef.current = false;
+        setPaginationError(false);
+        setIsLoadingMore(false);
+        void reloadFeed(nextTab, { requestId, showError: initialError });
+        return;
+      }
+
+      scrollPositionsRef.current[activeTab] = window.scrollY;
+      const cachedFeed = feedCache[nextTab];
+      const hasCachedFeed = Boolean(cachedFeed?.loadedSuccessfully);
       const requestId = activeRequestRef.current + 1;
       activeRequestRef.current = requestId;
-      // Invalidate any pagination request owned by the previous tab. Its
-      // result is discarded so it cannot append an old snapshot or change
-      // the loading/error state for the newly active one.
+
+      // Invalidate pagination owned by the previous tab. Its late result must
+      // never append into the newly active surface.
       loadMoreRequestRef.current += 1;
       paginationPendingRef.current = false;
+      refreshPendingRef.current = false;
 
       setActiveTab(nextTab);
       setInitialError(false);
       setPaginationError(false);
       setIsLoadingMore(false);
       setIsSwitching(!hasCachedFeed);
-      scrollFeedToTop();
       window.history.replaceState(null, "", buildFeedUrl(nextTab));
-      void reloadFeed(nextTab, {
-        requestId,
-        showError: !hasCachedFeed,
-      });
+
+      if (hasCachedFeed && cachedFeed) {
+        pendingScrollRestoreRef.current = {
+          tab: nextTab,
+          top: scrollPositionsRef.current[nextTab] ?? 0,
+        };
+        if (!pendingFresh[nextTab]) {
+          void checkForFreshContent(nextTab, cachedFeed);
+        }
+        return;
+      }
+
+      scrollFeedToTop();
+      void reloadFeed(nextTab, { requestId, showError: true });
     },
-    [feedCache, reloadFeed, scrollFeedToTop]
+    [
+      activeTab,
+      applyPendingFresh,
+      checkForFreshContent,
+      feedCache,
+      pendingFresh,
+      initialError,
+      reloadFeed,
+      scrollFeedToTop,
+    ]
   );
 
   const retryInitial = useCallback(() => {
@@ -483,37 +684,6 @@ export default function PostsFeedTabs({
     return () => observer.disconnect();
   }, [activeTab, feedCache, isSwitching, isLoadingMore, initialError, paginationError, loadMore]);
 
-  // Track whether the tab strip is currently pinned, so its shadow only
-  // appears while cards are actually passing beneath it -- a permanent shadow
-  // reads as a bar floating over nothing when the page is at rest.
-  //
-  // feedTopRef is the non-sticky marker just above the strip, so it leaves the
-  // viewport at exactly the moment the strip pins. Watching it costs one
-  // IntersectionObserver instead of a layout read on every scroll event.
-  useEffect(() => {
-    const anchor = feedTopRef.current;
-    if (!anchor || typeof IntersectionObserver === "undefined") return;
-
-    // Deliberately the measured height, frozen at mount, rather than the live
-    // --app-nav-offset: this gates the strip's shadow, not its position, and
-    // rebuilding the observer on every hide/reveal would flicker it.
-    const measuredNavHeight =
-      Number.parseFloat(
-        getComputedStyle(document.documentElement).getPropertyValue("--app-nav-height")
-      ) || 0;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0];
-        if (entry) setIsPinned(!entry.isIntersecting);
-      },
-      { rootMargin: `-${measuredNavHeight}px 0px 0px 0px`, threshold: 0 }
-    );
-
-    observer.observe(anchor);
-    return () => observer.disconnect();
-  }, []);
-
   const currentFeed = feedCache[activeTab];
   const posts = currentFeed?.posts ?? EMPTY_POSTS;
   const hasMore = currentFeed?.hasMore ?? false;
@@ -527,6 +697,7 @@ export default function PostsFeedTabs({
     !showSkeleton &&
     !isSwitching &&
     !isLoadingMore &&
+    !pendingFresh[activeTab] &&
     (!hasMore || emptyPageCount >= 3);
 
   /**
@@ -565,53 +736,67 @@ export default function PostsFeedTabs({
           document -- the sticky wrapper's own rect lies once it is pinned. */}
       <div ref={feedTopRef} aria-hidden="true" />
 
-      {/* Pinned beneath the nav while the nav is there, and at the very top of
-          the viewport once it isn't. The sticky offset comes from the shared
-          [data-app-context-nav] rule, which tracks the nav's live occupancy.
-
-          The wrapper paints nothing and swallows no taps; the tab row carries
-          its own full-bleed background and padding, so cards passing beneath
-          have no transparent gutter to ghost through. The bottom border is
-          always in the box, so gaining the shadow once pinned costs no reflow. */}
+      {/* The two Home modes are a balanced feed switcher, not a generic
+          horizontally scrolling tab list. On mobile the control breaks out of
+          the 16px reading gutter so it belongs to app chrome; publication rows
+          keep the reading gutter below it. */}
       {showTabs ? (
-        <div
-          ref={stripRef}
-          data-app-context-nav=""
-          data-app-chrome-motion=""
-          className="pointer-events-none z-30 mb-0 w-full"
-        >
+        <>
+          <span className="sr-only" aria-live="polite">
+            {pendingFresh[activeTab]
+              ? `New posts available in ${HOME_FEED_TAB_LABELS[activeTab]}.`
+              : ""}
+          </span>
           <div
-            data-app-context-primary=""
-            className={`pointer-events-auto flex gap-1 overflow-x-auto overscroll-x-contain border-b border-divider bg-canvas [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
-              isPinned ? "shadow-[0_1px_12px_rgb(0,0,0,0.08)]" : ""
-            }`}
-            role="tablist"
-            aria-label="Choose feed"
-            onKeyDown={handleTabKeyDown}
+            ref={stripRef}
+            data-app-context-nav=""
+            data-app-chrome-motion=""
+            className="pointer-events-none z-30 -mx-4 mb-0 w-[calc(100%+2rem)] md:mx-0 md:w-full"
           >
-            {tabs.map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                role="tab"
-                id={`feed-tab-${tab}`}
-                aria-controls="home-feed-panel"
-                aria-selected={activeTab === tab}
-                tabIndex={activeTab === tab ? 0 : -1}
-                onClick={() => selectTab(tab)}
-                // Underline only. Tabs are navigation, not an action, so they
-                // should be the quietest thing on the page.
-                className={`-mb-px min-h-10 shrink-0 border-b-2 sm:min-h-0 px-2.5 py-2 text-[13.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold sm:px-3.5 ${
-                  activeTab === tab
-                    ? "border-emerald-brand text-ink"
-                    : "border-transparent text-ink-muted hover:text-ink"
-                }`}
-              >
-                {HOME_FEED_TAB_LABELS[tab]}
-              </button>
-            ))}
+            <div
+              data-app-context-primary=""
+              className="pointer-events-auto grid grid-cols-2 border-b border-divider bg-canvas"
+              role="tablist"
+              aria-label="Choose feed"
+              onKeyDown={handleTabKeyDown}
+            >
+              {tabs.map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  role="tab"
+                  id={`feed-tab-${tab}`}
+                  aria-controls="home-feed-panel"
+                  aria-selected={activeTab === tab}
+                  tabIndex={activeTab === tab ? 0 : -1}
+                  onClick={() => selectTab(tab)}
+                  className={`relative flex min-h-12 w-full items-center justify-center px-4 py-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold ${
+                    activeTab === tab
+                      ? "text-ink"
+                      : "text-ink-muted hover:text-ink"
+                  }`}
+                >
+                  <span className="relative inline-flex items-center">
+                    {HOME_FEED_TAB_LABELS[tab]}
+                    {pendingFresh[tab] ? (
+                      <span
+                        data-feed-new-indicator=""
+                        aria-hidden="true"
+                        className="absolute -right-2.5 top-0 h-1.5 w-1.5 rounded-full bg-emerald-ink"
+                      />
+                    ) : null}
+                  </span>
+                  {activeTab === tab ? (
+                    <span
+                      aria-hidden="true"
+                      className="absolute -bottom-px left-1/2 h-0.5 w-10 -translate-x-1/2 rounded-full bg-emerald-brand"
+                    />
+                  ) : null}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        </>
       ) : null}
 
       <div
