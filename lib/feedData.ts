@@ -1092,6 +1092,6 @@ const fetchCachedPublicFeedPage = unstable_cache(
       null
     );
   },
-  ["public-feed-page-v4"],
-  { revalidate: 120, tags: ["feed", "public-feed"] }
+  ["public-feed-page-v4-1"],
+  { revalidate: 30, tags: ["feed", "public-feed"] }
 );

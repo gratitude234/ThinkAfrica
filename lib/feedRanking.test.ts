@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DIVERSITY_WINDOW_SIZE,
+  EXPLORATION_FADE_OUT_IMPRESSIONS,
   FRESHNESS_HALF_LIFE_HOURS,
+  INITIAL_DISTRIBUTION_IMPRESSIONS,
   MAX_POSTS_PER_AUTHOR_PER_WINDOW,
   MAX_POSTS_PER_TOPIC_PER_WINDOW,
   RELEVANCE_WEIGHTS,
@@ -120,6 +122,39 @@ describe("scorePost", () => {
     );
   });
 
+  it("removes the hard 100-impression cliff and fades exploration gradually", () => {
+    const at99 = scorePostBreakdown(post({ impression_count: 99 }), anonymous);
+    const at100 = scorePostBreakdown(post({ impression_count: 100 }), anonymous);
+    const nearFadeOut = scorePostBreakdown(
+      post({ impression_count: EXPLORATION_FADE_OUT_IMPRESSIONS - 1 }),
+      anonymous
+    );
+    const fadedOut = scorePostBreakdown(
+      post({ impression_count: EXPLORATION_FADE_OUT_IMPRESSIONS }),
+      anonymous
+    );
+
+    expect(at99.exploration).toBeGreaterThan(0);
+    expect(at100.exploration).toBeGreaterThan(0);
+    expect(Math.abs(at99.exploration - at100.exploration)).toBeLessThan(0.01);
+    expect(nearFadeOut.exploration).toBeGreaterThan(0);
+    expect(fadedOut.exploration).toBe(0);
+  });
+
+  it("keeps moderate exploration support between 48 and 72 hours", () => {
+    const sixtyHours = scorePostBreakdown(
+      post({ published_at: hoursAgo(60), impression_count: 0 }),
+      anonymous
+    );
+    const seventyThreeHours = scorePostBreakdown(
+      post({ published_at: hoursAgo(73), impression_count: 0 }),
+      anonymous
+    );
+
+    expect(sixtyHours.exploration).toBeGreaterThan(0);
+    expect(seventyThreeHours.exploration).toBe(0);
+  });
+
   it("halves the freshness component every two days", () => {
     const fresh = scorePostBreakdown(post(), anonymous);
     const halfLife = scorePostBreakdown(
@@ -210,6 +245,116 @@ describe("rankPosts", () => {
       "fresh-cold-start"
     );
     expect(ranked.find((item) => item.id === "fresh-cold-start")?.candidate_source).toBe(
+      "for_you_fresh"
+    );
+  });
+
+  it("protects five unseen recent publications in a twelve-card screen when inventory allows", () => {
+    const oldWinners = Array.from({ length: 12 }, (_, index) =>
+      post({
+        id: `winner-${index}`,
+        author_id: `winner-author-${index}`,
+        published_at: hoursAgo(24 * 14 + index),
+        created_at: hoursAgo(24 * 14 + index),
+        impression_count: 2_000,
+        read_count: 900,
+        bookmark_count: 300,
+      })
+    );
+    const newPosts = Array.from({ length: 5 }, (_, index) =>
+      post({
+        id: `new-${index}`,
+        author_id: `new-author-${index}`,
+        published_at: hoursAgo(index + 1),
+        created_at: hoursAgo(index + 1),
+        impression_count: index,
+        read_count: 0,
+      })
+    );
+
+    const ranked = rankPosts([...oldWinners, ...newPosts], anonymous);
+    const firstScreen = ranked.slice(0, DIVERSITY_WINDOW_SIZE);
+    expect(
+      firstScreen.filter((item) => item.candidate_source === "for_you_fresh")
+    ).toHaveLength(5);
+    for (const candidate of newPosts) {
+      expect(firstScreen.map((item) => item.id)).toContain(candidate.id);
+    }
+  });
+
+  it("does not spend protected fresh slots on content this reader has already seen", () => {
+    const alreadySeen = post({
+      id: "seen-fresh",
+      author_id: "seen-author",
+      impression_count: 0,
+      read_count: 100,
+    });
+    const unseen = Array.from({ length: 5 }, (_, index) =>
+      post({
+        id: `unseen-${index}`,
+        author_id: `unseen-author-${index}`,
+        impression_count: index,
+      })
+    );
+    const older = Array.from({ length: 8 }, (_, index) =>
+      post({
+        id: `older-${index}`,
+        author_id: `older-author-${index}`,
+        published_at: hoursAgo(200 + index),
+        created_at: hoursAgo(200 + index),
+        read_count: 50,
+      })
+    );
+    const ctx: RankingContext = {
+      ...anonymous,
+      userId: "reader",
+      viewerEngagement: new Map([[alreadySeen.id, { impressions: 1, hasRead: true }]]),
+    };
+
+    const ranked = rankPosts([alreadySeen, ...unseen, ...older], ctx);
+    const protectedFresh = ranked
+      .slice(0, DIVERSITY_WINDOW_SIZE)
+      .filter((item) => item.candidate_source === "for_you_fresh");
+
+    expect(protectedFresh).toHaveLength(5);
+    expect(protectedFresh.map((item) => item.id)).not.toContain(alreadySeen.id);
+    for (const candidate of unseen) {
+      expect(protectedFresh.map((item) => item.id)).toContain(candidate.id);
+    }
+  });
+
+  it("gives the initial test audience priority over an already well-exposed fresh winner", () => {
+    const underexposed = post({
+      id: "needs-test-audience",
+      author_id: "new-writer",
+      impression_count: INITIAL_DISTRIBUTION_IMPRESSIONS - 1,
+      read_count: 0,
+      published_at: hoursAgo(12),
+    });
+    const popularFresh = post({
+      id: "popular-fresh",
+      author_id: "popular-writer",
+      impression_count: 180,
+      read_count: 120,
+      bookmark_count: 80,
+      comment_count: 50,
+      like_count: 100,
+      published_at: hoursAgo(1),
+    });
+    const fillers = Array.from({ length: 10 }, (_, index) =>
+      post({
+        id: `filler-${index}`,
+        author_id: `filler-author-${index}`,
+        published_at: hoursAgo(200 + index),
+        created_at: hoursAgo(200 + index),
+      })
+    );
+
+    const ranked = rankPosts([popularFresh, underexposed, ...fillers], anonymous);
+    expect(ranked.findIndex((item) => item.id === underexposed.id)).toBeLessThan(
+      ranked.findIndex((item) => item.id === popularFresh.id)
+    );
+    expect(ranked.find((item) => item.id === underexposed.id)?.candidate_source).toBe(
       "for_you_fresh"
     );
   });

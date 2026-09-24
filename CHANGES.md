@@ -1,3 +1,15 @@
+# 24 September 2026 — Feed v4.1 new-content distribution foundation
+
+- Made new-content circulation a first-class feed rule instead of relying on a freshness score alone.
+- Protected 5 of every 12 For You positions (41.7%) for unseen publications under 72 hours old whenever enough inventory exists.
+- Reserved protected fresh candidates from personalized/discovery/trending lanes so those lanes cannot accidentally consume the new-content allocation.
+- Prioritized publications below the initial 30-impression test audience before already well-exposed fresh winners.
+- Replaced the hard 100-impression exploration cutoff with a gradual fade through 250 impressions.
+- Added staged age support: strongest at 0-24h, strong at 24-48h, tapering through 48-72h.
+- Prevented already-seen/read recent publications from consuming protected fresh slots; they can still rank normally on relevance/quality.
+- Bumped exposure attribution to `feed-v4.1.0`, changed the anonymous public-feed cache key to v4.1, and reduced guest-feed staleness from 120s to 30s.
+- Kept signed snapshot pagination unchanged; publications created after a snapshot starts still enter on the next fresh page-1 request, not mid-snapshot.
+
 # 23 September 2026 — Feed v4 production stability
 
 - Kept the v4 scoring and signed snapshot pagination, but stopped fully hydrating the entire 192-post first-page ranking window.

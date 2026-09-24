@@ -78,9 +78,17 @@ export const FRESHNESS_HALF_LIFE_HOURS = 48;
  */
 export const PRIOR_EXPOSURES = 75;
 
-/** New publications stay eligible for the exploration lane until this many exposures. */
-export const EXPLORATION_IMPRESSION_BUDGET = 100;
-export const FRESH_LANE_HOURS = 48;
+/**
+ * New-content distribution is a product guarantee, not merely a score boost.
+ * Every unseen publication receives strong protection while it is building its
+ * first audience, then that support fades gradually instead of falling off a
+ * hard impression cliff.
+ */
+export const INITIAL_DISTRIBUTION_IMPRESSIONS = 30;
+export const EXPLORATION_FADE_OUT_IMPRESSIONS = 250;
+export const NEW_CONTENT_PROTECTION_HOURS = 72;
+/** Backward-compatible name used by older tests/docs. */
+export const FRESH_LANE_HOURS = NEW_CONTENT_PROTECTION_HOURS;
 export const TRENDING_LANE_HOURS = 7 * 24;
 export const EVERGREEN_MIN_AGE_HOURS = 7 * 24;
 
@@ -93,27 +101,31 @@ export const MAX_POSTS_PER_TOPIC_PER_WINDOW = 4;
 export const FEED_LANE_TARGETS: ReadonlyArray<
   readonly [HybridCandidateSource, number]
 > = [
-  ["for_you_personalized", 4],
-  ["for_you_fresh", 3],
+  ["for_you_fresh", 5],
+  ["for_you_personalized", 3],
   ["for_you_discovery", 2],
   ["for_you_trending", 1],
   ["for_you_evergreen", 1],
 ] as const;
 
-/** Interleaves the lanes instead of rendering four personalized cards, then three fresh, etc. */
+/**
+ * Five protected fresh slots out of twelve (41.7%) whenever enough unseen
+ * recent inventory exists. Fresh cards are deliberately spread through the
+ * screen rather than stacked in one chronological block.
+ */
 const FEED_LANE_SCHEDULE: ReadonlyArray<HybridCandidateSource | null> = [
-  "for_you_personalized",
   "for_you_fresh",
   "for_you_personalized",
   "for_you_discovery",
+  "for_you_fresh",
   "for_you_personalized",
   "for_you_fresh",
   "for_you_trending",
-  "for_you_personalized",
   "for_you_discovery",
   "for_you_fresh",
+  "for_you_personalized",
   "for_you_evergreen",
-  null,
+  "for_you_fresh",
 ];
 
 function nonNegativeFinite(value: number | null | undefined): number {
@@ -216,14 +228,38 @@ function getNovelty(post: RankablePost, ctx: RankingContext): number {
   return 0.3;
 }
 
+function newContentAgeSupport(hours: number): number {
+  if (!Number.isFinite(hours) || hours < 0 || hours >= NEW_CONTENT_PROTECTION_HOURS) {
+    return 0;
+  }
+  // 0-24h: strongest protection. 24-48h: still heavily protected.
+  // 48-72h: taper to zero so old winners can take over naturally.
+  if (hours <= 24) return 1;
+  if (hours <= 48) return 1 - ((hours - 24) / 24) * 0.3;
+  return 0.7 * (1 - (hours - 48) / 24);
+}
+
+function distributionExposureNeed(impressions: number): number {
+  if (impressions < INITIAL_DISTRIBUTION_IMPRESSIONS) return 1;
+  if (impressions >= EXPLORATION_FADE_OUT_IMPRESSIONS) return 0;
+  const progress =
+    (impressions - INITIAL_DISTRIBUTION_IMPRESSIONS) /
+    (EXPLORATION_FADE_OUT_IMPRESSIONS - INITIAL_DISTRIBUTION_IMPRESSIONS);
+  return bounded01(1 - progress);
+}
+
 function getExploration(post: RankablePost, ctx: RankingContext): number {
   const hours = ageHours(post, ctx);
-  if (!Number.isFinite(hours) || hours > FRESH_LANE_HOURS) return 0;
-  const impressions = nonNegativeFinite(post.impression_count);
-  if (impressions >= EXPLORATION_IMPRESSION_BUDGET) return 0;
+  const ageSupport = newContentAgeSupport(hours);
+  if (ageSupport <= 0) return 0;
 
-  const exposureNeed = 1 - impressions / EXPLORATION_IMPRESSION_BUDGET;
-  return bounded01(exposureNeed * getFreshness(post, ctx));
+  const impressions = nonNegativeFinite(post.impression_count);
+  const exposureNeed = distributionExposureNeed(impressions);
+  if (exposureNeed <= 0) return 0;
+
+  // Already-read/repeated content can still rank on quality/relevance, but it
+  // should not receive the same new-content exploration assistance.
+  return bounded01(ageSupport * exposureNeed * getNovelty(post, ctx));
 }
 
 export interface FeedScoreBreakdown {
@@ -296,10 +332,52 @@ function sortScored<T extends RankablePost>(items: Array<ScoredPost<T>>) {
 }
 
 function isFresh<T extends RankablePost>(candidate: ScoredPost<T>, ctx: RankingContext) {
+  const viewerSignal = ctx.viewerEngagement?.get(candidate.post.id);
   return (
-    ageHours(candidate.post, ctx) <= FRESH_LANE_HOURS &&
-    nonNegativeFinite(candidate.post.impression_count) < EXPLORATION_IMPRESSION_BUDGET
+    ageHours(candidate.post, ctx) < NEW_CONTENT_PROTECTION_HOURS &&
+    !viewerSignal?.hasRead &&
+    (viewerSignal?.impressions ?? 0) <= 0
   );
+}
+
+/**
+ * Ordering inside the protected fresh lane is intentionally different from
+ * the general relevance/quality score. The first job is fair circulation:
+ * publications that have not yet reached the initial test audience are served
+ * before already-well-exposed fresh publications. Only after that do recency,
+ * reader relevance and early satisfaction break ties.
+ */
+function compareFreshDistribution<T extends RankablePost>(
+  left: ScoredPost<T>,
+  right: ScoredPost<T>,
+  ctx: RankingContext
+): number {
+  const leftImpressions = nonNegativeFinite(left.post.impression_count);
+  const rightImpressions = nonNegativeFinite(right.post.impression_count);
+  const leftInitial = leftImpressions < INITIAL_DISTRIBUTION_IMPRESSIONS ? 1 : 0;
+  const rightInitial = rightImpressions < INITIAL_DISTRIBUTION_IMPRESSIONS ? 1 : 0;
+  if (leftInitial !== rightInitial) return rightInitial - leftInitial;
+
+  // Within the test stage, distribute the least-seen work first. This is what
+  // prevents a newly published writer from being buried by a fresh winner that
+  // already received plenty of opportunity.
+  if (leftImpressions !== rightImpressions) return leftImpressions - rightImpressions;
+
+  const ageSupportDifference =
+    newContentAgeSupport(ageHours(right.post, ctx)) -
+    newContentAgeSupport(ageHours(left.post, ctx));
+  if (ageSupportDifference !== 0) return ageSupportDifference;
+
+  const readerFitLeft = left.breakdown.relevance + left.breakdown.writerAffinity;
+  const readerFitRight = right.breakdown.relevance + right.breakdown.writerAffinity;
+  if (readerFitRight !== readerFitLeft) return readerFitRight - readerFitLeft;
+  if (right.breakdown.satisfaction !== left.breakdown.satisfaction) {
+    return right.breakdown.satisfaction - left.breakdown.satisfaction;
+  }
+
+  const dateDifference = publishedAtMs(right.post) - publishedAtMs(left.post);
+  if (dateDifference !== 0) return dateDifference;
+  return compareIds(left.post.id, right.post.id);
 }
 
 function isPersonalized<T extends RankablePost>(candidate: ScoredPost<T>) {
@@ -339,13 +417,13 @@ function matchesLane<T extends RankablePost>(
     case "for_you_fresh":
       return isFresh(candidate, ctx);
     case "for_you_discovery":
-      return isDiscovery(candidate, ctx);
+      return !isFresh(candidate, ctx) && isDiscovery(candidate, ctx);
     case "for_you_trending":
-      return isTrending(candidate, ctx);
+      return !isFresh(candidate, ctx) && isTrending(candidate, ctx);
     case "for_you_evergreen":
       return isEvergreen(candidate, ctx);
     case "for_you_personalized":
-      return isPersonalized(candidate);
+      return !isFresh(candidate, ctx) && isPersonalized(candidate);
   }
 }
 
@@ -407,9 +485,9 @@ function findEligibleIndex<T extends RankablePost>(
 }
 
 /**
- * Soft-lane feed composition. In a healthy inventory each 12-card screen aims
- * for 4 personalized, 3 fresh, 2 discovery, 1 trending and 1 evergreen card;
- * the final slot (and every unavailable lane) is filled by overall score.
+ * Soft-lane feed composition. In healthy inventory each 12-card screen protects
+ * five slots for unseen recent work, then mixes personalized, discovery,
+ * trending and evergreen content. Any unavailable lane is backfilled by score.
  */
 function composeHybridFeed<T extends RankablePost>(
   sorted: Array<ScoredPost<T>>,
@@ -441,13 +519,25 @@ function composeHybridFeed<T extends RankablePost>(
 
     for (const source of FEED_LANE_SCHEDULE) {
       if (!source || remaining.length === 0) continue;
-      const index = findEligibleIndex(
-        remaining,
+
+      // Fresh distribution uses its own fair-circulation ordering. The global
+      // score still controls every other lane and all backfill slots.
+      let laneView = remaining;
+      if (source === "for_you_fresh") {
+        laneView = [...remaining].sort((left, right) =>
+          compareFreshDistribution(left, right, ctx)
+        );
+      }
+      const eligibleIndex = findEligibleIndex(
+        laneView,
         authorCounts,
         topicCounts,
         previousAuthor,
         (candidate) => matchesLane(candidate, source, ctx)
       );
+      if (eligibleIndex < 0) continue;
+      const selectedId = laneView[eligibleIndex].post.id;
+      const index = remaining.findIndex((candidate) => candidate.post.id === selectedId);
       if (index >= 0) place(index, source);
     }
 

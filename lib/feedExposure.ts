@@ -10,7 +10,7 @@ import type {
 
 // v4: hybrid candidate lanes + stable snapshot pagination + reader fatigue and
 // qualified-read affinity. Exposures from v3 are intentionally not comparable.
-export const FEED_ALGORITHM_VERSION = "feed-v4.0.0";
+export const FEED_ALGORITHM_VERSION = "feed-v4.1.0";
 
 export type FeedCandidateSource = FeedCandidateArm | "followed_author";
 

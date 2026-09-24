@@ -1,6 +1,6 @@
-# Indegenius Feed v4
+# Indegenius Feed v4.1
 
-Implemented 23 September 2026.
+Implemented 23 September 2026; new-content distribution foundation updated 24 September 2026.
 
 ## Why this exists
 
@@ -35,9 +35,21 @@ The v4 score is bounded to 0-100 and uses:
 
 Satisfaction is exposure-normalized and Bayesian-smoothed. Qualified reads and saves carry more weight than lightweight reactions.
 
-### 3. Fresh-content cold start
+### 3. Protected new-content distribution
 
-A publication under 48 hours old and below 100 impressions remains eligible for the fresh/exploration lane. This gives new work a chance to collect evidence instead of requiring engagement before it can receive exposure.
+New content is now a distribution guarantee, not just a scoring bonus. When enough inventory exists, five of every 12 For You positions (41.7%) are reserved for publications that are both recent and unseen by that reader.
+
+The protection window is 72 hours:
+
+- 0-24h: strongest support;
+- 24-48h: still strongly protected;
+- 48-72h: support tapers so sustained quality/relevance can take over.
+
+Within the protected fresh lane, circulation comes before popularity. Publications below the initial 30-impression test audience are served before already well-exposed fresh winners. Among comparable candidates, lower exposure is preferred first, then recency/reader fit/early satisfaction.
+
+A recent publication the reader has already seen or qualified-read cannot consume a protected fresh slot while unseen recent inventory exists. It may still rank through the normal personalized/trending/backfill paths.
+
+Exploration no longer falls off at a hard 100-impression cliff. Full test-audience support lasts through the initial 30 impressions, then fades gradually to zero at 250 impressions.
 
 ### 4. Reader signals
 
@@ -50,7 +62,7 @@ Both are fail-soft: the feed remains available if either signal lookup fails.
 
 ### 5. Soft lane composition and diversity
 
-Each 12-card window aims for an interleaved mix of personalized, fresh, discovery, trending and evergreen publications, then fills unavailable slots by overall score.
+Each 12-card window aims for an interleaved mix of 5 fresh, 3 personalized, 2 discovery, 1 trending and 1 evergreen publication. Unavailable lanes are backfilled by overall score. Fresh candidates are reserved for the fresh lane during lane composition so another lane cannot silently consume the protected allocation.
 
 Diversity preferences:
 
@@ -60,7 +72,7 @@ Diversity preferences:
 
 ## Exposure analytics
 
-The exposure algorithm version is now `feed-v4.0.0` and the experiment variant is `ranking_v4`. Hybrid candidate sources are recorded on signed exposure metadata:
+The exposure algorithm version is now `feed-v4.1.0` and the experiment variant remains `ranking_v4`. Hybrid candidate sources are recorded on signed exposure metadata:
 
 - `for_you_personalized`
 - `for_you_fresh`
@@ -89,7 +101,7 @@ A dedicated `FEED_CURSOR_SIGNING_SECRET` may be supplied. If absent, the server 
 
 ## Verification note
 
-The archive did not include installed dependencies and the package registry/cache available in the execution environment could not complete `npm ci`. The changed TypeScript was parsed with the available compiler and produced no feed-specific code/type errors after filtering out missing dependency/type declarations. The pure ranking module was also executed directly with `ts-node` to verify fresh cold-start inclusion, writer diversity, topic diversity and fatigue ordering. Run the normal project checks after installing dependencies:
+The ranking module was syntax/type-checked in isolation with the available TypeScript compiler and executed with runtime assertions covering the new-content guarantee, reader-aware fresh protection and gradual exploration fade. The environment could not complete `npm ci` because the package registry/cache was unavailable, so run the normal repository checks in a fully provisioned environment before deployment:
 
 ```bash
 npm ci
