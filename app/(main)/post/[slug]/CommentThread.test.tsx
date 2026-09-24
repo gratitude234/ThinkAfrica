@@ -13,6 +13,8 @@ const { mocks } = vi.hoisted(() => ({
   },
 }));
 
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+
 vi.mock("./commentActions", () => ({
   submitComment: mocks.submitComment,
   updateComment: mocks.updateComment,
@@ -90,18 +92,18 @@ beforeEach(() => {
 describe("CommentThread", () => {
   it("shows the count and the comment with its time", () => {
     renderThread();
-    expect(screen.getByText("Comments · 1")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Discussion 1 comments?/ })).toBeInTheDocument();
     expect(screen.getByText("First thought.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Upvote this comment" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Like this comment" })).toBeInTheDocument();
   });
 
   it("upvotes optimistically and adopts the server's count", async () => {
     renderThread();
-    const upvote = screen.getByRole("button", { name: "Upvote this comment" });
+    const upvote = screen.getByRole("button", { name: "Like this comment" });
 
     fireEvent.click(upvote);
     // Optimistic, before the RPC resolves.
-    expect(screen.getByRole("button", { name: "Remove upvote" })).toHaveTextContent("3");
+    expect(screen.getByRole("button", { name: "Unlike this comment" })).toHaveTextContent("3");
 
     await waitFor(() =>
       // The comment id and nothing else. The voter is the session's, resolved
@@ -117,17 +119,17 @@ describe("CommentThread", () => {
     });
     renderThread();
 
-    fireEvent.click(screen.getByRole("button", { name: "Upvote this comment" }));
+    fireEvent.click(screen.getByRole("button", { name: "Like this comment" }));
 
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Upvote this comment" })).toHaveTextContent("2")
+      expect(screen.getByRole("button", { name: "Like this comment" })).toHaveTextContent("2")
     );
   });
 
   it("sends a guest to the auth gate instead of voting", () => {
     renderThread({ userId: null, userProfileId: null });
 
-    fireEvent.click(screen.getByRole("button", { name: "Upvote this comment" }));
+    fireEvent.click(screen.getByRole("button", { name: "Like this comment" }));
 
     expect(mocks.requestAuth).toHaveBeenCalledWith("like", { contentKind: "post" });
     expect(mocks.toggleCommentVote).not.toHaveBeenCalled();
@@ -150,7 +152,7 @@ describe("CommentThread", () => {
       })
     );
     await waitFor(() => expect(screen.getByText("A reply.")).toBeInTheDocument());
-    expect(screen.getByText("Comments · 2")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Discussion 2 comments?/ })).toBeInTheDocument();
   });
 
   it("offers Edit and Delete only on your own comment", () => {
@@ -208,7 +210,7 @@ describe("CommentThread", () => {
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
 
     await waitFor(() => expect(screen.queryByText("First thought.")).toBeNull());
-    expect(screen.getByText("Comments · 0")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Discussion 0 comments?/ })).toBeInTheDocument();
   });
 
   it("appends the next page and hides the control when exhausted", async () => {
@@ -364,13 +366,13 @@ describe("CommentThread", () => {
     renderThread({ initialComments: [], initialTotalCount: 0, showHeading: false });
 
     expect(screen.queryByText(/^Comments · /)).toBeNull();
-    expect(screen.getByText("No comments yet. Start the conversation.")).toBeInTheDocument();
+    expect(screen.getByText("No comments yet. Start the discussion.")).toBeInTheDocument();
   });
 
   it("keeps its heading when Responses share the section", () => {
     renderThread({ initialTotalCount: 24, showHeading: true });
 
-    expect(screen.getByText("Comments · 24")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Discussion 24 comments?/ })).toBeInTheDocument();
   });
 
   it("gives every comment a permalink", () => {
@@ -379,4 +381,26 @@ describe("CommentThread", () => {
     const permalink = screen.getByRole("link", { name: /ago|edited|now/i });
     expect(permalink.getAttribute("href")).toBe("#comment-c1");
   });
+});
+
+
+it("adopts refreshed server comments after the sibling composer posts", () => {
+  const props = { postId: "post-1", initialComments: [comment()], initialTotalCount: 1,
+    initialHasMore: false, initialCursor: null, userId: "viewer-1", userProfileId: "viewer-1" };
+  const { rerender } = render(<CommentThread {...props} />);
+  expect(screen.queryByText("Newly posted comment")).toBeNull();
+  rerender(<CommentThread {...props} initialTotalCount={2}
+    initialComments={[comment({ id: "c2", content: "Newly posted comment" }), comment()]} />);
+  expect(screen.getByText("Newly posted comment")).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: /Discussion 2 comments/ })).toBeInTheDocument();
+});
+
+
+it("offers no comment mutations on an unpublished publication", () => {
+  renderThread({ readOnly: true, userId: "author-1", userProfileId: "author-1" });
+  expect(screen.queryByRole("button", { name: "Reply" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Like this comment" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
+  expect(screen.getByText("First thought.")).toBeInTheDocument();
 });

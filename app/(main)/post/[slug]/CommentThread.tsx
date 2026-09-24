@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import UserAvatar from "@/components/ui/UserAvatar";
 import Toast from "@/components/ui/Toast";
 import ReportButton from "@/components/moderation/ReportButton";
@@ -22,6 +23,7 @@ import { deleteComment, loadMoreComments, submitComment, updateComment, toggleCo
 export type { ThreadComment as CommentItem, ThreadReply as ReplyItem };
 
 interface CommentThreadProps {
+  readOnly?: boolean;
   postId: string;
   initialComments: ThreadComment[];
   initialTotalCount: number;
@@ -63,8 +65,10 @@ export default function CommentThread({
   userProfileId,
   userVotedCommentIds = [],
   showHeading = true,
+  readOnly = false,
 }: CommentThreadProps) {
   const { requestAuth } = useGuestAuthGate();
+  const router = useRouter();
   const [comments, setComments] = useState<ThreadComment[]>(() =>
     hydrate(initialComments, new Set(userVotedCommentIds))
   );
@@ -90,6 +94,24 @@ export default function CommentThread({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   // Guards against a slow page-1 response overwriting a later page-2 one.
   const loadRequestRef = useRef(0);
+
+  // router.refresh() preserves client component state. Adopt the new server
+  // page so a top-level comment posted by the sibling composer becomes visible.
+  const [adoptedComments, setAdoptedComments] = useState(initialComments);
+  const [adoptedCount, setAdoptedCount] = useState(initialTotalCount);
+  if (adoptedComments !== initialComments || adoptedCount !== initialTotalCount) {
+    setAdoptedComments(initialComments);
+    setAdoptedCount(initialTotalCount);
+    setComments(hydrate(initialComments, new Set(userVotedCommentIds)));
+    setTotalCount(initialTotalCount);
+    setHasMore(initialHasMore);
+    setCursor(initialCursor);
+    setSort(DEFAULT_COMMENT_SORT);
+    setSorting(false);
+    setLoadingMore(false);
+  }
+
+  useEffect(() => { loadRequestRef.current += 1; }, [initialComments, initialTotalCount]);
 
   const viewerId = userProfileId ?? userId;
 
@@ -175,6 +197,7 @@ export default function CommentThread({
     setReplyingToId(null);
     setDraft("");
     setAnnouncement("Reply posted.");
+    router.refresh();
     // A new reply on a collapsed chain must not land out of sight.
     setExpandedReplies((prev) => new Set(prev).add(result.comment?.parent_id ?? parentId));
   };
@@ -216,6 +239,7 @@ export default function CommentThread({
       // outright would cascade and take those replies with it.
       mapComment(commentId, (item) => ({ ...item, content: DELETED_COMMENT_TOMBSTONE }));
       setToastMessage("Comment removed. The replies to it are still here.");
+      router.refresh();
       return;
     }
 
@@ -230,6 +254,7 @@ export default function CommentThread({
         })
     );
     setTotalCount((count) => Math.max(0, count - 1));
+    router.refresh();
   };
 
   const handleLoadMore = async () => {
@@ -373,7 +398,7 @@ export default function CommentThread({
             </p>
           )}
 
-          {isDeleted || isEditing ? null : isConfirmingDelete ? (
+          {readOnly || isDeleted || isEditing ? null : isConfirmingDelete ? (
             <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
               <p className="text-meta leading-5 text-red-900">
                 Delete this comment?

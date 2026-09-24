@@ -56,3 +56,11 @@ describe("PostCover", () => {
     expect(box.className).toContain("aspect-[16/9]");
   });
 });
+
+it("shows the publication's neutral unavailable state after an image fails", () => {
+  render(<PostCover src={SRC} alt="Cover" className="aspect-[16/9]"
+    fallbackClassName="publication-media-fallback" fallbackLabel="Image unavailable" />);
+  fireEvent.error(screen.getByRole("img"));
+  expect(screen.getByText("Image unavailable").parentElement).toHaveClass("publication-media-fallback", "aspect-[16/9]");
+  expect(screen.queryByRole("img")).toBeNull();
+});

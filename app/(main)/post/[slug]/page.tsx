@@ -30,6 +30,7 @@ import PostCover from "@/components/post/PostCover";
 import PostConversationView from "./PostConversationView";
 import DiscussionSection from "./DiscussionSection";
 import PostActionsRow from "./PostActionsRow";
+import PublicationIdentity from "./PublicationIdentity";
 import PublicationMoreMenu from "./PublicationMoreMenu";
 import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
 import { stripLeadingEmptyParagraphs } from "@/lib/articleTypography";
@@ -228,7 +229,9 @@ async function DetailAuthorRow({
   authorName,
   userId,
   viewerDataPromise,
+  readTime,
 }: {
+  readTime: number;
   post: PostRecord;
   author: AuthorProfile | null;
   authorName: string;
@@ -240,27 +243,31 @@ async function DetailAuthorRow({
   const isOwnPost = userId === author.id;
 
   return (
-    <div className="mt-6 flex items-center gap-3 font-public-sans">
+    <div className="mt-[18px] flex items-center gap-2.5 font-public-sans sm:mt-6 sm:gap-3">
       <Link href={`/${author.username}`} className="shrink-0">
         <UserAvatar
           name={authorName}
           src={author.avatar_url}
           size={40}
-          className="overflow-hidden rounded-full"
+          className="!h-[34px] !w-[34px] overflow-hidden rounded-full sm:!h-10 sm:!w-10"
         />
       </Link>
       <div className="min-w-0 flex-1">
         <Link
           href={`/${author.username}`}
-          className="block truncate text-[14px] font-semibold leading-5 text-ink transition-colors hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
+          className="flex items-center gap-1.5 text-[13.5px] sm:text-[14.5px] font-semibold leading-5 text-ink transition-colors hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
         >
-          {authorName}
+          <span className="truncate">{authorName}</span>
+          <PublicationIdentity verified={author.verified} />
         </Link>
         {author.professional_title ? (
-          <p className="mt-0.5 truncate text-[12.5px] leading-5 text-[#69726D]">
+          <p className="mt-0.5 hidden truncate sm:block text-[12.5px] leading-5 text-[#69726D]">
             {author.professional_title}
           </p>
         ) : null}
+        <p className="mt-0.5 text-[11.5px] text-ink-faint sm:hidden">
+          {formatPublicationDate(post.published_at ?? post.created_at)} · {readTime} min read
+        </p>
       </div>
       {isOwnPost ? null : (
         <FollowButton
@@ -268,6 +275,7 @@ async function DetailAuthorRow({
           currentUserId={userId}
           initialFollowing={userId ? viewer.userFollowsAuthor : false}
           authorName={authorName}
+          className="publication-follow"
           source="post_header"
           postId={post.id}
         />
@@ -414,8 +422,8 @@ async function MoreFromAuthorSection({
   const shortName = writerName.trim().split(/\s+/)[0] || writerName;
 
   return (
-    <section className="border-t border-[#E9E5DE] py-7 font-public-sans" aria-labelledby="more-from-author">
-      <h2 id="more-from-author" className="publication-more-title text-[20px] font-semibold leading-tight text-ink">
+    <section className="pb-8 pt-2 font-public-sans" aria-labelledby="more-from-author">
+      <h2 id="more-from-author" className="publication-more-title text-[18px] font-semibold leading-tight text-ink">
         More from {shortName}
       </h2>
       <div className="mt-3">
@@ -424,7 +432,7 @@ async function MoreFromAuthorSection({
           const itemTitle = item.title?.trim() || sanitizePostExcerpt(item.excerpt ?? item.content)?.trim() || "Post";
           const meta = isArticle
             ? `Article · ${estimateReadTime(item.content ?? "")} min read`
-            : `Post · ${formatRelativeTime(item.published_at ?? item.created_at)}`;
+            : formatRelativeTime(item.published_at ?? item.created_at);
 
           return (
             <Link
@@ -432,8 +440,8 @@ async function MoreFromAuthorSection({
               href={`/post/${item.slug}`}
               className="group block border-b border-[#E9E5DE] py-4 last:border-b-0"
             >
-              <p className="text-[11px] font-semibold uppercase tracking-[0.07em] text-[#8A6C26]">{meta}</p>
-              <p className="mt-1 line-clamp-2 text-[15px] font-medium leading-[1.45] text-ink transition-colors group-hover:text-emerald-brand">
+              <p className={isArticle ? "text-[10.5px] font-bold uppercase tracking-[0.06em] text-[#8A5D1E]" : "text-[13px] text-ink-muted"}>{meta}</p>
+              <p className={`mt-1 line-clamp-2 text-ink transition-colors group-hover:text-emerald-brand ${isArticle ? "publication-more-title text-[16.5px] font-semibold leading-[1.3]" : "text-[15px] leading-[1.4]"}`}>
                 {itemTitle}
               </p>
             </Link>
@@ -608,7 +616,7 @@ export default async function PostPage({ params }: PageProps) {
               post={post}
               author={author}
               userId={userId}
-              bodyHtml={sanitizedContent}
+              bodyHtml={contentWithIds}
               sanitizedExcerpt={sanitizedExcerpt}
               authorName={authorName}
               metadataTitle={metadataTitle}
@@ -652,13 +660,13 @@ export default async function PostPage({ params }: PageProps) {
 
           <header className="pt-2 sm:pt-4">
             {displayTitle ? (
-              <h1 className="publication-article-title text-[34px] font-semibold leading-[1.12] tracking-[-0.025em] text-ink sm:text-[46px] sm:leading-[1.14]">
+              <h1 className="publication-article-title text-[36px] font-semibold leading-[1.16] tracking-[-0.01em] text-ink sm:text-[44px]">
                 {displayTitle}
               </h1>
             ) : null}
 
             {sanitizedExcerpt ? (
-              <p className="mt-4 max-w-[690px] font-public-sans text-[17px] leading-[1.55] text-[#4B5550] sm:text-[19px]">
+              <p className="mt-3 max-w-[690px] font-public-sans text-[16px] leading-[1.5] sm:mt-4 sm:leading-[1.55] text-[#4B5550] sm:text-[19px]">
                 {sanitizedExcerpt}
               </p>
             ) : null}
@@ -668,19 +676,22 @@ export default async function PostPage({ params }: PageProps) {
                 post={post}
                 author={author}
                 authorName={authorName}
+                readTime={readTime}
                 userId={userId}
                 viewerDataPromise={viewerDataPromise}
               />
             </Suspense>
 
-            <p className="mt-3 font-public-sans text-[12.5px] leading-5 text-[#79817D]">
+            <p className={`${author ? "hidden sm:block " : ""}mt-3 font-mono text-[12.5px] leading-5 text-[#79817D]`}>
               {formatPublicationDate(post.published_at ?? post.created_at)} · {readTime} min read
             </p>
           </header>
 
           {post.cover_image_url ? (
-            <div className="mt-7 sm:mt-8">
+            <div className="mt-[18px] sm:mt-7">
               <PostCover
+                fallbackClassName="publication-media-fallback"
+                fallbackLabel="Image unavailable"
                 src={post.cover_image_url}
                 alt={post.title}
                 content_kind={post.content_kind}
@@ -692,7 +703,7 @@ export default async function PostPage({ params }: PageProps) {
             </div>
           ) : null}
 
-          <main className="pt-8 sm:pt-10">
+          <div className="pt-6 sm:pt-9">
             <div className="publication-article-body relative">
               <HighlightShare containerId="post-article-prose" />
               <div
@@ -743,7 +754,7 @@ export default async function PostPage({ params }: PageProps) {
                 />
               </Suspense>
             </div>
-          </main>
+          </div>
         </div>
       </div>
     </PostEngagementProvider>

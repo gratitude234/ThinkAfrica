@@ -1,10 +1,12 @@
 "use client";
 
+import PublicationIdentity from "./PublicationIdentity";
 import Link from "next/link";
 import UserAvatar from "@/components/ui/UserAvatar";
 import FollowButton from "@/components/ui/FollowButton";
 
 interface Author {
+  verified?: boolean;
   id: string;
   username: string;
   full_name: string | null;
@@ -30,7 +32,7 @@ export default function AuthorBioCard({
   const authorName = author.full_name ?? author.username ?? "Anonymous";
 
   return (
-    <div className="flex items-start gap-3.5 border-t border-card-border py-[22px] font-public-sans">
+    <div className="mt-7 flex items-start gap-3.5 border-t border-card-border py-[22px] font-public-sans">
       <Link href={`/${author.username}`} className="shrink-0">
         <UserAvatar
           name={authorName}
@@ -42,9 +44,10 @@ export default function AuthorBioCard({
       <div className="min-w-0 flex-1">
         <Link
           href={`/${author.username}`}
-          className="block truncate text-[14.5px] font-semibold leading-5 text-ink transition-colors hover:text-emerald-brand"
+          className="flex items-center gap-1.5 text-[14.5px] font-semibold leading-5 text-ink transition-colors hover:text-emerald-brand"
         >
-          {authorName}
+          <span className="truncate">{authorName}</span>
+          <PublicationIdentity verified={author.verified} />
         </Link>
         {author.professional_title ? (
           <p className="mt-0.5 text-[13px] leading-5 text-ink-muted">{author.professional_title}</p>
@@ -67,7 +70,7 @@ export default function AuthorBioCard({
           initialFollowing={initialFollowing}
           source="author_card"
           postId={postId}
-          size="compact"
+          className="publication-follow"
         />
       ) : null}
     </div>

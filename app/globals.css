@@ -887,3 +887,32 @@ font-family: var(--font-inter), system-ui, sans-serif;
     line-height: 1.6;
   }
 }
+
+/* Rich text is rendered outside Tailwind's prose plugin. Restore the semantics
+   that Preflight resets, and contain long URLs/media on small screens. */
+.publication-detail { overflow-wrap: anywhere; }
+.publication-article-body ul, .publication-post-body ul { list-style-type: disc; }
+.publication-article-body ol, .publication-post-body ol { list-style-type: decimal; }
+.publication-post-body ul, .publication-post-body ol { margin: 16px 0; padding-left: 1.4em; }
+.publication-post-body li { margin-top: 8px; }
+#post-article-prose > :first-child { margin-top: 0; }
+.publication-article-body h2 + p, .publication-article-body h3 + p,
+.publication-article-body blockquote > :first-child { margin-top: 0; }
+.publication-article-body figure { margin: 32px 0; }
+.publication-article-body :is(h2, h3, sup),
+.publication-detail [id^="ref-"] { scroll-margin-top: 90px; }
+.publication-post-body img { max-width: 100%; height: auto; border-radius: 8px; }
+.publication-post-body blockquote { margin: 20px 0; border-left: 2px solid #073929; padding-left: 16px; }
+.publication-detail pre { max-width: 100%; overflow-x: auto; white-space: pre; padding: 16px; background: #EFEBE2; border-radius: 8px; }
+.publication-detail table { display: block; max-width: 100%; overflow-x: auto; }
+.publication-detail :is(td, th) { border: 1px solid #E9E5DE; padding: 8px; }
+.publication-follow > button { min-height: 36px; border-radius: 8px; padding: 8px 18px; font-size: 13.5px; }
+@media (max-width: 639px) {
+  .publication-follow > button { min-height: 32px; padding: 6px 13px; font-size: 12px; }
+  .publication-article-body p { margin-top: 16px; }
+}
+
+.publication-media-fallback {
+  color: #6B6B6B;
+  background: repeating-linear-gradient(135deg, #F5F3EE 0 8px, #EEEBE3 8px 16px);
+}

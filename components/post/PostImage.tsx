@@ -13,6 +13,8 @@ interface PostImageProps {
   priority?: boolean;
   /** Styling for the image box itself (width, radius, background). */
   className?: string;
+  fallbackClassName?: string;
+  fallbackLabel?: string;
   /** Styling for the tappable wrapper (spacing around the image). */
   wrapperClassName?: string;
   /** Feed keeps Post media natural and Article thumbnails editorially cropped. */
@@ -31,6 +33,8 @@ export default function PostImage({
   sizes,
   priority,
   className = "",
+  fallbackClassName,
+  fallbackLabel,
   wrapperClassName = "",
   variant = "natural",
 }: PostImageProps) {
@@ -57,6 +61,8 @@ export default function PostImage({
         className={`relative block w-full cursor-zoom-in rounded-[10px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 ${wrapperClassName}`}
       >
         <PostCover
+          fallbackClassName={fallbackClassName}
+          fallbackLabel={fallbackLabel}
           src={src}
           alt={alt}
           content_kind={content_kind}

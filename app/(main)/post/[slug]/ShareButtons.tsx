@@ -17,6 +17,7 @@ export default function ShareButtons({
   authorName,
   flat = false,
 }: Props) {
+  const [copyError, setCopyError] = useState(false);
   const [copied, setCopied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [url, setUrl] = useState(`/post/${slug}`);
@@ -48,7 +49,13 @@ export default function ShareButtons({
     .join("\n");
 
   const copyLink = async () => {
-    await navigator.clipboard.writeText(url);
+    setCopyError(false);
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      setCopyError(true);
+      return;
+    }
     setCopied(true);
     setMenuOpen(false);
     triggerRef.current?.focus();
@@ -92,6 +99,7 @@ export default function ShareButtons({
         ref={triggerRef}
         type="button"
         onClick={() => setMenuOpen((value) => !value)}
+        aria-label={copied ? "Link copied" : "Share publication"}
         aria-haspopup="menu"
         aria-expanded={menuOpen}
         className={triggerClass}
@@ -102,7 +110,7 @@ export default function ShareButtons({
           <circle cx="18" cy="19" r="3" />
           <path strokeLinecap="round" strokeLinejoin="round" d="m8.6 10.5 6.8-4M8.6 13.5l6.8 4" />
         </svg>
-        {copied ? "Copied" : "Share"}
+        <span className={flat ? "sr-only sm:not-sr-only" : undefined}>{copied ? "Copied" : "Share"}</span>
       </button>
 
       {menuOpen ? (
@@ -116,8 +124,14 @@ export default function ShareButtons({
               triggerRef.current?.focus();
             }
           }}
-          className="absolute left-0 top-[calc(100%+8px)] z-40 w-[240px] rounded-[10px] border border-[#E4DFD4] bg-surface p-3 shadow-[0_8px_24px_rgba(0,0,0,0.08)] sm:left-auto sm:right-0"
+          className="absolute right-0 top-[calc(100%+8px)] z-40 w-[240px] max-w-[calc(100vw-32px)] rounded-[10px] border border-[#E4DFD4] bg-surface p-3 shadow-[0_8px_24px_rgba(0,0,0,0.08)]"
         >
+          {copyError ? (
+            <div className="mb-2">
+              <p role="alert" className="text-xs text-red-600">Could not copy. Select and copy this link:</p>
+              <input aria-label="Publication link" readOnly value={url} onFocus={(event) => event.target.select()} className="mt-1 w-full min-w-0 rounded border border-card-border p-2 text-xs" />
+            </div>
+          ) : null}
           <p className="mb-2 text-[12.5px] font-semibold text-[#1B2420]">Share</p>
           <button
             ref={firstItemRef}

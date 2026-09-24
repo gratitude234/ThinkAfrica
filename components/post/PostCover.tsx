@@ -19,6 +19,7 @@ interface PostCoverProps {
   // surface rendering several placeholders at once needs them quiet enough
   // not to outshout the one real cover beside them.
   fallbackClassName?: string;
+  fallbackLabel?: string;
   // "cover"/"contain" size the image inside whatever box `className` sets
   // (callers pass an aspect utility). "natural" instead lets the image's own
   // proportions drive the box height: the container's aspect ratio is taken
@@ -66,6 +67,7 @@ export default function PostCover({
   className = "",
   imageClassName,
   fallbackClassName,
+  fallbackLabel,
   fit = "cover",
   sizes = "100vw",
   priority = false,
@@ -134,7 +136,7 @@ export default function PostCover({
         style={naturalStyle}
       >
         <span className="px-3 text-center text-[11px] font-bold uppercase tracking-[0.15em]">
-          {kindLabel}
+          {fallbackLabel ?? kindLabel}
         </span>
       </div>
     );

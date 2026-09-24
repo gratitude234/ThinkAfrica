@@ -1,3 +1,4 @@
+import PublicationIdentity from "./PublicationIdentity";
 import Link from "next/link";
 import UserAvatar from "@/components/ui/UserAvatar";
 import PostImage from "@/components/post/PostImage";
@@ -9,6 +10,7 @@ import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
 import { formatRelativeTime } from "@/lib/utils";
 
 interface ConversationAuthor {
+  verified?: boolean;
   id: string;
   username: string;
   full_name: string | null;
@@ -129,9 +131,10 @@ export default async function PostConversationView({
           <div className="min-w-0 flex-1 text-[13.5px] leading-5">
             <Link
               href={`/${author.username}`}
-              className="font-semibold text-ink transition-colors hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
+              className="inline-flex max-w-full items-center gap-1.5 align-middle font-semibold text-ink transition-colors hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
             >
-              {authorName}
+              <span className="truncate">{authorName}</span>
+              <PublicationIdentity verified={author.verified} />
             </Link>
             <span className="text-[#7A817D]"> · {formatRelativeTime(post.published_at ?? post.created_at)}</span>
           </div>
@@ -148,7 +151,7 @@ export default async function PostConversationView({
         </header>
       ) : null}
 
-      <main className="mt-5 sm:mt-6">
+      <div className="mt-5 sm:mt-6">
         {displayTitle ? (
           <h1 className="publication-article-title mb-3 text-[26px] font-semibold leading-tight text-ink">
             {displayTitle}
@@ -158,7 +161,9 @@ export default async function PostConversationView({
 
         {post.cover_image_url ? (
           <PostImage
-            src={post.cover_image_url}
+            fallbackClassName="publication-media-fallback"
+                fallbackLabel="Image unavailable"
+                src={post.cover_image_url}
             alt="Image attached to this post"
             content_kind={post.content_kind}
             sizes="(max-width: 560px) calc(100vw - 32px), 520px"
@@ -200,9 +205,9 @@ export default async function PostConversationView({
             </ol>
           </section>
         ) : null}
-      </main>
+      </div>
 
-      <div className="mt-7">
+      {isPublished ? <div className="mb-7 mt-7">
         <PostActionsRow
           postId={post.id}
           slug={post.slug}
@@ -215,7 +220,7 @@ export default async function PostConversationView({
           initialBookmarked={viewer.userBookmarked}
           commentCount={secondary.commentCount}
         />
-      </div>
+      </div> : null}
 
       <DiscussionSection
         postId={post.id}

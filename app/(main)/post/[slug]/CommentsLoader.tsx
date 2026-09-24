@@ -3,6 +3,7 @@ import { fetchCommentPage } from "@/lib/commentThread";
 import CommentThread from "./CommentThread";
 
 interface Props {
+  readOnly?: boolean;
   postId: string;
   userId: string | null;
   userProfileId: string | null;
@@ -22,6 +23,7 @@ export default async function CommentsLoader({
   userProfileId,
   showHeading,
   totalCount,
+  readOnly = false,
 }: Props) {
   const supabase = await createClient();
 
@@ -33,6 +35,7 @@ export default async function CommentsLoader({
 
   return (
     <CommentThread
+      readOnly={readOnly}
       postId={postId}
       initialComments={page.comments}
       initialTotalCount={totalCount}

@@ -11,6 +11,7 @@ const { mocks } = vi.hoisted(() => ({
       likeError: null as string | null,
       bookmarked: false,
       bookmarkPending: false,
+      bookmarkError: null as string | null,
       syncLiked: vi.fn(),
       syncLikeCount: vi.fn(),
       syncBookmarked: vi.fn(),
@@ -100,4 +101,12 @@ describe("PostActionsRow comment action", () => {
     expect(screen.getByRole("button", { name: "Comment on this publication" })).toHaveTextContent("Comment");
     expect(screen.getByRole("button", { name: "Comment on this publication" })).not.toHaveTextContent("0");
   });
+});
+
+
+it("announces save failures", () => {
+  mocks.engagement.bookmarkError = "Could not save this publication.";
+  renderRow();
+  expect(screen.getByRole("alert")).toHaveTextContent("Could not save this publication.");
+  mocks.engagement.bookmarkError = null;
 });

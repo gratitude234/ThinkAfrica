@@ -37,6 +37,7 @@ export default function PublicationMoreMenu({
 
   useEffect(() => {
     if (!open) return;
+    rootRef.current?.querySelector<HTMLElement>('[role="menuitem"], [role="menu"] button')?.focus();
     const close = (event: PointerEvent) => {
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     };
@@ -62,7 +63,12 @@ export default function PublicationMoreMenu({
   };
 
   return (
-    <div ref={rootRef} className="relative shrink-0 font-public-sans">
+    <div ref={rootRef} className="relative shrink-0 font-public-sans" onKeyDown={(event) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    }}>
       <button
         ref={triggerRef}
         type="button"
@@ -115,7 +121,7 @@ export default function PublicationMoreMenu({
               />
             </div>
           ) : (
-            <p className="px-2.5 py-2 text-[12px] text-ink-muted">Sign in for more actions.</p>
+            <Link role="menuitem" href={`/login?redirectTo=${encodeURIComponent(`/post/${slug}`)}`} className="block rounded-md px-2.5 py-2 text-[13px] text-ink-muted hover:bg-canvas">Sign in to report</Link>
           )}
           {error ? <p className="max-w-[220px] px-2.5 py-2 text-xs text-red-600">{error}</p> : null}
         </div>

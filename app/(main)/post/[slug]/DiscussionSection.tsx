@@ -45,6 +45,7 @@ export default function DiscussionSection({
             postId={postId}
             userId={userId}
             userProfileId={userProfileId}
+            readOnly={!isPublished}
             showHeading={false}
             totalCount={commentCount}
           />
