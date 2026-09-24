@@ -58,7 +58,7 @@ export default function NavClient({
         aria-label="Application header"
       >
         <div className="app-utility-inner">
-          <Link href="/" className="shrink-0" aria-label="Indegenius home">
+          <Link href={user ? "/" : "/?guest=1"} className="shrink-0" aria-label="Indegenius home">
             <BrandWordmark
               iconClassName="app-brand-icon"
               textClassName="app-brand-text"

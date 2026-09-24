@@ -46,7 +46,7 @@ describe("NavClient utilities", () => {
   });
 
   it("links the wordmark home", () => {
-    renderNav();
+    renderNav({ id: "user-1" });
 
     expect(screen.getByRole("link", { name: "Indegenius home" })).toHaveAttribute("href", "/");
   });
@@ -121,4 +121,9 @@ describe("NavClient shared chrome contract", () => {
     expect(sticky).toHaveClass("sticky", "top-0", "transition-transform");
     expect(document.documentElement).not.toHaveAttribute("data-nav-hidden");
   });
+});
+
+it("keeps guests in the public feed when they click the wordmark", () => {
+  renderNav();
+  expect(screen.getByRole("link", { name: "Indegenius home" })).toHaveAttribute("href", "/?guest=1");
 });

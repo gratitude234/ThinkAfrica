@@ -46,13 +46,13 @@ describe("HomeFeedCard", () => {
   it("shows recency by default and lets contextual callers suppress it", () => {
     const published = { published_at: "2026-07-22T10:00:00.000Z" };
     const { unmount } = render(<HomeFeedCard post={post(published)} currentUserId="user-1" />);
-    expect(screen.getByText(/\bago\b|just now/)).toBeInTheDocument();
+    expect(document.querySelector("time")).toHaveAttribute("datetime", published.published_at);
     unmount();
 
     render(
       <HomeFeedCard post={post(published)} currentUserId="user-1" showTimestamp={false} />
     );
-    expect(screen.queryByText(/\bago\b|just now/)).toBeNull();
+    expect(document.querySelector("time")).toBeNull();
   });
 
   it("names the writer, with no university line and no co-author count", () => {
@@ -103,7 +103,7 @@ describe("HomeFeedCard", () => {
   // "##africa" and linked to a /topics page keyed on the hashed spelling.
   it("renders a stored tag with one hash and links to the unhashed topic", () => {
     render(
-      <HomeFeedCard post={post({ tags: ["#africa", "Human Rights"] })} currentUserId="user-1" />
+      <HomeFeedCard post={post({ content_kind: "article", title: "Africa", tags: ["#africa", "Human Rights"] })} currentUserId="user-1" />
     );
 
     const link = screen.getByRole("link", { name: "#africa" });

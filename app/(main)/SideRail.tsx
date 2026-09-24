@@ -76,7 +76,7 @@ export default function SideRail({
     >
       <nav aria-label="Sections" className="flex flex-col gap-[3px]">
         <RailLink
-          href="/"
+          href={userId ? "/" : "/?guest=1"}
           label="Home"
           icon={HomeIcon}
           fillWhenActive

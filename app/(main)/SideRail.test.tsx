@@ -148,3 +148,8 @@ describe("SideRail", () => {
     expect(rail?.className).not.toMatch(/overscroll/);
   });
 });
+
+it("keeps guests in the public feed when they choose Home", () => {
+  renderRail({ userId: null, username: null });
+  expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/?guest=1");
+});

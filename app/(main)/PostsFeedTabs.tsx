@@ -41,6 +41,7 @@ class FeedRequestError extends Error {
 interface FeedCacheEntry extends FeedResponse {
   page: number;
   emptyPageCount: number;
+  feedSessionId: string;
 }
 
 function buildFeedUrl(tab: HomeFeedTab) {
@@ -130,6 +131,9 @@ export default function PostsFeedTabs({
   currentUserId: string | null;
 }) {
   const { navHeight, revealChrome } = useAppChrome();
+  const [initialSessionId] = useState(
+    () => initialPosts[0]?.feed_exposure?.feedSessionId ?? crypto.randomUUID()
+  );
   const [activeTab, setActiveTab] = useState<HomeFeedTab>(initialTab);
   const [feedCache, setFeedCache] = useState<
     Partial<Record<HomeFeedTab, FeedCacheEntry>>
@@ -139,6 +143,7 @@ export default function PostsFeedTabs({
       hasMore: initialHasMore,
       nextCursor: initialNextCursor,
       page: 1,
+      feedSessionId: initialSessionId,
       emptyPageCount: initialPosts.length === 0 ? 1 : 0,
     },
   }));
@@ -154,9 +159,9 @@ export default function PostsFeedTabs({
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const feedTopRef = useRef<HTMLDivElement | null>(null);
   const stripRef = useRef<HTMLDivElement | null>(null);
-  const feedSessionIdRef = useRef(
-    initialPosts[0]?.feed_exposure?.feedSessionId ?? crypto.randomUUID()
-  );
+  const refreshVersionsRef = useRef<Record<HomeFeedTab, number>>({ home: 0, following: 0 });
+  const refreshPendingRef = useRef(false);
+  const paginationPendingRef = useRef(false);
   const inFlightRef = useRef(new Map<string, Promise<FeedResponse>>());
   const activeRequestRef = useRef(0);
   const loadMoreRequestRef = useRef(0);
@@ -172,9 +177,13 @@ export default function PostsFeedTabs({
   useEffect(() => {
     const incomingFeedSessionId =
       initialPosts[0]?.feed_exposure?.feedSessionId;
-    if (incomingFeedSessionId) {
-      feedSessionIdRef.current = incomingFeedSessionId;
-    }
+    // Invalidate work from the previous server-rendered snapshot.
+    activeRequestRef.current += 1;
+    loadMoreRequestRef.current += 1;
+    refreshVersionsRef.current.home += 1;
+    refreshVersionsRef.current.following += 1;
+    refreshPendingRef.current = false;
+    paginationPendingRef.current = false;
     setActiveTab(initialTab);
     setFeedCache((current) => ({
       ...current,
@@ -183,6 +192,7 @@ export default function PostsFeedTabs({
         hasMore: initialHasMore,
         nextCursor: initialNextCursor,
         page: 1,
+        feedSessionId: incomingFeedSessionId ?? initialSessionId,
         emptyPageCount: initialPosts.length === 0 ? 1 : 0,
       },
     }));
@@ -191,6 +201,7 @@ export default function PostsFeedTabs({
     setInitialError(initialLoadFailed);
     setPaginationError(false);
   }, [
+    initialSessionId,
     initialHasMore,
     initialLoadFailed,
     initialNextCursor,
@@ -199,18 +210,23 @@ export default function PostsFeedTabs({
   ]);
 
   const requestFeedPage = useCallback(
-    (tab: HomeFeedTab, page: number, nextCursor: string | null = null) => {
+    (
+      tab: HomeFeedTab,
+      page: number,
+      feedSessionId: string,
+      nextCursor: string | null = null
+    ) => {
       // Both modes continue from a server cursor now. Following's cursor is a
       // chronological keyset; For You's is a signed frozen ranking snapshot.
       const cursor = nextCursor;
-      const requestKey = `${feedSessionIdRef.current}:${tab}:${page}:${cursor ?? "first"}`;
+      const requestKey = `${feedSessionId}:${tab}:${page}:${cursor ?? "first"}`;
       const existing = inFlightRef.current.get(requestKey);
       if (existing) return existing;
 
       const request = fetchFeed(
         tab,
         page,
-        feedSessionIdRef.current,
+        feedSessionId,
         cursor
       ).finally(() => {
         inFlightRef.current.delete(requestKey);
@@ -222,7 +238,13 @@ export default function PostsFeedTabs({
   );
 
   const writeFeedPage = useCallback(
-    (tab: HomeFeedTab, result: FeedResponse, page: number, append: boolean) => {
+    (
+      tab: HomeFeedTab,
+      result: FeedResponse,
+      page: number,
+      append: boolean,
+      feedSessionId: string
+    ) => {
       setFeedCache((current) => {
         const previous = current[tab];
 
@@ -255,6 +277,7 @@ export default function PostsFeedTabs({
             hasMore: result.hasMore,
             nextCursor: result.nextCursor ?? null,
             page,
+            feedSessionId,
             emptyPageCount,
           },
         };
@@ -269,27 +292,30 @@ export default function PostsFeedTabs({
       {
         requestId,
         showError,
-        showSkeleton,
       }: {
         requestId: number;
         showError: boolean;
-        showSkeleton: boolean;
       }
     ) => {
-      if (showSkeleton) setIsSwitching(true);
+      const version = ++refreshVersionsRef.current[tab];
+      refreshPendingRef.current = true;
+      setIsSwitching(true);
       if (showError) setInitialError(false);
       try {
         // A page-1 reload is a new ranking snapshot and therefore a new feed
         // session for exposure analytics. Infinite-scroll pages keep it.
-        feedSessionIdRef.current = crypto.randomUUID();
-        const result = await requestFeedPage(tab, 1, null);
-        writeFeedPage(tab, result, 1, false);
+        const feedSessionId = crypto.randomUUID();
+        const result = await requestFeedPage(tab, 1, feedSessionId, null);
+        if (refreshVersionsRef.current[tab] === version) {
+          writeFeedPage(tab, result, 1, false, feedSessionId);
+        }
       } catch {
         if (activeRequestRef.current === requestId && showError) {
           setInitialError(true);
         }
       } finally {
-        if (activeRequestRef.current === requestId && showSkeleton) {
+        if (activeRequestRef.current === requestId) {
+          refreshPendingRef.current = false;
           setIsSwitching(false);
         }
       }
@@ -328,9 +354,10 @@ export default function PostsFeedTabs({
       const requestId = activeRequestRef.current + 1;
       activeRequestRef.current = requestId;
       // Invalidate any pagination request owned by the previous tab. Its
-      // result may still warm that tab's cache, but it cannot change the
-      // loading or error state for the newly active one.
+      // result is discarded so it cannot append an old snapshot or change
+      // the loading/error state for the newly active one.
       loadMoreRequestRef.current += 1;
+      paginationPendingRef.current = false;
 
       setActiveTab(nextTab);
       setInitialError(false);
@@ -342,7 +369,6 @@ export default function PostsFeedTabs({
       void reloadFeed(nextTab, {
         requestId,
         showError: !hasCachedFeed,
-        showSkeleton: !hasCachedFeed,
       });
     },
     [feedCache, reloadFeed, scrollFeedToTop]
@@ -354,13 +380,15 @@ export default function PostsFeedTabs({
     void reloadFeed(activeTab, {
       requestId,
       showError: true,
-      showSkeleton: true,
     });
   }, [activeTab, reloadFeed]);
 
   const loadMore = useCallback(async () => {
     const currentFeed = feedCache[activeTab];
-    if (isSwitching || isLoadingMore || !currentFeed?.hasMore) return;
+    if (
+      refreshPendingRef.current || paginationPendingRef.current ||
+      isSwitching || isLoadingMore || !currentFeed?.hasMore
+    ) return;
     // The sentinel is 400px tall in effect and re-arms on every cache write, so
     // a `hasMore` that never turns false would page forever. Three pages that
     // added nothing is the same signal the end-state card reads.
@@ -369,6 +397,8 @@ export default function PostsFeedTabs({
     const tab = activeTab;
     const requestId = loadMoreRequestRef.current + 1;
     loadMoreRequestRef.current = requestId;
+    paginationPendingRef.current = true;
+    const refreshVersion = refreshVersionsRef.current[tab];
     setIsLoadingMore(true);
     setPaginationError(false);
     try {
@@ -376,9 +406,15 @@ export default function PostsFeedTabs({
       const result = await requestFeedPage(
         tab,
         nextPage,
+        currentFeed.feedSessionId,
         currentFeed.nextCursor ?? null
       );
-      writeFeedPage(tab, result, nextPage, true);
+      if (
+        loadMoreRequestRef.current === requestId &&
+        refreshVersionsRef.current[tab] === refreshVersion
+      ) {
+        writeFeedPage(tab, result, nextPage, true, currentFeed.feedSessionId);
+      }
     } catch (error) {
       if (loadMoreRequestRef.current === requestId) {
         if (
@@ -394,7 +430,6 @@ export default function PostsFeedTabs({
             void reloadFeed("home", {
               requestId: freshRequestId,
               showError: true,
-              showSkeleton: false,
             });
             setPaginationError(false);
             return;
@@ -412,6 +447,7 @@ export default function PostsFeedTabs({
       }
     } finally {
       if (loadMoreRequestRef.current === requestId) {
+        paginationPendingRef.current = false;
         setIsLoadingMore(false);
       }
     }
@@ -427,7 +463,11 @@ export default function PostsFeedTabs({
 
   useEffect(() => {
     const currentFeed = feedCache[activeTab];
-    if (!sentinelRef.current || !currentFeed?.hasMore || isSwitching) return;
+    if (
+      !sentinelRef.current || !currentFeed?.hasMore || isSwitching ||
+      isLoadingMore || initialError || paginationError
+    ) return;
+    if (typeof IntersectionObserver === "undefined") return;
     if (currentFeed.emptyPageCount >= 3) return;
 
     const observer = new IntersectionObserver(
@@ -441,7 +481,7 @@ export default function PostsFeedTabs({
 
     observer.observe(sentinelRef.current);
     return () => observer.disconnect();
-  }, [activeTab, feedCache, isSwitching, loadMore]);
+  }, [activeTab, feedCache, isSwitching, isLoadingMore, initialError, paginationError, loadMore]);
 
   // Track whether the tab strip is currently pinned, so its shadow only
   // appears while cards are actually passing beneath it -- a permanent shadow
@@ -478,13 +518,14 @@ export default function PostsFeedTabs({
   const posts = currentFeed?.posts ?? EMPTY_POSTS;
   const hasMore = currentFeed?.hasMore ?? false;
   const emptyPageCount = currentFeed?.emptyPageCount ?? 0;
-  const showSkeleton = isSwitching && !currentFeed;
+  const showSkeleton = isSwitching && posts.length === 0;
   const showEmpty = !initialError && !showSkeleton && posts.length === 0;
   const showFeedList = !initialError && !showSkeleton && posts.length > 0;
   const showEndState =
     posts.length > 0 &&
     !initialError &&
     !showSkeleton &&
+    !isSwitching &&
     !isLoadingMore &&
     (!hasMore || emptyPageCount >= 3);
 
@@ -578,7 +619,7 @@ export default function PostsFeedTabs({
         {...(showTabs
           ? { role: "tabpanel", "aria-labelledby": `feed-tab-${activeTab}` }
           : { "aria-label": "Publications" })}
-        aria-busy={showSkeleton || isLoadingMore}
+        aria-busy={isSwitching || isLoadingMore}
       >
         {initialError ? (
           <FeedErrorState onRetry={retryInitial} />
@@ -629,6 +670,18 @@ export default function PostsFeedTabs({
 
       {showEndState ? <EndStateCard /> : null}
 
+      {hasMore && emptyPageCount < 3 && !initialError && !paginationError ? (
+        <div className="flex justify-center py-4">
+          <button
+            type="button"
+            onClick={() => void loadMore()}
+            disabled={isSwitching || isLoadingMore}
+            className="min-h-11 rounded-lg px-4 text-sm font-semibold text-emerald-ink hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-50"
+          >
+            Load more
+          </button>
+        </div>
+      ) : null}
       <div ref={sentinelRef} className="h-1" />
     </div>
   );

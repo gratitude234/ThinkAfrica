@@ -18,7 +18,6 @@ function SkeletonByline({ nameWidth }: { nameWidth: string }) {
       <div className="h-[30px] w-[30px] shrink-0 rounded-full bg-divider sm:h-[34px] sm:w-[34px]" />
       <div className="flex min-w-0 flex-1 items-center gap-1.5">
         <Block className={`h-3 ${nameWidth}`} />
-        <Block className="h-2.5 w-20" />
         <Block className="h-2.5 w-8" />
       </div>
     </div>
@@ -30,7 +29,7 @@ function PostSkeletonCard() {
   return (
     <article className={CARD_SHELL}>
       <SkeletonByline nameWidth="w-32" />
-      <div className="mt-3 space-y-2">
+      <div className="mt-2.5 space-y-2 sm:mt-3">
         <Block className="h-3.5 w-full" />
         <Block className="h-3.5 w-4/5" />
       </div>
@@ -43,7 +42,7 @@ function ArticleSkeletonCard({ withCover = false }: { withCover?: boolean }) {
   return (
     <article className={CARD_SHELL}>
       <SkeletonByline nameWidth="w-28" />
-      <Block className="mt-3 h-2.5 w-24" />
+      <Block className="mt-2.5 h-2.5 w-24 sm:mt-3" />
       <Block className="mt-2 h-5 w-5/6" />
       <Block className="mt-2 h-3.5 w-3/5" />
       {withCover ? <div className="mt-2.5 aspect-[16/9] w-full rounded-xl bg-divider sm:mt-3 sm:rounded-[14px]" /> : null}

@@ -98,7 +98,7 @@ export default function BottomNav({
     >
       <div className="flex h-full items-center justify-around px-2">
         <Link
-          href="/"
+          href={userId ? "/" : "/?guest=1"}
           className={navLinkClass(isHomeActive)}
           aria-current={isHomeActive ? "page" : undefined}
         >

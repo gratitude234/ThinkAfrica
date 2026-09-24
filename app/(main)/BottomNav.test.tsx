@@ -155,3 +155,9 @@ describe("BottomNav shared chrome contract", () => {
     expect(bar).toHaveClass("translate-y-0", "transition-transform");
   });
 });
+
+it("keeps guests in the public feed when they choose Home", () => {
+  navigationState.pathname = "/";
+  render(<BottomNav username={null} userId={null} />);
+  expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/?guest=1");
+});

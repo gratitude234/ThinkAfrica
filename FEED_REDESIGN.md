@@ -1,43 +1,13 @@
-# Feed redesign summary
+# Home feed — current design
 
-This version gives Indegenius Posts, Articles, and Research three distinct feed
-templates without changing the Supabase schema or publishing workflow.
+The current Home feed follows the supplied Screen 02 mockup, `Indegenius Home Feed (1)(5).html`.
 
-## Content grammar
+- One flat reading stream on the warm canvas, with hairline separators and a 704px maximum reading column.
+- Signed-in readers have For you and Following. Guests have one inline sign-in notice and no redundant tab strip.
+- Posts lead with the author and body; attached photos retain their natural proportions within the compact media bounds and open the image viewer.
+- Articles use the gold Article/reading-time kicker, a Bodoni headline, excerpt, up to two topic links and an optional 16:9 cover beneath the text. No text-over-image layout.
+- Mobile engagement uses icons and counts; desktop adds action labels. Like, Comment, Share and Save use the existing product behaviours.
+- Skeletons, empty states, error/retry controls and the caught-up message remain part of the feed. Automatic pagination has a keyboard-accessible Load more fallback.
+- Research cards, subscribed/latest modes, discovery modules and sidebar briefs are retired; this design does not restore them.
 
-- **Posts are conversations.** The author and body lead, while attached photos
-  use their natural aspect ratio instead of a forced landscape crop.
-- **Articles are editorial stories.** A cover image becomes one immersive,
-  tappable story object with the type, reading time, headline, and standfirst
-  composed over a restrained emerald gradient. Articles without covers retain
-  a strong text-led variant.
-- **Research is evidence-first.** A pale plum surface, paper-shaped preview,
-  honest review/citation state, manuscript metadata, and a clear View paper
-  action distinguish it from social and editorial content.
-
-## Media behavior
-
-- Normal feed photography uses `object-contain` and the uploaded image's
-  intrinsic ratio.
-- Ordinary portrait photos remain portrait down to a 2:3 width/height ratio.
-- Extremely tall screenshots and panoramas are constrained to keep the feed
-  usable, but the full image remains visible with neutral breathing room.
-- Article covers keep a deliberate editorial 4:3 mobile / 16:10 desktop crop.
-  That treatment is reserved for authored cover art, not ordinary Post media.
-- Research covers use a contained 3:4 paper preview.
-
-## Feed controls and hierarchy
-
-- Content filters are compact, horizontally scrollable, one-tap chips on both
-  mobile and desktop.
-- The Subscriptions tab label is shortened to Subscribed for mobile clarity.
-- Recency appears beside the author's institution by default.
-- Existing Like, Discuss, Share, Save, topic discovery, response context,
-  evidence checks, pagination, and feed ranking behavior remain intact.
-
-## Data-model boundary
-
-The current product stores one `cover_image_url` per post. This redesign makes
-that image display correctly and naturally. A true multi-image carousel would
-require a separate media collection in the database, editor, upload flow, feed
-query, and post-detail page, so it is intentionally not fabricated in the UI.
+See `docs/Home_Feed_Mockup_Audit.md` for the September 24, 2026 review, fixes and validation limits.

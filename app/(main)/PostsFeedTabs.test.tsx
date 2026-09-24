@@ -630,12 +630,88 @@ describe("PostsFeedTabs -- pinned tab strip", () => {
     expect(stickyStrip(container)).not.toHaveClass("bg-card");
     expect(stickyStrip(container)).not.toHaveClass("px-4");
     expect(stickyStrip(container)).toHaveClass("pointer-events-none");
-    expect(tabRow(container)).toHaveClass("bg-card", "px-4", "pointer-events-auto");
+    expect(tabRow(container)).toHaveClass("bg-canvas", "pointer-events-auto");
   });
 
   it("has no filter row under the tabs", () => {
     const { container } = render(<PostsFeedTabs {...member} />);
 
     expect(container.querySelector("[data-app-context-expanded]")).toBeNull();
+  });
+});
+
+
+describe("PostsFeedTabs -- snapshot and retry safety", () => {
+  beforeEach(() => vi.stubGlobal("IntersectionObserver", MockIntersectionObserver));
+
+  it("shows loading rather than an empty feed during an initial retry", async () => {
+    let resolve!: (response: Response) => void;
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(r => { resolve = r; })));
+    const { container } = render(<PostsFeedTabs {...member} initialLoadFailed />);
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(screen.queryByText("No publications to show yet.")).not.toBeInTheDocument();
+    expect(container.querySelector("#home-feed-panel")).toHaveAttribute("aria-busy", "true");
+    await act(async () => resolve(page([post("recovered")])));
+    expect(screen.getByTestId("feed")).toHaveTextContent("recovered");
+  });
+
+  it("disconnects automatic pagination after a failure until explicit retry", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("failed", { status: 500 })));
+    render(<PostsFeedTabs {...member} initialPosts={[post("first")]} initialHasMore />);
+    await paginate();
+    expect(screen.getByText("Couldn't load more.")).toBeInTheDocument();
+    const observers = observerInstances.filter(o => o.options?.rootMargin === "400px 0px");
+    expect(observers.every(o => o.disconnect.mock.calls.length > 0)).toBe(true);
+    expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
+  });
+
+  it("does not let an older page-one response replace a newer tab refresh", async () => {
+    const pending: Array<(response: Response) => void> = [];
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(r => pending.push(r))));
+    render(<PostsFeedTabs {...member} initialPosts={[post("original")]} />);
+    fireEvent.click(screen.getByRole("tab", { name: "Following" }));
+    fireEvent.click(screen.getByRole("tab", { name: "For you" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Following" }));
+    await act(async () => pending[2](page([post("new-following")])));
+    await act(async () => pending[0](page([post("old-following")])));
+    expect(screen.getByTestId("feed")).toHaveTextContent("new-following");
+    expect(screen.getByTestId("feed")).not.toHaveTextContent("old-following");
+    await act(async () => pending[1](page([post("new-home")])));
+  });
+
+  it("discards a late pagination response after refreshing the same tab", async () => {
+    const pending: Array<(response: Response) => void> = [];
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(r => pending.push(r))));
+    render(<PostsFeedTabs {...member} initialPosts={[post("original")]} initialHasMore />);
+    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+    fireEvent.click(screen.getByRole("tab", { name: "For you" }));
+    await act(async () => pending[1](page([post("fresh-snapshot")])));
+    await act(async () => pending[0](page([post("stale-page")], true, "stale-cursor")));
+    expect(screen.getByTestId("feed")).toHaveTextContent("fresh-snapshot");
+    expect(screen.getByTestId("feed")).not.toHaveTextContent("stale-page");
+    expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the cached snapshot's session if its background refresh fails", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(page([post("following")]))
+      .mockResolvedValueOnce(new Response("failed", { status: 500 }))
+      .mockResolvedValueOnce(page([post("continued")]));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<PostsFeedTabs {...member} initialPosts={[post("original")]} initialHasMore initialNextCursor="original-cursor" />);
+    await act(async () => fireEvent.click(screen.getByRole("tab", { name: "Following" })));
+    await act(async () => fireEvent.click(screen.getByRole("tab", { name: "For you" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Load more" })));
+    expect(requestParams(fetchMock, 2).get("cursor")).toBe("original-cursor");
+    expect(requestParams(fetchMock, 2).get("session")).not.toBe(requestParams(fetchMock, 1).get("session"));
+    expect(screen.getByTestId("feed")).toHaveTextContent("original,continued");
+  });
+
+  it("supports manual pagination when IntersectionObserver is unavailable", async () => {
+    vi.stubGlobal("IntersectionObserver", undefined);
+    vi.stubGlobal("fetch", vi.fn(async () => page([post("second")])));
+    render(<PostsFeedTabs {...member} initialPosts={[post("first")]} initialHasMore />);
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Load more" })));
+    expect(screen.getByTestId("feed")).toHaveTextContent("first,second");
   });
 });

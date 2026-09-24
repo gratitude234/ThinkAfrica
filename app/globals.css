@@ -691,7 +691,7 @@ font-family: var(--font-inter), system-ui, sans-serif;
   /* The desktop mockup places the 176px rail 32px from the viewport edge and
      leaves a 28px lane before the centered 704px feed. */
   .app-shell-with-rail.app-shell-home { margin-left: 204px; padding: 28px 32px 64px; }
-  .app-shell-home .app-side-rail { left: 32px; padding-top: 28px; }
+  .app-shell-home .app-side-rail { left: 32px; padding: 28px 0; }
   .app-side-rail a, .app-side-rail button { justify-content: flex-start; }
   .app-rail-label { display: inline; }
   .app-rail-write-label { display: none; }

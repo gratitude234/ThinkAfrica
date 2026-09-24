@@ -17,6 +17,11 @@ interface Props {
   showTimestamp?: boolean;
 }
 
+/** Keep the narrow byline from spending space on "ago" / "yesterday". */
+function compactRelativeTime(date: string) {
+  return formatRelativeTime(date).replace(/ ago$/, "").replace("yesterday", "1d");
+}
+
 function initials(name: string) {
   return name
     .split(/\s+/)
@@ -79,7 +84,7 @@ function AuthorLine({
     />
   ) : (
     <span
-      className={`${avatarClass} flex items-center justify-center rounded-full bg-green-tint text-[11px] font-bold text-emerald-brand dark:bg-emerald-brand dark:text-emerald-ink`}
+      className={`${avatarClass} flex items-center justify-center rounded-full bg-green-tint text-[11px] sm:text-[12px] font-bold text-emerald-brand dark:bg-emerald-brand dark:text-emerald-ink`}
     >
       {initials(name)}
     </span>
@@ -110,10 +115,15 @@ function AuthorLine({
           <span className="truncate font-semibold text-ink">{name}</span>
         )}
         {showTimestamp && publishedAt ? (
-          <span className="shrink-0 whitespace-nowrap text-[12px] leading-[1.45] text-ink-muted sm:text-meta">
+          <time
+            dateTime={publishedAt}
+            title={new Date(publishedAt).toLocaleString("en-GB", { timeZone: "UTC" }) + " UTC"}
+            aria-label={formatRelativeTime(publishedAt)}
+            className="shrink-0 whitespace-nowrap text-[12px] leading-[1.45] text-ink-muted sm:text-meta"
+          >
             <span aria-hidden="true">· </span>
-            {formatRelativeTime(publishedAt)}
-          </span>
+            {compactRelativeTime(publishedAt)}
+          </time>
         ) : null}
       </div>
     </div>
@@ -217,7 +227,7 @@ function PostFeedCard({
   return (
     <article className={CARD_SHELL} data-content-kind="post">
       <AuthorLine post={post} avatarSize={34} showTimestamp={showTimestamp ?? true} />
-      <div className="mt-3">
+      <div className="mt-2.5 sm:mt-3">
         {title ? (
           <Link href={`/post/${post.slug}`} className={`group block ${FOCUS_RING}`}>
             <h2 className="font-sans text-title font-semibold text-ink transition-colors group-hover:text-emerald-ink motion-reduce:transition-none">
@@ -301,10 +311,10 @@ function ArticleFeedCard({
     <article className={CARD_SHELL} data-content-kind="article">
       <AuthorLine post={post} avatarSize={34} showTimestamp={showTimestamp ?? true} />
 
-      <div className="mt-3">
+      <div className="mt-2.5 sm:mt-3">
         <ArticleMeta readingTime={readingTime} />
         <Link href={`/post/${post.slug}`} className={`group block ${FOCUS_RING}`}>
-          <h2 className="mt-1.5 font-display line-clamp-4 text-[21px] font-semibold leading-[1.22] text-ink transition-colors group-hover:text-emerald-ink motion-reduce:transition-none sm:mt-2 sm:text-[26px] sm:leading-[1.2]">
+          <h2 className="mt-1.5 max-w-[640px] font-display line-clamp-4 text-[21px] font-semibold leading-[1.22] text-ink transition-colors group-hover:text-emerald-ink motion-reduce:transition-none sm:mt-2 sm:text-[26px] sm:leading-[1.2]">
             {title}
           </h2>
         </Link>

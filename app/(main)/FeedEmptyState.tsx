@@ -10,8 +10,8 @@ export default function FeedEmptyState({
   cta?: ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-card-border bg-card px-6 py-16 text-center">
-      <h2 className="text-base font-semibold text-ink">{title}</h2>
+    <div className="rounded-xl border border-card-border bg-card px-6 py-14 text-center">
+      <h2 className="mx-auto max-w-[260px] text-base font-semibold text-ink">{title}</h2>
       {body ? (
         <p className="mx-auto mt-1 max-w-sm text-sm text-ink-muted">{body}</p>
       ) : null}

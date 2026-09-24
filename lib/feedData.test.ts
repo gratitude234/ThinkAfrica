@@ -119,12 +119,13 @@ function feedSupabase(
           return false;
         }
         if (keysetPosition) {
-          const publishedAt = String(row.published_at ?? "");
+          const publishedAt = new Date(String(row.published_at)).getTime();
+          const cursorTime = new Date(keysetPosition.publishedAt).getTime();
           const id = String(row.id ?? "");
           if (
             !(
-              publishedAt < keysetPosition.publishedAt ||
-              (publishedAt === keysetPosition.publishedAt && id < keysetPosition.id)
+              publishedAt < cursorTime ||
+              (publishedAt === cursorTime && id < keysetPosition.id)
             )
           ) {
             return false;
@@ -949,7 +950,9 @@ describe("fetchFeedPage -- For You snapshot paging", () => {
     expect(new Set(served)).toEqual(new Set(deep.map((row) => row.id)));
   });
 
-  it("lifts a followed writer and a chosen topic above an equal stranger", async () => {
+  it("scores affinity above an equal stranger while retaining the discovery lane", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-24T00:00:00.000Z"));
     const candidates = [
       rankedRow(0, 0, { author_id: "stranger" }),
       rankedRow(1, 0, { author_id: "followed" }),
@@ -963,6 +966,14 @@ describe("fetchFeedPage -- For You snapshot paging", () => {
       supabase: feedSupabase(candidates).supabase as never,
     });
 
-    expect(new Set(result.posts.map((post) => post.id).slice(0, 2))).toEqual(new Set(["p1", "p2"]));
+    // Composition deliberately interleaves discovery; affinity is a score
+    // advantage, not a promise that both personalized rows occupy slots 1–2.
+    const byId = new Map(result.posts.map(post => [post.id, post]));
+    expect(byId.get("p1")?.score).toBeGreaterThan(byId.get("p0")!.score!);
+    expect(byId.get("p2")?.score).toBeGreaterThan(byId.get("p0")!.score!);
+    expect(byId.get("p1")?.candidate_source).toBe("for_you_personalized");
+    expect(byId.get("p2")?.candidate_source).toBe("for_you_personalized");
+    expect(byId.get("p0")?.candidate_source).toBe("for_you_discovery");
+    expect(new Set(byId.keys())).toEqual(new Set(["p0", "p1", "p2"]));
   });
 });
