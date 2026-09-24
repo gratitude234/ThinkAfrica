@@ -23,20 +23,16 @@ import { PostEngagementProvider } from "./PostEngagementContext";
 import ViewTracker from "./ViewTracker";
 import { createPostEngagementToken } from "@/lib/postEngagementToken";
 import ReadingProgressBar from "./ReadingProgressBar";
-import ReadingBar from "./ReadingBar";
 import AuthorBioCard from "./AuthorBioCard";
-import BodyContents from "./BodyContents";
-import BackLink from "@/components/ui/BackLink";
 import HighlightShare from "./HighlightShare";
 import PublishedToast from "./PublishedToast";
 import PostCover from "@/components/post/PostCover";
-import { formatTagLabel } from "@/lib/tags";
-import ReportButton from "@/components/moderation/ReportButton";
 import PostConversationView from "./PostConversationView";
 import DiscussionSection from "./DiscussionSection";
 import PostActionsRow from "./PostActionsRow";
+import PublicationMoreMenu from "./PublicationMoreMenu";
 import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
-import { earnsDropCap, stripLeadingEmptyParagraphs } from "@/lib/articleTypography";
+import { stripLeadingEmptyParagraphs } from "@/lib/articleTypography";
 import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
 import { resolveContentKind } from "@/lib/contentModel";
 
@@ -54,23 +50,15 @@ interface ReferenceRecord {
   url: string | null;
 }
 
-
-
-interface RelatedPost {
+interface AuthorPublication {
   id: string;
   title: string | null;
   slug: string;
   content_kind?: string | null;
   published_at: string | null;
   created_at: string;
-  cover_image_url: string | null;
-  profiles: { full_name: string | null; username: string } | null;
-}
-
-interface PostNavigationItem {
-  id: string;
-  title: string | null;
-  slug: string;
+  excerpt: string | null;
+  content: string | null;
 }
 
 interface SecondaryData {
@@ -78,9 +66,7 @@ interface SecondaryData {
   commentCount: number;
   likeCount: number;
   bookmarkCount: number;
-  relatedPosts: RelatedPost[];
-  previousPost: PostNavigationItem | null;
-  nextPost: PostNavigationItem | null;
+  moreFromAuthor: AuthorPublication[];
 }
 
 interface ViewerData {
@@ -99,37 +85,15 @@ function countWords(content: string): number {
   return content.replace(/<[^>]*>/g, " ").trim().split(/\s+/).filter(Boolean).length;
 }
 
-interface BodyHeading {
-  id: string;
-  text: string;
-  level: number;
-}
-
-/**
- * Stamps an id on every h2/h3 in the body *and* hands back the list.
- *
- * BodyContents reads the list to render the Article contents; the ids are
- * what its links jump to.
- */
-function injectHeadingIds(content: string): { html: string; headings: BodyHeading[] } {
-  const headings: BodyHeading[] = [];
+function injectHeadingIds(content: string): string {
   let index = 0;
-
-  const html = content.replace(
+  return content.replace(
     /<h([23])([^>]*)>([\s\S]*?)<\/h[23]>/gi,
     (_match, level: string, attrs: string, inner: string) => {
       const id = `heading-${index++}`;
-      const text = inner
-        .replace(/<[^>]*>/g, "")
-        .replace(/&nbsp;/g, " ")
-        .replace(/&amp;/g, "&")
-        .trim();
-      if (text) headings.push({ id, text, level: Number.parseInt(level, 10) });
       return `<h${level}${attrs} id="${id}">${inner}</h${level}>`;
     }
   );
-
-  return { html, headings };
 }
 
 function renderReferenceShortcodes(content: string): string {
@@ -142,6 +106,16 @@ function renderReferenceShortcodes(content: string): string {
       return `<sup><a href="#ref-id-${referenceKey}" class="no-underline" aria-label="Jump to cited source">[source]</a></sup>`;
     }
   );
+}
+
+function formatPublicationDate(value: string | null): string {
+  const date = new Date(value ?? Date.now());
+  const currentYear = new Date().getFullYear();
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    ...(date.getFullYear() === currentYear ? {} : { year: "numeric" as const }),
+  }).format(date);
 }
 
 function buildArticleJsonLd({
@@ -172,8 +146,6 @@ function ArticleJsonLd({ data }: { data: ReturnType<typeof buildArticleJsonLd> }
   return (
     <script
       type="application/ld+json"
-      // Escaping "<" prevents a title/description containing "</script>"
-      // from breaking out of this script tag when embedded in the HTML.
       dangerouslySetInnerHTML={{
         __html: JSON.stringify(data).replace(/</g, "\\u003c"),
       }}
@@ -183,45 +155,27 @@ function ArticleJsonLd({ data }: { data: ReturnType<typeof buildArticleJsonLd> }
 
 async function getSecondaryData(
   postId: string,
-  tags: string[],
   isPublished: boolean,
-  publishedAt: string | null,
+  authorId: string | null,
   viewerId: string | null
 ): Promise<SecondaryData> {
   const supabase = await createClient();
   const repository = postPageRepository(supabase);
 
-  const [counts, collections, related, neighbours] = await Promise.all([
+  const [counts, collections, moreFromAuthor] = await Promise.all([
     repository.counts(postId),
     repository.collections(postId, viewerId),
-    isPublished && tags.length > 0
-      ? repository.related(postId, tags, 3, viewerId)
+    isPublished && authorId
+      ? repository.moreFromAuthor(postId, authorId, 3, viewerId)
       : Promise.resolve([]),
-    isPublished && publishedAt
-      ? repository.neighbours(postId, publishedAt)
-      : Promise.resolve({ previous: null, next: null }),
   ]);
-
-  const relatedPosts = (related as Array<
-    Omit<RelatedPost, "profiles"> & {
-      profiles:
-        | { full_name: string | null; username: string }
-        | Array<{ full_name: string | null; username: string }>
-        | null;
-    }
-  >).map((item) => ({
-    ...item,
-    profiles: Array.isArray(item.profiles) ? item.profiles[0] ?? null : item.profiles,
-  }));
 
   return {
     references: collections.references as ReferenceRecord[],
     commentCount: counts.commentCount,
     likeCount: counts.likeCount,
     bookmarkCount: counts.bookmarkCount,
-    relatedPosts,
-    previousPost: neighbours.previous as PostNavigationItem | null,
-    nextPost: neighbours.next as PostNavigationItem | null,
+    moreFromAuthor: moreFromAuthor as AuthorPublication[],
   };
 }
 
@@ -244,54 +198,22 @@ async function getViewerData({
     };
   }
 
-  // Three maybeSingle() round trips became three `exists` in one row. The
-  // viewer id is the one the server resolved; a direct connection has no
-  // auth.uid() to fall back on, which is the point.
   const viewerState = await postPageRepository(supabase).viewerState(
     postId,
     userId,
     authorId ?? null
   );
 
-  const existingLike = viewerState.liked;
-  const existingBookmark = viewerState.bookmarked;
-  const followData = viewerState.following;
-
   return {
-    userLiked: Boolean(existingLike),
-    userBookmarked: Boolean(existingBookmark),
-    userFollowsAuthor: Boolean(followData),
+    userLiked: viewerState.liked,
+    userBookmarked: viewerState.bookmarked,
+    userFollowsAuthor: viewerState.following,
   };
-}
-
-/**
- * The author's own labels for the piece, and the reader's route into
- * /topics/[tag]. The editorial template rendered none at all: tags were mapped
- * in the research branch only, so an essay, a blog post or a policy brief was
- * the one page that could not link into the taxonomy it had just fed.
- */
-function PostTags({ tags }: { tags: string[] | null }) {
-  const labels = (tags ?? []).map((tag) => formatTagLabel(tag)).filter(Boolean);
-  if (labels.length === 0) return null;
-
-  return (
-    <div className="mb-8 flex flex-wrap gap-2">
-      {labels.map((tag) => (
-        <Link
-          key={tag}
-          href={`/topics/${encodeURIComponent(tag)}`}
-          className="rounded-full border border-card-border bg-surface px-3 py-1 text-meta text-ink-soft transition-colors hover:border-emerald-brand/40 hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
-        >
-          #{tag}
-        </Link>
-      ))}
-    </div>
-  );
 }
 
 function SectionSkeleton({ rows = 3 }: { rows?: number }) {
   return (
-    <div className="animate-pulse motion-reduce:animate-none space-y-3">
+    <div className="animate-pulse space-y-3 motion-reduce:animate-none">
       <div className="h-4 w-24 rounded bg-gray-200" />
       {[...Array(rows)].map((_, index) => (
         <div key={index} className="h-4 rounded bg-canvas" />
@@ -299,7 +221,6 @@ function SectionSkeleton({ rows = 3 }: { rows?: number }) {
     </div>
   );
 }
-
 
 async function DetailAuthorRow({
   post,
@@ -319,29 +240,27 @@ async function DetailAuthorRow({
   const isOwnPost = userId === author.id;
 
   return (
-    <div className="mt-5 flex items-start justify-between gap-4">
-      <div className="flex min-w-0 items-start gap-3">
-        <Link href={`/${author.username}`} className="shrink-0">
-          <UserAvatar
-            name={authorName}
-            src={author.avatar_url}
-            size={48}
-            className="overflow-hidden rounded-full"
-          />
+    <div className="mt-6 flex items-center gap-3 font-public-sans">
+      <Link href={`/${author.username}`} className="shrink-0">
+        <UserAvatar
+          name={authorName}
+          src={author.avatar_url}
+          size={40}
+          className="overflow-hidden rounded-full"
+        />
+      </Link>
+      <div className="min-w-0 flex-1">
+        <Link
+          href={`/${author.username}`}
+          className="block truncate text-[14px] font-semibold leading-5 text-ink transition-colors hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
+        >
+          {authorName}
         </Link>
-        <div className="min-w-0">
-          <p className="text-excerpt leading-snug">
-            <Link
-              href={`/${author.username}`}
-              className="font-bold text-ink transition-colors hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
-            >
-              {authorName}
-            </Link>
+        {author.professional_title ? (
+          <p className="mt-0.5 truncate text-[12.5px] leading-5 text-[#69726D]">
+            {author.professional_title}
           </p>
-          <p className="mt-0.5 text-meta leading-5 text-ink-muted">
-            {formatRelativeTime(post.published_at ?? post.created_at)}
-          </p>
-        </div>
+        ) : null}
       </div>
       {isOwnPost ? null : (
         <FollowButton
@@ -353,39 +272,16 @@ async function DetailAuthorRow({
           postId={post.id}
         />
       )}
+      <PublicationMoreMenu
+        postId={post.id}
+        slug={post.slug}
+        title={getPostMetadataTitle(post, author)}
+        status={post.status}
+        isOwner={isOwnPost}
+        viewerId={userId}
+        ownerUsername={author.username}
+      />
     </div>
-  );
-}
-
-async function PostReadingChrome({
-  post,
-  userId,
-  isPublished,
-  secondaryDataPromise,
-  viewerDataPromise,
-}: {
-  post: PostRecord;
-  userId: string | null;
-  isPublished: boolean;
-  secondaryDataPromise: Promise<SecondaryData>;
-  viewerDataPromise: Promise<ViewerData>;
-}) {
-  if (!isPublished) return null;
-  const [secondary, viewer] = await Promise.all([
-    secondaryDataPromise,
-    viewerDataPromise,
-  ]);
-
-  return (
-    <ReadingBar
-      postId={post.id}
-      userId={userId}
-      initialLiked={viewer.userLiked}
-      initialLikeCount={secondary.likeCount}
-      initialBookmarked={viewer.userBookmarked}
-      title={getPostMetadataTitle(post)}
-      slug={post.slug}
-    />
   );
 }
 
@@ -398,47 +294,33 @@ async function PostReferences({
   if (references.length === 0) return null;
 
   return (
-    <section
-      id="references"
-      className="mb-8 scroll-mt-24 border-t border-[#EDE9E2] pt-6"
-    >
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-kicker font-semibold uppercase text-ink-muted">
+    <section id="references" className="mb-8 scroll-mt-24 border-t border-[#E9E5DE] pt-6">
+      <div className="mb-4 flex items-center justify-between gap-3 font-public-sans">
+        <h2 className="text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
           Sources
         </h2>
-        <span className="rounded-full bg-canvas px-3 py-1 text-kicker font-medium text-ink-soft">
-          {references.length} listed
-        </span>
+        <span className="text-[12px] text-ink-muted">{references.length} listed</span>
       </div>
-      <ol>
+      <ol className="font-public-sans">
         {references.map((reference, index) => (
           <li
             key={reference.id}
             id={`ref-${index + 1}`}
-            className="flex gap-3 border-t border-divider py-3 text-meta leading-relaxed text-ink-soft first:border-t-0"
+            className="flex gap-3 border-t border-divider py-3 text-[13px] leading-relaxed text-ink-soft first:border-t-0"
           >
-            <span
-              id={`ref-id-${reference.id}`}
-              className="sr-only"
-              aria-hidden="true"
-            />
-            <span className="min-w-[2rem] shrink-0 font-bold text-emerald-ink">
+            <span id={`ref-id-${reference.id}`} className="sr-only" aria-hidden="true" />
+            <span className="min-w-[2rem] shrink-0 font-semibold text-emerald-ink">
               [{index + 1}]
             </span>
             <div>
               <p className="font-medium text-ink">{reference.title}</p>
-              <p className="mt-0.5 text-xs text-ink-muted">
-                {[reference.authors, reference.year, reference.source]
-                  .filter(Boolean)
-                  .join(" / ") || "Source details not provided"}
+              <p className="mt-0.5 text-[12px] text-ink-muted">
+                {[reference.authors, reference.year, reference.source].filter(Boolean).join(" · ") ||
+                  "Source details not provided"}
               </p>
               {reference.doi || reference.url ? (
-                <p className="mt-1 text-xs">
-                  {reference.doi ? (
-                    <span className="mr-2 text-ink-muted">
-                      DOI: {reference.doi}
-                    </span>
-                  ) : null}
+                <p className="mt-1 text-[12px]">
+                  {reference.doi ? <span className="mr-2 text-ink-muted">DOI: {reference.doi}</span> : null}
                   {reference.url ? (
                     <a
                       href={reference.url}
@@ -475,10 +357,7 @@ async function PostEngagementSection({
   viewerDataPromise: Promise<ViewerData>;
 }) {
   if (post.status !== "published") return null;
-  const [secondary, viewer] = await Promise.all([
-    secondaryDataPromise,
-    viewerDataPromise,
-  ]);
+  const [secondary, viewer] = await Promise.all([secondaryDataPromise, viewerDataPromise]);
 
   return (
     <PostActionsRow
@@ -492,16 +371,6 @@ async function PostEngagementSection({
       initialLikeCount={secondary.likeCount}
       initialBookmarked={viewer.userBookmarked}
       commentCount={secondary.commentCount}
-      reportSlot={
-        userId && author && userId !== author.id ? (
-          <ReportButton
-            targetType="post"
-            targetId={post.id}
-            targetLabel={`"${getPostMetadataTitle(post, author)}"`}
-            variant="text"
-          />
-        ) : null
-      }
     />
   );
 }
@@ -530,86 +399,47 @@ async function AuthorSection({
   );
 }
 
-async function PostContinueExploringSection({
+async function MoreFromAuthorSection({
+  author,
   secondaryDataPromise,
 }: {
+  author: AuthorProfile | null;
   secondaryDataPromise: Promise<SecondaryData>;
 }) {
-  const { relatedPosts, previousPost, nextPost } = await secondaryDataPromise;
+  if (!author) return null;
+  const { moreFromAuthor } = await secondaryDataPromise;
+  if (moreFromAuthor.length === 0) return null;
 
-  if (relatedPosts.length === 0 && !previousPost && !nextPost) return null;
+  const writerName = author.full_name ?? author.username;
+  const shortName = writerName.trim().split(/\s+/)[0] || writerName;
 
   return (
-    <section className="mt-14 border-t border-card-border pt-6">
-      {relatedPosts.length > 0 ? (
-        <>
-          <h3 className="text-kicker font-semibold uppercase text-ink-muted">
-            More like this
-          </h3>
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {relatedPosts.map((item) => (
-              <Link
-                key={item.id}
-                href={`/post/${item.slug}`}
-                className="group flex overflow-hidden rounded-lg border border-card-border bg-surface transition-all hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] sm:flex-col"
-              >
-                <div className="h-[92px] w-[112px] shrink-0 overflow-hidden sm:h-[96px] sm:w-full">
-                  <PostCover
-                    src={item.cover_image_url}
-                    alt={getPostDisplayTitle(item)}
-                    content_kind={item.content_kind}
-                    sizes="200px"
-                    className="h-full w-full"
-                    imageClassName="object-cover"
-                  />
-                </div>
-                <div className="flex min-w-0 flex-1 flex-col p-3">
-                  <p className="line-clamp-2 text-meta font-semibold leading-snug text-ink transition-colors group-hover:text-emerald-brand">
-                    {getPostMetadataTitle(item, item.profiles)}
-                  </p>
-                  <p className="mt-auto pt-2 text-kicker text-ink-muted">
-                    {item.profiles?.full_name ?? item.profiles?.username}
-                  </p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </>
-      ) : null}
+    <section className="border-t border-[#E9E5DE] py-7 font-public-sans" aria-labelledby="more-from-author">
+      <h2 id="more-from-author" className="publication-more-title text-[20px] font-semibold leading-tight text-ink">
+        More from {shortName}
+      </h2>
+      <div className="mt-3">
+        {moreFromAuthor.map((item) => {
+          const isArticle = (item.content_kind ?? (item.title ? "article" : "post")) === "article";
+          const itemTitle = item.title?.trim() || sanitizePostExcerpt(item.excerpt ?? item.content)?.trim() || "Post";
+          const meta = isArticle
+            ? `Article · ${estimateReadTime(item.content ?? "")} min read`
+            : `Post · ${formatRelativeTime(item.published_at ?? item.created_at)}`;
 
-      {previousPost || nextPost ? (
-        <nav
-          aria-label="Adjacent posts"
-          className="mt-8 grid gap-4 border-t border-card-border pt-5 sm:grid-cols-2"
-        >
-          {previousPost ? (
+          return (
             <Link
-              href={`/post/${previousPost.slug}`}
-              className="group min-w-0 transition-colors hover:text-emerald-brand"
+              key={item.id}
+              href={`/post/${item.slug}`}
+              className="group block border-b border-[#E9E5DE] py-4 last:border-b-0"
             >
-              <span className="block text-kicker font-semibold uppercase text-ink-muted">
-                <span aria-hidden="true">&larr;</span> Previous
-              </span>
-              <span className="mt-1 line-clamp-2 text-sm font-medium text-ink-soft transition-colors group-hover:text-emerald-brand">
-                {getPostMetadataTitle(previousPost)}
-              </span>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.07em] text-[#8A6C26]">{meta}</p>
+              <p className="mt-1 line-clamp-2 text-[15px] font-medium leading-[1.45] text-ink transition-colors group-hover:text-emerald-brand">
+                {itemTitle}
+              </p>
             </Link>
-          ) : null}
-          {nextPost ? (
-            <Link
-              href={`/post/${nextPost.slug}`}
-              className="group min-w-0 transition-colors hover:text-emerald-brand sm:col-start-2 sm:text-right"
-            >
-              <span className="block text-kicker font-semibold uppercase text-ink-muted">
-                Next <span aria-hidden="true">&rarr;</span>
-              </span>
-              <span className="mt-1 line-clamp-2 text-sm font-medium text-ink-soft transition-colors group-hover:text-emerald-brand">
-                {getPostMetadataTitle(nextPost)}
-              </span>
-            </Link>
-          ) : null}
-        </nav>
-      ) : null}
+          );
+        })}
+      </div>
     </section>
   );
 }
@@ -623,8 +453,8 @@ async function PostPublishSuccessSection({
   author: AuthorProfile | null;
   secondaryDataPromise: Promise<SecondaryData>;
 }) {
-  const { relatedPosts } = await secondaryDataPromise;
-  const related = relatedPosts[0] ?? null;
+  const { moreFromAuthor } = await secondaryDataPromise;
+  const related = moreFromAuthor[0] ?? null;
 
   return (
     <PublishedToast
@@ -637,7 +467,7 @@ async function PostPublishSuccessSection({
         related
           ? {
               id: related.id,
-              title: getPostMetadataTitle(related, related.profiles),
+              title: getPostMetadataTitle(related, author),
               slug: related.slug,
             }
           : null
@@ -646,7 +476,6 @@ async function PostPublishSuccessSection({
   );
 }
 
-// The discussion under the piece: comments and their replies.
 async function PostDiscussion({
   post,
   userId,
@@ -671,18 +500,11 @@ async function PostDiscussion({
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  // Both of these are memoised for this render, so the page component below
-  // reuses them instead of asking the database and the auth server again.
-  const [post, user] = await Promise.all([
-    getPostBySlug(slug),
-    getCurrentUser(),
-  ]);
+  const [post, user] = await Promise.all([getPostBySlug(slug), getCurrentUser()]);
 
   if (!post) return { title: "Post not found - Indegenius" };
   if (
-    (post.status === "draft" ||
-      post.status === "pending" ||
-      post.status === "pending_revision") &&
+    (post.status === "draft" || post.status === "pending" || post.status === "pending_revision") &&
     user?.id !== post.author_id
   ) {
     return { title: "Post not found - Indegenius" };
@@ -697,13 +519,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     content: post.content,
     fallback: `Read this post by ${authorLabel} on Indegenius`,
   });
-  // TODO(gratitude): confirm production domain — SITE_URL is a placeholder until then.
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? SITE_URL;
   const ogImageUrl = `${appUrl}/api/og?${new URLSearchParams({
     title: metadataTitle,
     author: author?.full_name ?? "",
-    // The parameter keeps its name so an image cached against an existing
-    // share URL still resolves; /api/og maps both vocabularies.
     type: resolveContentKind(post) ?? "post",
   }).toString()}`;
   const ogImage = coverUrl ?? ogImageUrl;
@@ -732,18 +551,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function PostPage({ params }: PageProps) {
   const { slug } = await params;
   const supabase = await createClient();
-
-  // generateMetadata() ran first and asked for exactly these two things, so
-  // both are already resolved here. See lib/postBySlug.ts.
-  const [post, user] = await Promise.all([
-    getPostBySlug(slug),
-    getCurrentUser(),
-  ]);
+  const [post, user] = await Promise.all([getPostBySlug(slug), getCurrentUser()]);
 
   if (!post) notFound();
-
   if (post.status === "draft" && user?.id !== post.author_id) notFound();
-
   if (
     (post.status === "pending" || post.status === "pending_revision") &&
     user?.id !== post.author_id
@@ -752,29 +563,19 @@ export default async function PostPage({ params }: PageProps) {
   }
 
   const isPublished = post.status === "published";
-  const engagementToken = isPublished
-    ? createPostEngagementToken(post.id, slug)
-    : null;
+  const engagementToken = isPublished ? createPostEngagementToken(post.id, slug) : null;
   const author = getPostAuthor(post);
   const sanitizedContent = sanitizePostHtml(post.content);
   const sanitizedExcerpt = sanitizePostExcerpt(post.excerpt);
   const readTime = estimateReadTime(sanitizedContent);
   const wordCount = countWords(sanitizedContent);
-  const { html: headedContent, headings: bodyHeadings } = injectHeadingIds(
-    stripLeadingEmptyParagraphs(sanitizedContent)
-  );
+  const headedContent = injectHeadingIds(stripLeadingEmptyParagraphs(sanitizedContent));
   const contentWithIds = renderReferenceShortcodes(headedContent);
   const authorName = author?.full_name ?? author?.username ?? "Anonymous";
   const displayTitle = getPostDisplayTitle(post);
   const metadataTitle = getPostMetadataTitle(post, author);
   const userId = user?.id ?? null;
-  const secondaryDataPromise = getSecondaryData(
-    post.id,
-    post.tags ?? [],
-    isPublished,
-    post.published_at,
-    userId
-  );
+  const secondaryDataPromise = getSecondaryData(post.id, isPublished, author?.id ?? null, userId);
   const viewerDataPromise = getViewerData({
     postId: post.id,
     userId,
@@ -794,20 +595,13 @@ export default async function PostPage({ params }: PageProps) {
       })
     : null;
 
-  // Short, titleless Posts get a conversation view (content → actions →
-  // comments), not the publication template below — see
-  // PostConversationView.tsx.
   if (resolvedKind === "post") {
     return (
       <PostEngagementProvider postId={post.id} userId={userId} contentKind={resolvedKind}>
-        <div className="relative">
+        <div className="publication-detail relative">
           {articleJsonLd ? <ArticleJsonLd data={articleJsonLd} /> : null}
           {isPublished ? (
-            <ViewTracker
-              slug={slug}
-              wordCount={wordCount}
-              engagementToken={engagementToken}
-            />
+            <ViewTracker slug={slug} wordCount={wordCount} engagementToken={engagementToken} />
           ) : null}
           <Suspense fallback={<SectionSkeleton rows={6} />}>
             <PostConversationView
@@ -829,160 +623,129 @@ export default async function PostPage({ params }: PageProps) {
 
   return (
     <PostEngagementProvider postId={post.id} userId={userId} contentKind={resolvedKind}>
-    <div className="relative">
-    {articleJsonLd ? <ArticleJsonLd data={articleJsonLd} /> : null}
-    {isPublished ? (
-      <>
-        <Suspense fallback={null}>
-          <PostReadingChrome
-            post={post}
-            userId={userId}
-            isPublished={isPublished}
-            secondaryDataPromise={secondaryDataPromise}
-            viewerDataPromise={viewerDataPromise}
-          />
-        </Suspense>
-        {/* A scroll-progress affordance implies a long-form read; skip it
-            for titleless lightweight Posts, which are short by design. */}
-        {displayTitle ? <ReadingProgressBar /> : null}
-        <ViewTracker
-          slug={slug}
-          wordCount={wordCount}
-          engagementToken={engagementToken}
-        />
-      </>
-    ) : null}
-
-    <header className="mx-auto max-w-[680px] pb-2 pt-1 sm:pt-3">
-      <div>
-        {/* Real history, not a hardcoded "/". Arrive from a profile, a search
-            result or a topic page and "Back to feed" was a lie. */}
-        <BackLink className="inline-flex min-h-11 items-center gap-1.5 text-sm text-ink-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2">
-          <span aria-hidden="true">‹</span> Back
-        </BackLink>
-
-        <div className="mt-1 flex flex-wrap items-center gap-2.5">
-          <span className="rounded-full bg-gold-tint px-3 py-1 text-xs font-semibold text-gold-ink">
-            Article
-          </span>
-          <span className="text-meta font-medium text-ink-muted">{readTime} min read</span>
-        </div>
-
-        {displayTitle ? (
-          <h1 className="font-display mt-4 text-feature font-semibold tracking-[-0.02em] text-ink">
-            {displayTitle}
-          </h1>
+      <div className="publication-detail relative">
+        {articleJsonLd ? <ArticleJsonLd data={articleJsonLd} /> : null}
+        {isPublished ? (
+          <>
+            <ReadingProgressBar />
+            <ViewTracker slug={slug} wordCount={wordCount} engagementToken={engagementToken} />
+          </>
         ) : null}
 
-        <Suspense fallback={<div className="mt-5 h-12 animate-pulse motion-reduce:animate-none rounded-lg bg-canvas" />}>
-          <DetailAuthorRow
-            post={post}
-            author={author}
-            authorName={authorName}
-            userId={userId}
-            viewerDataPromise={viewerDataPromise}
-          />
-        </Suspense>
-
-      </div>
-    </header>
-
-    {post.cover_image_url ? (
-      <div className="mx-auto mt-6 max-w-[680px]">
-        <PostCover
-          src={post.cover_image_url}
-          alt={post.title}
-          content_kind={post.content_kind}
-          sizes="(max-width: 720px) calc(100vw - 32px), 680px"
-          priority
-          className="aspect-[16/9] w-full rounded-[10px] border border-card-border bg-canvas"
-          imageClassName="object-cover"
-        />
-      </div>
-    ) : null}
-
-    <div className="mx-auto max-w-[680px] pb-20 pt-8 sm:pt-10">
-      <main className="min-w-0">
-        <Suspense fallback={null}>
-          <PostPublishSuccessSection
-            post={post}
-            author={author}
-            secondaryDataPromise={secondaryDataPromise}
-          />
-        </Suspense>
-
-        {post.status === "draft" ? (
-          <div className="mb-6 rounded-xl border border-card-border bg-canvas p-4 text-sm text-ink-soft">
-            This post is a <strong>draft</strong> and is only visible to you.{" "}
-            <Link href={`/edit/${post.slug}`} className="font-semibold underline">
-              Edit &amp; publish
-            </Link>
-          </div>
-        ) : null}
-
-        <BodyContents headings={bodyHeadings} />
-
-        <div
-          className={`article-journal-body article-redesign-body relative mb-10 sm:mb-12${
-            earnsDropCap(sanitizedContent) ? " has-dropcap" : ""
-          }`}
-        >
-          <HighlightShare containerId="post-article-prose" />
-          <div
-            id="post-article-prose"
-            className="article-journal-body prose prose-gray max-w-[680px] prose-lg prose-a:text-emerald-brand prose-headings:font-semibold prose-headings:tracking-normal prose-headings:text-ink"
-            dangerouslySetInnerHTML={{ __html: contentWithIds }}
-          />
-        </div>
-
-        <PostTags tags={post.tags} />
-
-        <Suspense fallback={<SectionSkeleton rows={4} />}>
-          <PostReferences secondaryDataPromise={secondaryDataPromise} />
-        </Suspense>
-
-        <Suspense fallback={<SectionSkeleton rows={2} />}>
-          <PostEngagementSection
-            post={post}
-            author={author}
-            userId={userId}
-            sanitizedExcerpt={sanitizedExcerpt}
-            secondaryDataPromise={secondaryDataPromise}
-            viewerDataPromise={viewerDataPromise}
-          />
-        </Suspense>
-
-        {/* The comments come directly after the actions row. Nothing may
-            sit between a reader finishing the piece and the conversation. */}
-        <Suspense fallback={<SectionSkeleton rows={3} />}>
-          <PostDiscussion
-            post={post}
-            userId={userId}
-            secondaryDataPromise={secondaryDataPromise}
-          />
-        </Suspense>
-
-        <div className="mt-14">
-          <Suspense fallback={<SectionSkeleton rows={3} />}>
-            <AuthorSection
+        <div className="mx-auto max-w-[740px] pb-20">
+          <Suspense fallback={null}>
+            <PostPublishSuccessSection
               post={post}
               author={author}
-              userId={userId}
-              viewerDataPromise={viewerDataPromise}
-            />
-          </Suspense>
-        </div>
-
-        {isPublished ? (
-          <Suspense fallback={<SectionSkeleton rows={3} />}>
-            <PostContinueExploringSection
               secondaryDataPromise={secondaryDataPromise}
             />
           </Suspense>
-        ) : null}
-      </main>
-    </div>
-    </div>
+
+          {post.status === "draft" ? (
+            <div className="mb-6 rounded-xl border border-card-border bg-canvas p-4 font-public-sans text-sm text-ink-soft">
+              This post is a <strong>draft</strong> and is only visible to you.{" "}
+              <Link href={`/edit/${post.slug}`} className="font-semibold underline">
+                Edit &amp; publish
+              </Link>
+            </div>
+          ) : null}
+
+          <header className="pt-2 sm:pt-4">
+            {displayTitle ? (
+              <h1 className="publication-article-title text-[34px] font-semibold leading-[1.12] tracking-[-0.025em] text-ink sm:text-[46px] sm:leading-[1.14]">
+                {displayTitle}
+              </h1>
+            ) : null}
+
+            {sanitizedExcerpt ? (
+              <p className="mt-4 max-w-[690px] font-public-sans text-[17px] leading-[1.55] text-[#4B5550] sm:text-[19px]">
+                {sanitizedExcerpt}
+              </p>
+            ) : null}
+
+            <Suspense fallback={<div className="mt-6 h-10 animate-pulse rounded-lg bg-canvas motion-reduce:animate-none" />}>
+              <DetailAuthorRow
+                post={post}
+                author={author}
+                authorName={authorName}
+                userId={userId}
+                viewerDataPromise={viewerDataPromise}
+              />
+            </Suspense>
+
+            <p className="mt-3 font-public-sans text-[12.5px] leading-5 text-[#79817D]">
+              {formatPublicationDate(post.published_at ?? post.created_at)} · {readTime} min read
+            </p>
+          </header>
+
+          {post.cover_image_url ? (
+            <div className="mt-7 sm:mt-8">
+              <PostCover
+                src={post.cover_image_url}
+                alt={post.title}
+                content_kind={post.content_kind}
+                sizes="(max-width: 780px) calc(100vw - 32px), 740px"
+                priority
+                className="aspect-[16/9] w-full overflow-hidden rounded-[8px] bg-canvas"
+                imageClassName="object-cover"
+              />
+            </div>
+          ) : null}
+
+          <main className="pt-8 sm:pt-10">
+            <div className="publication-article-body relative">
+              <HighlightShare containerId="post-article-prose" />
+              <div
+                id="post-article-prose"
+                dangerouslySetInnerHTML={{ __html: contentWithIds }}
+              />
+            </div>
+
+            <div className="mt-10 sm:mt-12">
+              <Suspense fallback={<SectionSkeleton rows={4} />}>
+                <PostReferences secondaryDataPromise={secondaryDataPromise} />
+              </Suspense>
+
+              <Suspense fallback={<SectionSkeleton rows={2} />}>
+                <PostEngagementSection
+                  post={post}
+                  author={author}
+                  userId={userId}
+                  sanitizedExcerpt={sanitizedExcerpt}
+                  secondaryDataPromise={secondaryDataPromise}
+                  viewerDataPromise={viewerDataPromise}
+                />
+              </Suspense>
+
+              <Suspense fallback={<SectionSkeleton rows={3} />}>
+                <AuthorSection
+                  post={post}
+                  author={author}
+                  userId={userId}
+                  viewerDataPromise={viewerDataPromise}
+                />
+              </Suspense>
+
+              {isPublished ? (
+                <Suspense fallback={<SectionSkeleton rows={3} />}>
+                  <MoreFromAuthorSection
+                    author={author}
+                    secondaryDataPromise={secondaryDataPromise}
+                  />
+                </Suspense>
+              ) : null}
+
+              <Suspense fallback={<SectionSkeleton rows={3} />}>
+                <PostDiscussion
+                  post={post}
+                  userId={userId}
+                  secondaryDataPromise={secondaryDataPromise}
+                />
+              </Suspense>
+            </div>
+          </main>
+        </div>
+      </div>
     </PostEngagementProvider>
   );
 }

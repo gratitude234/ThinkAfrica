@@ -736,3 +736,154 @@ font-family: var(--font-inter), system-ui, sans-serif;
 }
 
 .app-account-trigger svg { width:100%; height:100%; }
+
+/* --------------------------------------------------------------------------
+   Publication detail / reading experience
+   Screen 05 is intentionally scoped: Home, Explore, profiles and the composer
+   keep their own typography. Articles use Newsreader; conversation surfaces
+   use Public Sans. */
+.font-public-sans {
+  font-family: var(--font-public-sans), system-ui, sans-serif;
+}
+
+.publication-detail {
+  color: #1A1A1A;
+  font-family: var(--font-public-sans), system-ui, sans-serif;
+}
+
+.publication-reading-progress {
+  top: var(--app-nav-offset, 64px);
+}
+
+.publication-article-title,
+.publication-more-title {
+  font-family: var(--font-newsreader), Georgia, serif;
+}
+
+.publication-article-body {
+  max-width: 660px;
+  margin-inline: auto;
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 20px;
+  line-height: 1.78;
+  color: #1A1A1A;
+}
+
+.publication-article-body > :first-child {
+  margin-top: 0;
+}
+
+.publication-article-body p {
+  margin: 20px 0 0;
+  font: inherit;
+  color: inherit;
+}
+
+.publication-article-body h2 {
+  margin: 44px 0 16px;
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0;
+  color: #1A1A1A;
+}
+
+.publication-article-body h3 {
+  margin: 34px 0 12px;
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 23px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #1A1A1A;
+}
+
+.publication-article-body ul,
+.publication-article-body ol {
+  margin: 20px 0 0;
+  padding-left: 1.4em;
+}
+
+.publication-article-body li {
+  margin-top: 8px;
+}
+
+.publication-article-body blockquote {
+  margin: 36px 0;
+  border-left: 2px solid #073929;
+  padding-left: 22px;
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 22px;
+  font-style: italic;
+  line-height: 1.5;
+  color: #1B2420;
+}
+
+.publication-article-body a {
+  color: #0B4A36;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.publication-article-body img {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+.publication-article-body figcaption {
+  margin-top: 8px;
+  font-family: var(--font-public-sans), system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #6B6B6B;
+}
+
+.publication-post-body {
+  font-family: var(--font-public-sans), system-ui, sans-serif;
+  font-size: 18px;
+  line-height: 1.6;
+  color: #1A1A1A;
+}
+
+.publication-post-body p {
+  margin: 0 0 16px;
+}
+
+.publication-post-body p:last-child {
+  margin-bottom: 0;
+}
+
+.publication-post-body a {
+  color: #0B4A36;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (max-width: 639px) {
+  .publication-article-body {
+    font-size: 18px;
+    line-height: 1.72;
+  }
+
+  .publication-article-body h2 {
+    margin-top: 32px;
+    font-size: 22px;
+  }
+
+  .publication-article-body h3 {
+    margin-top: 28px;
+    font-size: 20px;
+  }
+
+  .publication-article-body blockquote {
+    margin: 28px 0;
+    padding-left: 16px;
+    font-size: 20px;
+  }
+
+  .publication-post-body {
+    font-size: 17px;
+    line-height: 1.6;
+  }
+}

@@ -15,14 +15,14 @@ describe("InlineResponseComposer", () => {
 
   it("keeps comments inline", async () => {
     render(<InlineResponseComposer parentPostId="parent-1" userId="user-1" />);
-    fireEvent.change(screen.getByLabelText("Write a comment"), { target: { value: "A comment." } });
+    fireEvent.change(screen.getByLabelText("Add to the discussion"), { target: { value: "A comment." } });
     fireEvent.click(screen.getByRole("button", { name: "Comment" }));
     await waitFor(() => expect(mocks.submit).toHaveBeenCalledWith({ postId: "parent-1", content: "A comment." }));
   });
 
   it("offers no way to turn a comment into a publication", () => {
     render(<InlineResponseComposer parentPostId="parent-1" userId="user-1" />);
-    fireEvent.change(screen.getByLabelText("Write a comment"), { target: { value: "Needs more room." } });
+    fireEvent.change(screen.getByLabelText("Add to the discussion"), { target: { value: "Needs more room." } });
 
     // Responses are retired. The only control is the one that posts a comment.
     expect(screen.queryByRole("button", { name: "Open editor" })).not.toBeInTheDocument();
@@ -32,7 +32,7 @@ describe("InlineResponseComposer", () => {
 
   it("asks a guest to sign in without sending them to the composer", () => {
     render(<InlineResponseComposer parentPostId="parent-1" userId={null} />);
-    fireEvent.click(screen.getByRole("button", { name: "Sign in to reply" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign in to join the discussion…" }));
     expect(mocks.requestAuth).toHaveBeenCalledWith("respond", { contentKind: "post" });
     expect(JSON.stringify(mocks.requestAuth.mock.calls)).not.toContain("/write");
   });

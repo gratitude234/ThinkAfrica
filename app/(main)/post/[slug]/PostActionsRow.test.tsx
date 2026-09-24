@@ -54,10 +54,10 @@ beforeEach(() => {
   document.body.innerHTML = "";
 });
 
-describe("PostActionsRow reply action", () => {
+describe("PostActionsRow comment action", () => {
   it("shows the comment count, and nothing else", () => {
     renderRow();
-    expect(screen.getByRole("button", { name: "Reply to this post" })).toHaveTextContent("3");
+    expect(screen.getByRole("button", { name: "Comment on this publication" })).toHaveTextContent("3");
   });
 
   it("takes the reader to the composer instead of navigating away", () => {
@@ -67,7 +67,7 @@ describe("PostActionsRow reply action", () => {
     document.body.appendChild(composer);
 
     renderRow();
-    fireEvent.click(screen.getByRole("button", { name: "Reply to this post" }));
+    fireEvent.click(screen.getByRole("button", { name: "Comment on this publication" }));
 
     expect(composer.scrollIntoView).toHaveBeenCalled();
     expect(document.activeElement).toBe(composer);
@@ -82,7 +82,7 @@ describe("PostActionsRow reply action", () => {
     document.body.appendChild(thread);
 
     renderRow();
-    fireEvent.click(screen.getByRole("button", { name: "Reply to this post" }));
+    fireEvent.click(screen.getByRole("button", { name: "Comment on this publication" }));
 
     expect(thread.scrollIntoView).toHaveBeenCalled();
   });
@@ -90,14 +90,14 @@ describe("PostActionsRow reply action", () => {
   it("gates a guest to sign-in rather than focusing a box they can't use", () => {
     renderRow({ userId: null });
 
-    fireEvent.click(screen.getByRole("button", { name: "Reply to this post" }));
+    fireEvent.click(screen.getByRole("button", { name: "Comment on this publication" }));
 
     expect(mocks.requestAuth).toHaveBeenCalledWith("respond", { contentKind: "post" });
   });
 
   it("hides the count when there is nothing to count", () => {
     renderRow({ commentCount: 0 });
-    expect(screen.getByRole("button", { name: "Reply to this post" })).toHaveTextContent("Reply");
-    expect(screen.getByRole("button", { name: "Reply to this post" })).not.toHaveTextContent("0");
+    expect(screen.getByRole("button", { name: "Comment on this publication" })).toHaveTextContent("Comment");
+    expect(screen.getByRole("button", { name: "Comment on this publication" })).not.toHaveTextContent("0");
   });
 });

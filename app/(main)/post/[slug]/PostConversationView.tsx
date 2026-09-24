@@ -1,12 +1,10 @@
 import Link from "next/link";
 import UserAvatar from "@/components/ui/UserAvatar";
-import FollowButton from "@/components/ui/FollowButton";
-import ReportButton from "@/components/moderation/ReportButton";
-import BackLink from "@/components/ui/BackLink";
 import PostImage from "@/components/post/PostImage";
 import PublishedToast from "./PublishedToast";
 import PostActionsRow from "./PostActionsRow";
 import DiscussionSection from "./DiscussionSection";
+import PublicationMoreMenu from "./PublicationMoreMenu";
 import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
 import { formatRelativeTime } from "@/lib/utils";
 
@@ -14,6 +12,7 @@ interface ConversationAuthor {
   id: string;
   username: string;
   full_name: string | null;
+  professional_title?: string | null;
   avatar_url: string | null;
 }
 
@@ -42,11 +41,15 @@ interface ConversationSecondary {
   commentCount: number;
   likeCount: number;
   bookmarkCount: number;
-  relatedPosts: Array<{
+  moreFromAuthor: Array<{
     id: string;
     title: string | null;
     slug: string;
-    profiles: { full_name: string | null; username: string } | null;
+    content_kind?: string | null;
+    published_at: string | null;
+    created_at: string;
+    excerpt: string | null;
+    content: string | null;
   }>;
 }
 
@@ -68,11 +71,6 @@ interface PostConversationViewProps {
   viewerDataPromise: Promise<ConversationViewer>;
 }
 
-/**
- * The detail page for a short, titleless Post — a conversation view, not a
- * publication template: content, one actions row, then the comments. The
- * Articles keep the long-form reading template in page.tsx.
- */
 export default async function PostConversationView({
   post,
   author,
@@ -84,18 +82,14 @@ export default async function PostConversationView({
   secondaryDataPromise,
   viewerDataPromise,
 }: PostConversationViewProps) {
-  const [secondary, viewer] = await Promise.all([
-    secondaryDataPromise,
-    viewerDataPromise,
-  ]);
+  const [secondary, viewer] = await Promise.all([secondaryDataPromise, viewerDataPromise]);
   const isPublished = post.status === "published";
   const isOwnPost = Boolean(userId && author && userId === author.id);
-  const relatedPost = secondary.relatedPosts[0] ?? null;
+  const relatedPost = secondary.moreFromAuthor[0] ?? null;
   const displayTitle = getPostDisplayTitle(post);
-  const topics = post.tags ?? [];
 
   return (
-    <div className="mx-auto max-w-[640px] pb-20">
+    <div className="mx-auto max-w-[700px] pb-20 font-public-sans">
       <PublishedToast
         postId={post.id}
         contentKind={post.content_kind ?? null}
@@ -106,21 +100,15 @@ export default async function PostConversationView({
           relatedPost
             ? {
                 id: relatedPost.id,
-                // The related query already carries the author, so a titleless
-                // Post is nameable rather than "another post".
-                title: getPostMetadataTitle(relatedPost, relatedPost.profiles),
+                title: getPostMetadataTitle(relatedPost, author),
                 slug: relatedPost.slug,
               }
             : null
         }
       />
 
-      <BackLink className="inline-flex min-h-11 items-center gap-1.5 text-sm text-ink-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2">
-        <span aria-hidden="true">‹</span> Back
-      </BackLink>
-
       {post.status === "draft" ? (
-        <div className="mt-4 rounded-xl border border-card-border bg-canvas p-4 text-sm text-ink-soft">
+        <div className="mb-6 rounded-xl border border-card-border bg-canvas p-4 text-sm text-ink-soft">
           This post is a <strong>draft</strong> and is only visible to you.{" "}
           <Link href={`/edit/${post.slug}`} className="font-semibold underline">
             Edit &amp; publish
@@ -129,82 +117,82 @@ export default async function PostConversationView({
       ) : null}
 
       {author ? (
-        <div className="mt-4 flex items-start justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <Link href={`/${author.username}`} className="shrink-0">
-              <UserAvatar
-                name={authorName}
-                src={author.avatar_url}
-                size={48}
-                className="overflow-hidden rounded-full"
-              />
-            </Link>
-            <div className="min-w-0">
-              <Link
-                href={`/${author.username}`}
-                className="block truncate text-lede font-bold text-ink transition-colors hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
-              >
-                {authorName}
-              </Link>
-              <p className="text-meta leading-5 text-ink-muted">
-                {formatRelativeTime(post.published_at ?? post.created_at)}
-              </p>
-              
-            </div>
-          </div>
-          {isOwnPost ? null : (
-            <FollowButton
-              followingId={author.id}
-              authorName={authorName}
-              currentUserId={userId}
-              initialFollowing={viewer.userFollowsAuthor}
-              source="post_header"
-              postId={post.id}
+        <header className="flex items-center gap-3 pt-2 sm:pt-4">
+          <Link href={`/${author.username}`} className="shrink-0">
+            <UserAvatar
+              name={authorName}
+              src={author.avatar_url}
+              size={38}
+              className="overflow-hidden rounded-full"
             />
-          )}
-        </div>
+          </Link>
+          <div className="min-w-0 flex-1 text-[13.5px] leading-5">
+            <Link
+              href={`/${author.username}`}
+              className="font-semibold text-ink transition-colors hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
+            >
+              {authorName}
+            </Link>
+            <span className="text-[#7A817D]"> · {formatRelativeTime(post.published_at ?? post.created_at)}</span>
+          </div>
+          <PublicationMoreMenu
+            postId={post.id}
+            slug={post.slug}
+            title={metadataTitle}
+            status={post.status}
+            isOwner={isOwnPost}
+            viewerId={userId}
+            ownerUsername={author.username}
+            compact
+          />
+        </header>
       ) : null}
 
-      <div className="mt-7">
-        {/* Titleless Posts render no heading at all rather than a fabricated
-            one -- but a Post that does carry a title showed it in the feed and
-            nowhere here, which also left the page with no h1. */}
+      <main className="mt-5 sm:mt-6">
         {displayTitle ? (
-          <h1 className="mb-3 font-display text-headline font-semibold text-ink">
+          <h1 className="publication-article-title mb-3 text-[26px] font-semibold leading-tight text-ink">
             {displayTitle}
           </h1>
         ) : null}
-        <div
-          className="text-title text-ink [&_a]:text-emerald-brand [&_a]:underline [&_p]:my-4 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0"
-          dangerouslySetInnerHTML={{ __html: bodyHtml }}
-        />
+        <div className="publication-post-body" dangerouslySetInnerHTML={{ __html: bodyHtml }} />
+
         {post.cover_image_url ? (
           <PostImage
             src={post.cover_image_url}
             alt="Image attached to this post"
             content_kind={post.content_kind}
-            sizes="(max-width: 680px) calc(100vw - 32px), 640px"
+            sizes="(max-width: 560px) calc(100vw - 32px), 520px"
             priority
-            wrapperClassName="mt-5"
-            className="w-full overflow-hidden rounded-xl bg-canvas"
+            wrapperClassName="mt-5 max-w-[520px]"
+            className="w-full overflow-hidden rounded-[8px] bg-canvas"
           />
         ) : null}
+
         {secondary.references.length > 0 ? (
-          <section className="mt-8 border-t border-divider pt-6" aria-labelledby="conversation-sources">
-            <h2 id="conversation-sources" className="font-display text-lg font-semibold text-ink">Sources</h2>
-            <ol className="mt-3 space-y-3 text-sm text-ink-soft">
+          <section className="mt-8 border-t border-[#E9E5DE] pt-6" aria-labelledby="conversation-sources">
+            <h2 id="conversation-sources" className="text-[13px] font-semibold text-ink">Sources</h2>
+            <ol className="mt-3 space-y-3 text-[13px] text-ink-soft">
               {secondary.references.map((reference, index) => (
                 <li key={reference.id} id={`ref-${index + 1}`} className="flex gap-3">
                   <span id={`ref-id-${reference.id}`} className="sr-only" aria-hidden="true" />
                   <span className="text-ink-muted">{index + 1}.</span>
                   <span>
                     {reference.url ? (
-                      <a href={reference.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-emerald-brand underline-offset-2 hover:underline">{reference.title || reference.source || reference.url}</a>
+                      <a
+                        href={reference.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-emerald-brand underline-offset-2 hover:underline"
+                      >
+                        {reference.title || reference.source || reference.url}
+                      </a>
                     ) : (
                       <span className="font-semibold text-ink">{reference.title || reference.source}</span>
                     )}
                     {[reference.authors, reference.source, reference.year].filter(Boolean).length > 0 ? (
-                      <span className="block text-ink-muted">{[reference.authors, reference.source, reference.year].filter(Boolean).join(" · ")}</span>
+                      <span className="block text-ink-muted">
+                        {[reference.authors, reference.source, reference.year].filter(Boolean).join(" · ")}
+                      </span>
                     ) : null}
                   </span>
                 </li>
@@ -212,7 +200,7 @@ export default async function PostConversationView({
             </ol>
           </section>
         ) : null}
-      </div>
+      </main>
 
       <div className="mt-7">
         <PostActionsRow
@@ -227,32 +215,7 @@ export default async function PostConversationView({
           initialBookmarked={viewer.userBookmarked}
           commentCount={secondary.commentCount}
         />
-        {userId && author && !isOwnPost ? (
-          <p className="mt-2 text-right">
-            <ReportButton
-              targetType="post"
-              targetId={post.id}
-              targetLabel={`"${metadataTitle}"`}
-              variant="text"
-              className="text-xs text-ink-muted hover:text-red-600"
-            />
-          </p>
-        ) : null}
       </div>
-
-      {topics.length > 0 ? (
-        <div className="mt-5 flex flex-wrap gap-2">
-          {topics.map((topic) => (
-            <Link
-              key={topic}
-              href={`/topics/${encodeURIComponent(topic)}`}
-              className="rounded-full border border-card-border bg-surface px-3 py-1 text-meta text-ink-soft transition-colors hover:border-emerald-brand/40 hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
-            >
-              #{topic}
-            </Link>
-          ))}
-        </div>
-      ) : null}
 
       <DiscussionSection
         postId={post.id}

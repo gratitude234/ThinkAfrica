@@ -2,37 +2,23 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
+import UserAvatar from "@/components/ui/UserAvatar";
 import { useGuestAuthGate } from "@/components/ui/GuestAuthGateProvider";
-import {
-  COMMENT_MAX_CHARACTERS,
-  countCommentCharacters,
-} from "@/lib/commentContent";
+import { COMMENT_MAX_CHARACTERS, countCommentCharacters } from "@/lib/commentContent";
 import { submitComment } from "./commentActions";
 
 interface InlineResponseComposerProps {
   parentPostId: string;
   userId: string | null;
-  /** The thread renders a second composer at its foot, so the textarea id has
-   *  to be unique. PostActionsRow scrolls to the default one by id. */
   composerId?: string;
-  /** The foot composer sits under the thread it belongs to and needs no
-   *  restatement of what the box is for. */
   label?: string;
 }
 
-/**
- * The comment box under a post. Comments stay inline, on this page.
- *
- * It used to offer "Open editor", which carried the comment into the full
- * composer as a draft Response. The publishing reset removed Responses, so a
- * comment is the only thing written here. The name is kept so the scroll
- * target in PostActionsRow and the thread's two mount points did not move.
- */
 export default function InlineResponseComposer({
   parentPostId,
   userId,
   composerId = "inline-response",
-  label = "Write a comment",
+  label = "Add to the discussion",
 }: InlineResponseComposerProps) {
   const router = useRouter();
   const { requestAuth } = useGuestAuthGate();
@@ -49,14 +35,14 @@ export default function InlineResponseComposer({
 
   if (!userId) {
     return (
-      <div className="mt-4 rounded-xl border border-card-border bg-surface px-4 py-4">
-        <p className="text-excerpt text-ink-soft">Join the conversation.</p>
+      <div className="mt-4 flex items-center gap-3 font-public-sans sm:mt-[18px]">
+        <UserAvatar name="You" src={null} size={36} className="shrink-0 overflow-hidden rounded-full" />
         <button
           type="button"
           onClick={() => requestAuth("respond", { contentKind: "post" })}
-          className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-emerald-brand px-5 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
+          className="min-h-11 flex-1 rounded-[10px] border border-card-border bg-transparent px-3.5 text-left text-[14px] text-ink-faint transition-colors hover:border-emerald-brand/30 hover:text-ink-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
         >
-          Sign in to reply
+          Sign in to join the discussion…
         </button>
       </div>
     );
@@ -75,12 +61,10 @@ export default function InlineResponseComposer({
     try {
       const result = await submitComment({ postId: parentPostId, content: body });
       setSubmitting(false);
-
       if (result.error) {
         setError(result.error);
         return;
       }
-
       reset();
       startRefresh(() => router.refresh());
     } catch {
@@ -90,53 +74,50 @@ export default function InlineResponseComposer({
   };
 
   return (
-    <div className="mt-4 rounded-xl border border-card-border bg-surface px-4 py-3">
-      <label htmlFor={composerId} className="sr-only">
-        {label}
-      </label>
-      <textarea
-        id={composerId}
-        ref={textareaRef}
-        value={body}
-        onChange={(event) => {
-          setBody(event.target.value);
-          const node = event.target;
-          node.style.height = "auto";
-          node.style.height = `${node.scrollHeight}px`;
-        }}
-        onKeyDown={(event) => {
-          if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-            event.preventDefault();
-            void postComment();
-          }
-        }}
-        rows={2}
-        disabled={busy}
-        placeholder="Add a comment…"
-        aria-describedby={error ? `${composerId}-error` : undefined}
-        className="w-full resize-none bg-transparent text-lede text-ink outline-none placeholder:text-ink-muted disabled:opacity-60"
-      />
+    <div className="mt-4 flex items-start gap-3 font-public-sans sm:mt-[18px]">
+      <UserAvatar name="You" src={null} size={36} className="mt-0.5 shrink-0 overflow-hidden rounded-full" />
+      <div className="min-w-0 flex-1">
+        <label htmlFor={composerId} className="sr-only">{label}</label>
+        <textarea
+          id={composerId}
+          ref={textareaRef}
+          value={body}
+          onChange={(event) => {
+            setBody(event.target.value);
+            const node = event.target;
+            node.style.height = "auto";
+            node.style.height = `${node.scrollHeight}px`;
+          }}
+          onKeyDown={(event) => {
+            if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+              event.preventDefault();
+              void postComment();
+            }
+          }}
+          rows={1}
+          disabled={busy}
+          placeholder="Add to the discussion…"
+          aria-describedby={error ? `${composerId}-error` : undefined}
+          className="min-h-11 w-full resize-none rounded-[10px] border border-card-border bg-transparent px-3.5 py-2.5 text-[14px] leading-5 text-ink outline-none transition-colors placeholder:text-ink-faint focus:border-emerald-brand/50 disabled:opacity-60"
+        />
 
-      {error ? (
-        <p id={`${composerId}-error`} role="alert" className="mt-1 text-meta text-red-600">
-          {error}
-        </p>
-      ) : null}
+        {error ? <p id={`${composerId}-error`} role="alert" className="mt-1 text-[12px] text-red-600">{error}</p> : null}
 
-      <div className="mt-2 flex flex-wrap items-center justify-end gap-2 border-t border-divider pt-2">
-        {characters >= COMMENT_MAX_CHARACTERS - 200 ? (
-          <span className={`text-meta ${overLimit ? "font-semibold text-red-600" : "text-ink-muted"}`}>
-            {COMMENT_MAX_CHARACTERS - characters}
-          </span>
-        ) : null}
-        <button
-          type="button"
-          onClick={() => void postComment()}
-          disabled={!canSubmit}
-          className="inline-flex min-h-11 items-center rounded-lg bg-emerald-brand px-5 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
-        >
-          {submitting ? "Posting…" : refreshing ? "Posted" : "Comment"}
-        </button>
+        <div className="mt-2 flex items-center justify-end gap-2">
+          {characters >= COMMENT_MAX_CHARACTERS - 200 ? (
+            <span className={`text-[11.5px] ${overLimit ? "font-semibold text-red-600" : "text-ink-muted"}`}>
+              {COMMENT_MAX_CHARACTERS - characters}
+            </span>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => void postComment()}
+            disabled={!canSubmit}
+            className="inline-flex min-h-9 items-center rounded-lg bg-emerald-brand px-4 text-[13px] font-semibold text-white transition-colors hover:bg-[#0E4B37] disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+          >
+            {submitting ? "Posting…" : refreshing ? "Posted" : "Comment"}
+          </button>
+        </div>
       </div>
     </div>
   );

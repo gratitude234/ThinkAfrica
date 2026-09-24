@@ -5,7 +5,6 @@ import UserAvatar from "@/components/ui/UserAvatar";
 import Toast from "@/components/ui/Toast";
 import ReportButton from "@/components/moderation/ReportButton";
 import { useGuestAuthGate } from "@/components/ui/GuestAuthGateProvider";
-import { createClient } from "@/lib/supabase/client";
 import { formatRelativeTime } from "@/lib/utils";
 import {
   COMMENT_MAX_CHARACTERS,
@@ -17,8 +16,7 @@ import {
 // commentThread would pull `server-only` into the client bundle.
 import type { ThreadComment, ThreadReply } from "@/lib/commentThread";
 import { DEFAULT_COMMENT_SORT, type CommentSort } from "@/lib/commentSort";
-import { deleteComment, loadMoreComments, submitComment, updateComment ,
-  toggleCommentVote,
+import { deleteComment, loadMoreComments, submitComment, updateComment, toggleCommentVote,
 } from "./commentActions";
 
 export type { ThreadComment as CommentItem, ThreadReply as ReplyItem };
@@ -42,7 +40,7 @@ interface CommentThreadProps {
 const REPLY_PREVIEW_COUNT = 3;
 
 const ACTION_CLASS =
-  "inline-flex min-h-9 items-center gap-1 rounded-lg px-2 text-meta font-medium text-ink-muted transition-colors hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2";
+  "inline-flex min-h-8 items-center rounded-md px-1.5 font-public-sans text-[12.5px] font-semibold text-ink-muted transition-colors hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold";
 
 function withVotes<T extends ThreadReply>(items: T[], votedIds: Set<string>): T[] {
   return items.map((item) => ({ ...item, userVoted: votedIds.has(item.id) }));
@@ -317,21 +315,21 @@ export default function CommentThread({
       "replies" in comment && (comment as ThreadComment).replies.length > 0;
 
     return (
-      <div id={`comment-${comment.id}`} className="flex scroll-mt-24 gap-2.5">
+      <div id={`comment-${comment.id}`} className="flex scroll-mt-24 gap-3 font-public-sans">
         <UserAvatar
           name={name}
           src={comment.profiles?.avatar_url ?? null}
-          size={isReply ? 26 : 32}
+          size={isReply ? 28 : 32}
           className="mt-0.5 shrink-0 overflow-hidden rounded-full"
         />
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-baseline gap-x-2">
-            <span className="text-byline font-semibold text-ink">{name}</span>
+          <div className="flex flex-wrap items-center gap-x-1.5">
+            <span className={`${isReply ? "text-[13px]" : "text-[13.5px]"} font-semibold text-ink`}>{name}</span>
             {/* The timestamp is the permalink. A comment could not be linked to
                 at all before, so there was no way to point anyone at one. */}
             <a
               href={`#comment-${comment.id}`}
-              className="text-meta text-ink-muted underline-offset-2 hover:text-emerald-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
+              className={`${isReply ? "text-[11.5px]" : "text-[12px]"} text-ink-faint underline-offset-2 hover:text-emerald-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold`}
             >
               {formatRelativeTime(comment.created_at)}
               {comment.updated_at && !isDeleted ? " · edited" : ""}
@@ -367,7 +365,7 @@ export default function CommentThread({
             </div>
           ) : (
             <p
-              className={`mt-0.5 whitespace-pre-line text-byline ${
+              className={`${isReply ? "mt-1 text-[13.5px] leading-[1.5]" : "mt-1 text-[14px] leading-[1.55]"} whitespace-pre-line ${
                 isDeleted ? "italic text-ink-muted" : "text-ink"
               }`}
             >
@@ -400,22 +398,22 @@ export default function CommentThread({
               </div>
             </div>
           ) : (
-            <div className="mt-0.5 flex flex-wrap items-center gap-1">
-              <button
-                type="button"
-                onClick={() => void handleVote(comment.id, comment.userVoted ?? false)}
-                aria-pressed={comment.userVoted ?? false}
-                aria-label={comment.userVoted ? "Remove upvote" : "Upvote this comment"}
-                className={`${ACTION_CLASS} ${comment.userVoted ? "text-emerald-brand" : ""}`}
-              >
-                Upvote{comment.upvotes > 0 ? ` ${comment.upvotes}` : ""}
-              </button>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => startReply(comment, isReply)}
                 className={ACTION_CLASS}
               >
                 Reply
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleVote(comment.id, comment.userVoted ?? false)}
+                aria-pressed={comment.userVoted ?? false}
+                aria-label={comment.userVoted ? "Unlike this comment" : "Like this comment"}
+                className={`${ACTION_CLASS} ${comment.userVoted ? "text-emerald-brand" : ""}`}
+              >
+                Like{comment.upvotes > 0 ? ` · ${comment.upvotes}` : ""}
               </button>
               {isOwn ? (
                 <>
@@ -463,8 +461,8 @@ export default function CommentThread({
         }`}
       >
         {showHeading ? (
-          <h2 className="font-display text-title font-semibold text-ink">
-            Comments · {totalCount}
+          <h2 className="font-public-sans text-[17px] font-semibold text-[#1B2420]">
+            Discussion <span className="ml-1.5 text-[12px] font-normal text-ink-faint">{totalCount} {totalCount === 1 ? "comment" : "comments"}</span>
           </h2>
         ) : null}
 
@@ -473,7 +471,7 @@ export default function CommentThread({
           <div
             role="group"
             aria-label="Sort comments"
-            className="flex items-center gap-0.5 rounded-lg border border-card-border bg-surface p-0.5"
+            className="flex items-center gap-0.5 rounded-lg border border-card-border bg-transparent p-0.5 font-public-sans"
           >
             {(
               [
@@ -489,7 +487,7 @@ export default function CommentThread({
                 aria-pressed={sort === option.id}
                 className={`inline-flex min-h-8 items-center rounded-md px-3 text-meta font-semibold transition-colors disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-1 ${
                   sort === option.id
-                    ? "bg-emerald-brand text-white"
+                    ? "bg-[#E7F0EC] text-emerald-brand"
                     : "text-ink-muted hover:text-ink"
                 }`}
               >
@@ -501,17 +499,17 @@ export default function CommentThread({
       </div>
 
       {comments.length === 0 ? (
-        <p className="mt-4 text-excerpt text-ink-muted">
-          No comments yet. Start the conversation.
+        <p className="mt-4 font-public-sans text-[13.5px] text-ink-muted">
+          {userId ? "No comments yet. Start the discussion." : "No comments yet. Sign in to join the discussion."}
         </p>
       ) : (
         <ul
-          className={`mt-4 space-y-5 transition-opacity motion-reduce:transition-none ${
+          className={`mt-2 transition-opacity motion-reduce:transition-none ${
             sorting ? "opacity-50" : ""
           }`}
         >
           {comments.map((comment) => (
-            <li key={comment.id}>
+            <li key={comment.id} className="border-t border-[#EDE8DD] py-4 first:border-t-0 first:pt-2">
               {renderRow(comment, false)}
 
               {replyingToId === comment.id ? (
@@ -569,8 +567,8 @@ export default function CommentThread({
                       : comment.replies.slice(0, REPLY_PREVIEW_COUNT);
 
                   return (
-                    <div className="ml-[42px] mt-3 border-l border-divider pl-3">
-                      <ul className="space-y-4">
+                    <div className="ml-[42px] mt-3 border-l border-[#EDE8DD] pl-4">
+                      <ul className="space-y-3.5">
                         {shown.map((reply) => (
                           <li key={reply.id}>{renderRow(reply, true)}</li>
                         ))}
@@ -602,7 +600,7 @@ export default function CommentThread({
             type="button"
             onClick={() => void handleLoadMore()}
             disabled={loadingMore}
-            className="inline-flex min-h-11 items-center rounded-lg border border-card-border bg-surface px-4 text-byline font-semibold text-ink-soft transition-colors hover:border-emerald-brand/40 hover:text-emerald-brand disabled:opacity-60"
+            className="inline-flex min-h-10 items-center rounded-lg border border-card-border bg-transparent px-4 font-public-sans text-[13px] font-semibold text-ink-soft transition-colors hover:border-emerald-brand/40 hover:text-emerald-brand disabled:opacity-60"
           >
             {loadingMore ? "Loading…" : "Load more comments"}
           </button>

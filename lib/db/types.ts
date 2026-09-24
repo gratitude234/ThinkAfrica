@@ -29,6 +29,7 @@ export interface AuthorProfile {
   id: string;
   username: string;
   full_name: string | null;
+  professional_title?: string | null;
   university: string | null;
   field_of_study: string | null;
   bio: string | null;

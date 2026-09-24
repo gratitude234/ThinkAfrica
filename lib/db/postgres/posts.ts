@@ -87,6 +87,7 @@ export const POST_BY_SLUG_SQL = `
         'id', author.id,
         'username', author.username,
         'full_name', author.full_name,
+        'professional_title', author.professional_title,
         'university', author.university,
         'field_of_study', author.field_of_study,
         'bio', author.bio,

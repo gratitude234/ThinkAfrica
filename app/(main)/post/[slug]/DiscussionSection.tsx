@@ -6,19 +6,13 @@ interface Props {
   postId: string;
   userId: string | null;
   userProfileId: string | null;
-  /** Drafts and rejected posts get the thread read-only. */
   isPublished: boolean;
   commentCount: number;
 }
 
-/**
- * The discussion under any post, whatever its kind: comments and their replies.
- *
- * It used to list Responses above the comments and add them to the heading
- * count. The publishing reset retired Responses as a product (Phase 2C). A post
- * published as a response before then is an ordinary Post or Article at its own
- * address, and nothing about it appears under the post it once answered.
- */
+/** Shared discussion grammar for Articles and Posts. The visual treatment is
+ * intentionally flatter than the old comments card so the conversation reads
+ * as the continuation of the publication, not a second application surface. */
 export default function DiscussionSection({
   postId,
   userId,
@@ -27,19 +21,26 @@ export default function DiscussionSection({
   commentCount,
 }: Props) {
   return (
-    <div id="discussion" className="mt-10 scroll-mt-24">
-      <h2 className="font-display text-title font-semibold text-ink">
-        Comments · {commentCount}
-      </h2>
+    <section id="discussion" className="publication-discussion scroll-mt-24 border-t border-card-border pt-6 sm:pt-[26px]">
+      <div className="flex items-baseline gap-2">
+        <h2 className="font-public-sans text-[17px] font-semibold text-[#1B2420] sm:text-[18px]">
+          Discussion
+        </h2>
+        <span className="font-public-sans text-[12px] text-ink-faint sm:text-[13px]">
+          {commentCount} {commentCount === 1 ? "comment" : "comments"}
+        </span>
+      </div>
 
-      {isPublished ? <InlineResponseComposer parentPostId={postId} userId={userId} /> : null}
+      {isPublished ? (
+        <InlineResponseComposer parentPostId={postId} userId={userId} />
+      ) : (
+        <p className="mt-4 font-public-sans text-[13.5px] text-ink-muted">
+          Discussion is read-only while this publication is unpublished.
+        </p>
+      )}
 
-      <div className="mt-8">
-        <Suspense
-          fallback={
-            <p className="text-excerpt text-ink-muted">Loading comments…</p>
-          }
-        >
+      <div className="mt-5 sm:mt-6">
+        <Suspense fallback={<p className="font-public-sans text-[13.5px] text-ink-muted">Loading comments…</p>}>
           <CommentsLoader
             postId={postId}
             userId={userId}
@@ -49,18 +50,6 @@ export default function DiscussionSection({
           />
         </Suspense>
       </div>
-
-      {/* A second composer at the foot of the thread. With only the one at the
-          top, reading to the bottom of twenty comments and deciding to reply
-          meant scrolling all the way back up. */}
-      {isPublished && commentCount > 0 ? (
-        <InlineResponseComposer
-          parentPostId={postId}
-          userId={userId}
-          composerId="inline-response-foot"
-          label="Write a comment"
-        />
-      ) : null}
-    </div>
+    </section>
   );
 }

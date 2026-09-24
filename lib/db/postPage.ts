@@ -78,6 +78,17 @@ export interface RelatedPost {
   profiles: { full_name: string | null; username: string } | null;
 }
 
+export interface AuthorPublication {
+  id: string;
+  title: string | null;
+  slug: string;
+  content_kind: string | null;
+  published_at: string | null;
+  created_at: string;
+  excerpt: string | null;
+  content: string | null;
+}
+
 export interface PostPageCollections {
   references: PostReferenceRow[];
 }
@@ -100,6 +111,12 @@ export interface PostPageRepository {
     limit: number,
     viewerId: string | null
   ): Promise<RelatedPost[]>;
+  moreFromAuthor(
+    postId: string,
+    authorId: string,
+    limit: number,
+    viewerId: string | null
+  ): Promise<AuthorPublication[]>;
   neighbours(
     postId: string,
     publishedAt: string
@@ -215,6 +232,19 @@ export function createSupabasePostPageRepository(
           ? (row.profiles[0] ?? null)
           : (row.profiles ?? null)) as RelatedPost["profiles"],
       }));
+    },
+
+    async moreFromAuthor(postId, authorId, limit, _viewerId) {
+      const result = await supabase
+        .from("posts")
+        .select("id, title, slug, content_kind, published_at, created_at, excerpt, content")
+        .eq("status", "published")
+        .eq("author_id", authorId)
+        .neq("id", postId)
+        .order("published_at", { ascending: false })
+        .limit(limit);
+
+      return rows<AuthorPublication>(result, "more from author");
     },
 
     async neighbours(postId, publishedAt) {
@@ -351,6 +381,18 @@ const RELATED_SQL = `
   limit $3::int
 `;
 
+const MORE_FROM_AUTHOR_SQL = `
+  select
+    p.id, p.title, p.slug, p.content_kind,
+    p.published_at, p.created_at, p.excerpt, p.content
+  from public.posts as p
+  where p.status = 'published'
+    and p.id <> $1::uuid
+    and p.author_id = $2::uuid
+  order by p.published_at desc nulls last
+  limit $3::int
+`;
+
 /**
  * The previous and next published post, in one statement.
  *
@@ -459,6 +501,25 @@ export function createPostgresPostPageRepository(
         created_at: toIso(row.created_at) ?? "",
         cover_image_url: (row.cover_image_url as string | null) ?? null,
         profiles: (row.profiles ?? null) as RelatedPost["profiles"],
+      }));
+    },
+
+    async moreFromAuthor(postId, authorId, limit, _viewerId) {
+      const rows = await executor.query<Record<string, unknown>>(MORE_FROM_AUTHOR_SQL, [
+        postId,
+        authorId,
+        limit,
+      ]);
+
+      return rows.map((row) => ({
+        id: String(row.id),
+        title: (row.title as string | null) ?? null,
+        slug: String(row.slug),
+        content_kind: (row.content_kind as string | null) ?? null,
+        published_at: toIso(row.published_at),
+        created_at: toIso(row.created_at) ?? "",
+        excerpt: (row.excerpt as string | null) ?? null,
+        content: (row.content as string | null) ?? null,
       }));
     },
 
