@@ -35,9 +35,14 @@ export default function AppShell({
 }: AppShellProps) {
   const pathname = usePathname();
   const showRail = shouldShowDesktopRail(pathname);
+  const isHome = pathname === "/";
+
+  const mainClassName = showRail
+    ? `${MAIN_WITH_RAIL}${isHome ? " app-shell-home" : ""}`
+    : MAIN_BASE;
 
   return (
-    <main className={showRail ? MAIN_WITH_RAIL : MAIN_BASE}>
+    <main className={mainClassName}>
       {showRail ? (
         <SideRail
           userId={userId}

@@ -48,7 +48,7 @@ export default function NavUserMenu({ user, profile, isAdmin }: NavUserMenuProps
     return (
       <div className="app-guest-account flex items-center gap-2">
         <Link href="/login"><Button variant="ghost" size="sm">Sign in</Button></Link>
-        <Link href="/signup"><Button size="sm">Get started</Button></Link>
+        <Link href="/signup"><Button size="sm">Join</Button></Link>
       </div>
     );
   }

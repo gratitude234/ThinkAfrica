@@ -66,26 +66,27 @@ function AuthorLine({
   const publishedAt = post.published_at ?? post.created_at;
   const profile = post.profiles;
   const name = profile?.full_name ?? profile?.username ?? "Indegenius member";
-  const avatarDimensions = { width: avatarSize, height: avatarSize };
+  const avatarClass =
+    avatarSize <= 34
+      ? "h-[30px] w-[30px] sm:h-[34px] sm:w-[34px]"
+      : "h-9 w-9";
   const avatar = profile?.avatar_url ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={profile.avatar_url}
       alt=""
-      style={avatarDimensions}
-      className="rounded-full object-cover"
+      className={`${avatarClass} rounded-full object-cover`}
     />
   ) : (
     <span
-      style={avatarDimensions}
-      className="flex items-center justify-center rounded-full bg-green-tint text-[11px] font-bold text-emerald-brand dark:bg-emerald-brand dark:text-emerald-ink"
+      className={`${avatarClass} flex items-center justify-center rounded-full bg-green-tint text-[11px] font-bold text-emerald-brand dark:bg-emerald-brand dark:text-emerald-ink`}
     >
       {initials(name)}
     </span>
   );
 
   return (
-    <div className="flex min-w-0 items-center gap-2.5">
+    <div className="flex min-w-0 items-center gap-[9px] sm:gap-2.5">
       {profile?.username ? (
         <Link
           href={`/${profile.username}`}
@@ -97,7 +98,7 @@ function AuthorLine({
       ) : (
         <span className="shrink-0">{avatar}</span>
       )}
-      <div className="flex min-w-0 flex-1 items-center gap-1.5 text-byline">
+      <div className="flex min-w-0 flex-1 items-center gap-1.5 text-[13.5px] leading-[1.35] sm:text-byline">
         {profile?.username ? (
           <Link
             href={`/${profile.username}`}
@@ -109,7 +110,7 @@ function AuthorLine({
           <span className="truncate font-semibold text-ink">{name}</span>
         )}
         {showTimestamp && publishedAt ? (
-          <span className="shrink-0 whitespace-nowrap text-meta text-ink-muted">
+          <span className="shrink-0 whitespace-nowrap text-[12px] leading-[1.45] text-ink-muted sm:text-meta">
             <span aria-hidden="true">· </span>
             {formatRelativeTime(publishedAt)}
           </span>
@@ -171,7 +172,7 @@ function TopicLinks({ tags }: { tags: string[] | null }) {
         <Link
           key={topic}
           href={`/topics/${encodeURIComponent(topic)}`}
-          className={`inline-flex min-h-8 items-center rounded-full border border-card-border bg-card px-2.5 text-meta font-semibold text-ink-soft transition-colors hover:border-emerald-ink hover:text-emerald-ink ${FOCUS_RING}`}
+          className={`inline-flex h-7 items-center rounded-full border border-card-border bg-card px-2.5 text-[12.5px] font-semibold text-ink-soft transition-colors hover:border-emerald-ink hover:text-emerald-ink ${FOCUS_RING}`}
         >
           #{topic}
         </Link>
@@ -180,7 +181,7 @@ function TopicLinks({ tags }: { tags: string[] | null }) {
   );
 }
 
-function FullWidthCover({
+function PostMedia({
   post,
   title,
   priority,
@@ -195,13 +196,11 @@ function FullWidthCover({
       src={post.cover_image_url}
       alt={title}
       content_kind={post.content_kind}
-      // 100vw less the row's own px-4 (32); the shell's px-4 is cancelled by
-      // the row's -mx-4 on phones, so it no longer enters the arithmetic.
-      sizes="(max-width: 640px) calc(100vw - 32px), 720px"
+      sizes="(max-width: 640px) 220px, 300px"
       priority={priority}
       variant="feed"
-      wrapperClassName="mt-3 overflow-hidden rounded-[14px]"
-      className="w-full rounded-[14px] bg-card"
+      wrapperClassName="mt-2.5 max-w-[220px] overflow-hidden rounded-xl sm:mt-3 sm:max-w-[300px] sm:rounded-[14px]"
+      className="w-full rounded-xl bg-card sm:rounded-[14px]"
     />
   );
 }
@@ -234,15 +233,14 @@ function PostFeedCard({
             className={`${
               title
                 ? "line-clamp-3 text-excerpt text-ink-soft"
-                : "line-clamp-6 text-lede text-ink"
+                : "line-clamp-6 text-[15.5px] leading-[1.58] text-ink sm:text-lede"
             } max-w-measure whitespace-pre-line`}
           >
             {excerpt}
           </p>
         </Link>
       </div>
-      <TopicLinks tags={post.tags} />
-      <FullWidthCover post={post} title={title ?? excerpt} priority={priority} />
+      <PostMedia post={post} title={title ?? excerpt} priority={priority} />
       <Actions post={post} currentUserId={currentUserId} />
     </article>
   );
@@ -258,7 +256,7 @@ function PostFeedCard({
 function ArticleMeta({ readingTime }: { readingTime: number | null }) {
   return (
     <p
-      className="font-sans text-kicker font-bold uppercase text-gold-ink"
+      className="font-sans text-[10.5px] font-bold uppercase leading-[1.45] tracking-[0.13em] text-gold-ink sm:text-kicker"
       aria-label={`Article${readingTime ? `, ${readingTime} minute read` : ""}`}
     >
       <span>Article</span>
@@ -306,12 +304,12 @@ function ArticleFeedCard({
       <div className="mt-3">
         <ArticleMeta readingTime={readingTime} />
         <Link href={`/post/${post.slug}`} className={`group block ${FOCUS_RING}`}>
-          <h2 className="mt-2 font-display line-clamp-4 text-headline font-semibold text-ink transition-colors group-hover:text-emerald-ink motion-reduce:transition-none">
+          <h2 className="mt-1.5 font-display line-clamp-4 text-[21px] font-semibold leading-[1.22] text-ink transition-colors group-hover:text-emerald-ink motion-reduce:transition-none sm:mt-2 sm:text-[26px] sm:leading-[1.2]">
             {title}
           </h2>
         </Link>
         {excerpt ? (
-          <p className="mt-2.5 line-clamp-3 max-w-measure text-excerpt text-ink-soft">
+          <p className="mt-2 line-clamp-3 max-w-measure text-[14.5px] leading-[1.55] text-ink-soft sm:mt-2.5 sm:text-excerpt">
             {excerpt}
           </p>
         ) : null}
@@ -332,13 +330,13 @@ function ArticleFeedCard({
           href={`/post/${post.slug}`}
           tabIndex={-1}
           aria-hidden="true"
-          className="group mt-3 block overflow-hidden rounded-[14px] bg-green-tint"
+          className="group mt-2.5 block overflow-hidden rounded-xl bg-green-tint sm:mt-3 sm:rounded-[14px]"
         >
           <PostCover
             src={post.cover_image_url}
             alt={title}
             content_kind={post.content_kind}
-            sizes="(max-width: 640px) calc(100vw - 32px), 720px"
+            sizes="(max-width: 640px) calc(100vw - 32px), 704px"
             priority={priority}
             fit="cover"
             className="aspect-[16/9] w-full"

@@ -14,8 +14,8 @@ function Block({ className }: { className: string }) {
  */
 function SkeletonByline({ nameWidth }: { nameWidth: string }) {
   return (
-    <div className="flex items-center gap-2.5">
-      <div className="h-9 w-9 shrink-0 rounded-full bg-divider" />
+    <div className="flex items-center gap-[9px] sm:gap-2.5">
+      <div className="h-[30px] w-[30px] shrink-0 rounded-full bg-divider sm:h-[34px] sm:w-[34px]" />
       <div className="flex min-w-0 flex-1 items-center gap-1.5">
         <Block className={`h-3 ${nameWidth}`} />
         <Block className="h-2.5 w-20" />
@@ -46,7 +46,7 @@ function ArticleSkeletonCard({ withCover = false }: { withCover?: boolean }) {
       <Block className="mt-3 h-2.5 w-24" />
       <Block className="mt-2 h-5 w-5/6" />
       <Block className="mt-2 h-3.5 w-3/5" />
-      {withCover ? <div className="mt-3 aspect-[4/3] w-full rounded-[10px] bg-divider sm:aspect-[16/10]" /> : null}
+      {withCover ? <div className="mt-2.5 aspect-[16/9] w-full rounded-xl bg-divider sm:mt-3 sm:rounded-[14px]" /> : null}
     </article>
   );
 }

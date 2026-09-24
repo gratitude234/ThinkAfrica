@@ -156,27 +156,13 @@ export default function FeedEngagementActions({
     }
   };
 
-  // `ring-offset-canvas`, not `-card`. These buttons sat on a white card when
-  // the ring was written; they sit on the canvas row now, and a card-coloured
-  // offset drew a white halo around the focused button instead of blending
-  // into the ground behind it.
   const actionClass =
-    "inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg px-1.5 text-meta font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-wait disabled:opacity-60 motion-reduce:transition-none sm:px-2.5";
+    "inline-flex min-h-9 min-w-0 items-center justify-center gap-1 rounded-lg px-1 text-[12.5px] font-semibold text-ink-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-wait disabled:opacity-60 motion-reduce:transition-none sm:min-h-10 sm:gap-1.5 sm:px-1.5 sm:text-[13px]";
 
-  // `hover:bg-card`, not `hover:bg-canvas`. The canvas wash worked when these
-  // buttons sat on a white card, and briefly still worked when the row itself
-  // washed to white on hover. The row has no hover state any more, so a canvas
-  // wash on a canvas row painted nothing at all -- only the text colour was
-  // still moving. White-on-cream restores the chip.
   const actionHoverBg = "hover:bg-card";
-
-  /**
-   * One breakpoint for all four labels. They used to appear at three different
-   * widths -- Like at 390px, Discuss and Share at 420px, Save always -- so a
-   * 375px phone showed three bare icons next to one icon-and-word, which read
-   * as a rendering fault rather than a decision.
-   */
-  const labelClass = "hidden min-[400px]:inline";
+  // The mockup intentionally drops action words on phone while keeping counts.
+  // Desktop restores Like / Comment / Share / Save for faster scanning.
+  const labelClass = "hidden sm:inline";
 
   const shareLabel =
     shareStatus === "sharing"
@@ -187,72 +173,55 @@ export default function FeedEngagementActions({
           ? "Copied"
           : "Share";
 
-  // Spacing, not a rule. This used to draw `border-t border-divider`, which
-  // was invisible work inside a bordered card but lands a few pixels above the
-  // feed row's own bottom hairline now that the feed is flat -- two parallel
-  // lines closing every post, which is a box by another name. The gap alone
-  // separates the actions from the prose; the row hairline below ends the post.
   return (
-    <div className="mt-4 pt-0.5">
-      {/* Clustered left, not spread across the row. This was
-          `justify-between`, which pinned Like to the far left edge and Save to
-          the far right -- roughly 900px apart on a desktop column, with an
-          empty gulf between them. Nothing was gained by the distance: the four
-          belong to the same post and read as one control group, so they should
-          sit like one. It was also the single biggest reason the feed felt
-          spread out.
-
-          `justify-start` with a real gap matches how X and Medium both group
-          their engagement controls. Flex rather than `grid grid-cols-4`
-          because Discuss is conditional, and a fixed four-column grid packed
-          three buttons into the first three columns and left a quarter of the
-          row empty whenever it was hidden. */}
-      <div className="flex items-center justify-start gap-1 text-ink-muted sm:gap-2">
-        <button
-          type="button"
-          onClick={handleLike}
-          disabled={likePending}
-          aria-pressed={liked}
-          aria-label={liked ? "Unlike this item" : "Like this item"}
-          className={`${actionClass} ${liked ? "bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400" : `${actionHoverBg} hover:text-red-600 dark:hover:text-red-400`}`}
-        >
-          <svg className="h-[18px] w-[18px]" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-          </svg>
-          <span className={labelClass}>Like</span>
-          {likeCount > 0 ? <span>{likeCount}</span> : null}
-        </button>
-
-        {showDiscussion ? (
-          // The comment count, linking to the comments under the post.
-          <Link
-            href={`/post/${slug}#discussion`}
-            aria-label={`${commentCount} ${commentCount === 1 ? "comment" : "comments"}`}
-            className={`${actionClass} ${actionHoverBg} hover:text-emerald-ink`}
+    <div className="mt-3 sm:mt-4">
+      <div className="flex items-center justify-between gap-3 text-ink-muted">
+        <div className="flex min-w-0 items-center gap-3 sm:gap-[14px]">
+          <button
+            type="button"
+            onClick={handleLike}
+            disabled={likePending}
+            aria-pressed={liked}
+            aria-label={liked ? "Unlike this item" : "Like this item"}
+            className={`${actionClass} ${liked ? "text-red-600 dark:text-red-400" : `${actionHoverBg} hover:text-red-600 dark:hover:text-red-400`}`}
           >
-            <svg className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            <svg className="h-[17px] w-[17px] sm:h-[18px] sm:w-[18px]" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
             </svg>
-            <span className={labelClass}>Discuss</span>
-            {commentCount > 0 ? <span>{commentCount}</span> : null}
-          </Link>
-        ) : null}
+            <span className={labelClass}>Like</span>
+            {likeCount > 0 ? <span>{likeCount}</span> : null}
+          </button>
 
-        <button
-          type="button"
-          onClick={handleShare}
-          disabled={shareStatus === "sharing"}
-          aria-label="Share this item"
-          className={`${actionClass} ${actionHoverBg} hover:text-blue-700 dark:hover:text-blue-400`}
-        >
-          <svg className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="18" cy="5" r="3" />
-            <circle cx="6" cy="12" r="3" />
-            <circle cx="18" cy="19" r="3" />
-            <path strokeLinecap="round" strokeLinejoin="round" d="m8.6 10.5 6.8-4M8.6 13.5l6.8 4" />
-          </svg>
-          <span className={labelClass}>{shareLabel}</span>
-        </button>
+          {showDiscussion ? (
+            <Link
+              href={`/post/${slug}#discussion`}
+              aria-label={`${commentCount} ${commentCount === 1 ? "comment" : "comments"}`}
+              className={`${actionClass} ${actionHoverBg} hover:text-emerald-ink`}
+            >
+              <svg className="h-[17px] w-[17px] sm:h-[18px] sm:w-[18px]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+              <span className={labelClass}>Comment</span>
+              {commentCount > 0 ? <span>{commentCount}</span> : null}
+            </Link>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={handleShare}
+            disabled={shareStatus === "sharing"}
+            aria-label="Share this item"
+            className={`${actionClass} ${actionHoverBg} hover:text-blue-700 dark:hover:text-blue-400`}
+          >
+            <svg className="h-[17px] w-[17px] sm:h-[18px] sm:w-[18px]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="18" cy="5" r="3" />
+              <circle cx="6" cy="12" r="3" />
+              <circle cx="18" cy="19" r="3" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="m8.6 10.5 6.8-4M8.6 13.5l6.8 4" />
+            </svg>
+            <span className={labelClass}>{shareLabel}</span>
+          </button>
+        </div>
 
         <button
           type="button"
@@ -260,18 +229,18 @@ export default function FeedEngagementActions({
           disabled={bookmarkPending}
           aria-pressed={bookmarked}
           aria-label={bookmarked ? "Remove from saved" : "Save for later"}
-          className={`${actionClass} ${bookmarked ? "bg-green-tint text-emerald-brand dark:bg-emerald-brand dark:text-emerald-ink" : `${actionHoverBg} hover:text-emerald-ink`}`}
+          className={`${actionClass} shrink-0 ${bookmarked ? "text-emerald-brand sm:bg-green-tint sm:px-2 dark:text-emerald-ink sm:dark:bg-emerald-brand" : `${actionHoverBg} hover:text-emerald-ink`}`}
         >
-          <svg className="h-[18px] w-[18px]" fill={bookmarked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+          <svg className="h-[17px] w-[17px] sm:h-[18px] sm:w-[18px]" fill={bookmarked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
           </svg>
-          <span>{bookmarked ? "Saved" : "Save"}</span>
+          <span className={labelClass}>{bookmarked ? "Saved" : "Save"}</span>
         </button>
       </div>
       <p
         role="status"
         aria-live="polite"
-        className={error ? "mt-1 px-2.5 text-xs text-red-600 dark:text-red-400" : "sr-only"}
+        className={error ? "mt-1 px-1 text-xs text-red-600 dark:text-red-400" : "sr-only"}
       >
         {error ?? (shareStatus === "copied" ? "Link copied to clipboard." : shareStatus === "shared" ? "Post shared." : "")}
       </p>

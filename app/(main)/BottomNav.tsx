@@ -39,10 +39,8 @@ const WRITE_CLASS =
 
 function WriteMark() {
   return (
-    <span className="flex flex-col items-center justify-center gap-0.5">
-      <span className="flex h-[30px] w-[42px] items-center justify-center rounded-lg bg-emerald-brand text-white shadow-sm">
-        <WriteIcon className="h-[20px] w-[20px]" />
-      </span>
+    <span className="flex flex-col items-center justify-center gap-0.5 text-emerald-brand">
+      <WriteIcon className="h-[22px] w-[22px]" />
       <span className="whitespace-nowrap text-[10.5px] font-semibold">Write</span>
     </span>
   );

@@ -48,16 +48,15 @@
  * well clear of X's ~24px, which is right, because a row here is a headline
  * plus three lines of excerpt rather than a two-line message.
  *
- * The mobile `-mx-4` cancels the app shell's `px-4` so the rule reaches the
- * screen edge, while `px-4` puts the text back where it was; net, the row
- * recovers the 28px of measure the card's own padding was taking. From `sm` up
- * the shell's padding is wider than the bleed, so the row simply fills its grid
- * column -- rule spanning the full column, text inset by `px-4` within it.
+ * Home now owns the reading gutter at the page level: 16px on phone and the
+ * centered 704px column on larger screens. Rows therefore carry no horizontal
+ * padding or negative margin of their own; the divider ends with the reading
+ * column exactly as it does in the approved mockup.
  */
 
 /** The one row geometry. Real cards and skeletons share it verbatim. */
 export const CARD_SHELL =
-  "-mx-4 border-b border-divider px-4 py-4 sm:mx-0 sm:py-5";
+  "border-b border-divider py-4 sm:py-5";
 
 /**
  * There is deliberately no hover state on the row itself.

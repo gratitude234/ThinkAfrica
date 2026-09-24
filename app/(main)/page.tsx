@@ -93,7 +93,7 @@ export default async function HomePage({ searchParams }: PageProps) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[720px]">
+    <div className="mx-auto w-full max-w-[704px]">
       {userId ? (
         <RetentionEventTracker event="home_viewed" metadata={{ tab: activeTab }} />
       ) : null}

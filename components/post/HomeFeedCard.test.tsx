@@ -228,7 +228,11 @@ describe("HomeFeedCard", () => {
   it("surfaces real publication topics as navigable discovery cues", () => {
     render(
       <HomeFeedCard
-        post={post({ tags: ["Climate Policy", "Public Health", "Education"] })}
+        post={post({
+          title: "Institutions and the climate transition",
+          content_kind: "article",
+          tags: ["Climate Policy", "Public Health", "Education"],
+        })}
         currentUserId="user-1"
       />
     );

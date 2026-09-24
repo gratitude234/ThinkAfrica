@@ -49,7 +49,7 @@ export default function BrandWordmark({
         />
       ) : null}
       <span
-        className={`font-display font-bold leading-none tracking-tight ${textColor} ${textClassName}`}
+        className={`font-display font-semibold leading-none tracking-tight ${textColor} ${textClassName}`}
       >
         Indegenius
       </span>

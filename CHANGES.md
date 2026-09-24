@@ -1,3 +1,13 @@
+# 24 September 2026 — Home Feed Screen 02 mockup implementation
+
+- Implemented the approved Home Feed mockup as a presentation-layer pass without changing feed-v4 ranking, cursor, exposure, or live-session freshness logic.
+- Set the Home reading column to 704px on desktop and a 16px mobile gutter that begins directly below the compact utility header.
+- Aligned the desktop Home rail to the mockup while keeping the shared shell behavior on non-Home routes unchanged.
+- Matched Post and Article feed grammar: flat divider rows, responsive byline/avatar sizing, titleless Post prose, natural Post media, Article kicker/headline/excerpt/topics, and 16:9 Article covers.
+- Reworked feed actions to place Like/Comment/Share together and Save on the opposite edge, with compact icon/count controls on mobile.
+- Matched mobile bottom navigation by removing the filled Write pill, tuned guest copy/notice styling, and changed the guest signup action to “Join.”
+- Corrected Article loading skeletons to 16:9 so loading geometry matches rendered cards.
+
 # 24 September 2026 — Feed v4.3 fresh-first reservation
 
 - Changed fresh content from a soft lane preference into a selection-stage reservation: up to 5 of every 12 For You positions are reserved before older personalized/trending/evergreen winners can compete for the rest.

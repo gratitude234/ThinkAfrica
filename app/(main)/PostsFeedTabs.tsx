@@ -537,11 +537,11 @@ export default function PostsFeedTabs({
           ref={stripRef}
           data-app-context-nav=""
           data-app-chrome-motion=""
-          className="pointer-events-none z-30 -mx-4 mb-3 w-[calc(100%+2rem)] sm:mx-0 sm:w-full"
+          className="pointer-events-none z-30 mb-0 w-full"
         >
           <div
             data-app-context-primary=""
-            className={`pointer-events-auto flex gap-1 overflow-x-auto overscroll-x-contain border-b border-divider bg-card px-4 [scrollbar-width:none] sm:px-0 [&::-webkit-scrollbar]:hidden ${
+            className={`pointer-events-auto flex gap-1 overflow-x-auto overscroll-x-contain border-b border-divider bg-canvas [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
               isPinned ? "shadow-[0_1px_12px_rgb(0,0,0,0.08)]" : ""
             }`}
             role="tablist"
@@ -560,7 +560,7 @@ export default function PostsFeedTabs({
                 onClick={() => selectTab(tab)}
                 // Underline only. Tabs are navigation, not an action, so they
                 // should be the quietest thing on the page.
-                className={`-mb-px min-h-11 shrink-0 border-b-2 px-3.5 py-2 text-byline font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold sm:px-4 ${
+                className={`-mb-px min-h-10 shrink-0 border-b-2 sm:min-h-0 px-2.5 py-2 text-[13.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold sm:px-3.5 ${
                   activeTab === tab
                     ? "border-emerald-brand text-ink"
                     : "border-transparent text-ink-muted hover:text-ink"

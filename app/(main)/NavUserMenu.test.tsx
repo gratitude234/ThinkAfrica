@@ -104,7 +104,7 @@ describe("NavUserMenu", () => {
 
     expect(screen.queryByRole("button", { name: "Open account menu" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
-    expect(screen.getByRole("link", { name: "Get started" })).toHaveAttribute("href", "/signup");
+    expect(screen.getByRole("link", { name: "Join" })).toHaveAttribute("href", "/signup");
   });
 
   it("closes on Escape", () => {
