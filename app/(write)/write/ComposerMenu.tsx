@@ -13,6 +13,8 @@ export interface ComposerMenuProps {
   onOpenDrafts?: () => void;
   /** The reader preview. A header button from md up, and in this menu at every size. */
   onPreview?: () => void;
+  /** An Article with no cover yet. A blank page has no cover button of its own. */
+  onAddCover?: () => void;
   sourcesCount?: number;
   onOpenSources?: () => void;
   onOpenHistory?: () => void;
@@ -32,8 +34,9 @@ const ITEM_SELECTOR = '[role="menuitem"]:not([aria-disabled="true"])';
 
 /**
  * The ••• menu on both write screens. What is not given is not shown: the Post
- * composer passes no preview, sources or history, and the Article editor
- * passes history only for a draft the account holds.
+ * composer passes no preview, cover, sources or history, and the Article
+ * editor passes history only for a draft the account holds and Add cover only
+ * while there is no cover.
  */
 export default function ComposerMenu({
   canSaveDraft,
@@ -43,6 +46,7 @@ export default function ComposerMenu({
   onDiscard,
   onOpenDrafts,
   onPreview,
+  onAddCover,
   sourcesCount = 0,
   onOpenSources,
   onOpenHistory,
@@ -70,6 +74,7 @@ export default function ComposerMenu({
 
   const items: MenuItem[] = [];
   if (onPreview) items.push({ key: "preview", label: "Preview", onSelect: onPreview });
+  if (onAddCover) items.push({ key: "cover", label: "Add cover", onSelect: onAddCover });
   if (onOpenSources) {
     items.push({
       key: "sources",

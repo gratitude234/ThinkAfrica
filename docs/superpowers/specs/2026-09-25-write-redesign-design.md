@@ -559,5 +559,12 @@ D1 to D5 were taken as written. Where the build differs from sections 4 to 6:
   the alignment choices.
 - **Cmd+Enter in the Post composer** is taken before the editor sees it, since
   Tiptap binds the same keys to a line break.
+- **Later: the cover and Publish settings (Stage 6).** Two decisions in section 2
+  were reversed after a comparison with Medium's editor. The cover button left
+  the blank page: a cover is added from Publish settings or the ••• menu and
+  shows under the title once there is one. Publish settings now opens on the
+  feed card as readers will see it, with an optional summary that starts as the
+  opening lines. So there is a feed preview in Publish settings after all, and a
+  written summary, though the subtitle is still not on the writing page.
 - **Not changed:** the remove button on a topic chip in the shared `TagInput`
   is below 44px. It is used across the app, so it is left for its own change.

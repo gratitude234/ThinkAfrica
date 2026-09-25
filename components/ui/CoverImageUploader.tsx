@@ -1,11 +1,18 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useImperativeHandle, type Ref } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 
+export interface CoverImageUploaderHandle {
+  /** Opens the file picker, as the uploader's own button does. */
+  open: () => void;
+}
+
 interface CoverImageUploaderProps {
+  /** For a caller that offers the upload from somewhere else, such as a menu. */
+  ref?: Ref<CoverImageUploaderHandle>;
   initialUrl?: string;
   onUpload: (url: string) => void;
   onRemove: () => void;
@@ -20,6 +27,7 @@ interface CoverImageUploaderProps {
 }
 
 export default function CoverImageUploader({
+  ref,
   initialUrl,
   onUpload,
   onRemove,
@@ -41,6 +49,8 @@ export default function CoverImageUploader({
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const blobUrlRef = useRef<string | null>(null);
+
+  useImperativeHandle(ref, () => ({ open: () => inputRef.current?.click() }), []);
 
   const releaseBlobUrl = useCallback(() => {
     if (blobUrlRef.current) {

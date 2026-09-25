@@ -249,7 +249,20 @@ md up, and a failed save always gets a line of its own under the header.
 Article Preview is a header button from md up and a ••• menu item at every
 size. The Post composer is a full page, not a card, with its Image and "Write
 an article instead" actions in a row under the text that sits above the
-keyboard on a phone. The Article editor puts the cover under the title.
+keyboard on a phone.
+
+A blank Article is a title and a body, and nothing else. There is no cover
+button on the page: a cover is added from Publish settings or from "Add cover"
+in the ••• menu, and once there is one it shows under the title. The faint
+"Title" placeholder stays, because it is the one sign that the first line is
+the headline. Publish settings works like Medium's preview screen: the card as
+the feed will show it (`FeedCardPreview`, which follows `ArticleFeedCard` in
+`components/post/HomeFeedCard.tsx`), then the cover, the summary and the
+topics, side by side from md up. The summary starts as the opening lines
+(`deriveContributionExcerpt()`, as the server derives them at publish), and
+nothing is stored until the writer edits it. Emptied, or edited back to exactly
+the opening lines, it follows the body again. A written summary is printed
+under the title on the page too, by the `isWrittenExcerpt()` rule below.
 The (write) layout draws the app navigation from md up through
 `WriteChrome`, reading the viewer with `getNavigationViewer()` from
 `lib/navigationViewer.ts`, the same lookup the (main) layout uses.
