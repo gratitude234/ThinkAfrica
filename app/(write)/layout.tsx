@@ -1,19 +1,20 @@
-"use client";
-
-import { useVisualViewportBottom } from "@/lib/useVisualViewportBottom";
+import { getNavigationViewer } from "@/lib/navigationViewer";
+import WriteChrome from "./WriteChrome";
 
 /**
- * The composer deliberately renders without the (main) NavigationShell, so
- * nothing here used to publish `--mobile-visual-viewport-bottom`. The
- * composer's fixed formatting toolbar read the 0px fallback and sat under
- * the soft keyboard while typing, which is the one moment it is needed.
+ * The write screens sit under the app navigation on a desktop, and fill the
+ * screen on a phone. /edit/[slug] lives in (main) and stays full screen.
  */
-export default function WriteLayout({
+export default async function WriteLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  useVisualViewportBottom();
+  const { user, profile, isAdmin } = await getNavigationViewer();
 
-  return children;
+  return (
+    <WriteChrome user={user} profile={profile} isAdmin={isAdmin}>
+      {children}
+    </WriteChrome>
+  );
 }

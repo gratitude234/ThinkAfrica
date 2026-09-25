@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { parseContentKind } from "@/lib/contentModel";
 import type { ContributionSnapshot } from "@/lib/contribution";
 import type { PostReferenceRecord } from "@/lib/types";
 import UniversalComposer from "./UniversalComposer";
@@ -20,7 +21,8 @@ function safeReturnTo(candidate: string | undefined, fallback: string) {
 /**
  * Parameters old links still carry and the composer no longer honours.
  *
- * `kind` and `type` chose a format, which a title now decides. `prompt`
+ * `kind` and `type` chose a format before there were two screens. The screen
+ * is `editor=article` now, and a title still decides what is stored. `prompt`
  * attached a campus prompt, and `inResponseTo`, `response_to` and
  * `responseIntent` started a Response. The publishing reset removed both
  * paths. A link carrying any of them opens the ordinary composer, and they are
@@ -51,7 +53,7 @@ export default async function WritePage({ searchParams }: PageProps) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, username, university")
+    .select("full_name, username, university, avatar_url")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -94,6 +96,7 @@ export default async function WritePage({ searchParams }: PageProps) {
       userId={user.id}
       profile={profile}
       initialSnapshot={initialSnapshot}
+      initialSurface={parseContentKind(value(params, "editor"))}
       draftId={draftParam}
       draftUpdatedAt={(draft?.updated_at as string | null | undefined) ?? null}
       returnTo={safeReturnTo(value(params, "returnTo"), "/")}

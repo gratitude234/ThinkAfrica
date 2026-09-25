@@ -5,8 +5,10 @@
 > in an `article_format` column. None of that is the product any more, and as
 > of `20260915000005` to `20260915000007` none of it is the database either.
 >
-> What is true now: a piece is a **Post** or an **Article**, and its title
-> decides which. `posts.content_kind` is NOT NULL and constrained to those two
+> What is true now: a piece is a **Post** or an **Article**. The writer
+> chooses which by choosing the screen they write on (the 2026-09-25 write
+> redesign), and a title still makes a piece an Article, which is what the
+> database records. `posts.content_kind` is NOT NULL and constrained to those two
 > values, `posts.article_format` is always null, and `posts.type` is derived
 > from `content_kind` by a trigger until the column is dropped. See
 > `PUBLISHING_RESET_PHASE2I.md` and `lib/contentModel.ts`, which is now the

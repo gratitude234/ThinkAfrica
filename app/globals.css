@@ -261,53 +261,42 @@
   border-radius: 10px;
 }
 
-/* Distraction-free writing canvas */
-.write-canvas-editor {
-  min-height: 430px;
-  padding: 0.25rem 0;
-  color: var(--ta-ink);
-  font-family: var(--font-inter), system-ui, sans-serif;
-  font-size: 1.0625rem;
-  line-height: 1.72;
+/* The two write screens. Their type comes from the live page classes they
+   sit on (.publication-article-body, .publication-post-body), so these add
+   only what an editable surface needs, and undo the generic .tiptap rules
+   above that would otherwise set paragraphs and list items in the UI face. */
+.write-article-editor {
+  min-height: 50vh;
+  padding-bottom: 4rem;
 }
 
-.write-canvas-editor p,
-.write-canvas-editor li {
-  margin-bottom: 1.15em;
+.write-post-editor {
+  min-height: 3rem;
+}
+
+.write-article-editor :is(p, li),
+.write-post-editor :is(p, li) {
   font-family: inherit;
-  font-size: inherit;
   line-height: inherit;
 }
 
-.write-canvas-editor p.is-editor-empty:first-child::before {
+.write-post-editor :is(h2, h3) {
+  margin: 20px 0 8px;
+  font-family: inherit;
+  font-weight: 600;
+}
+
+.write-post-editor blockquote {
+  font-family: inherit;
+}
+
+.write-article-editor p.is-editor-empty:first-child::before,
+.write-post-editor p.is-editor-empty:first-child::before {
   color: #7d7986;
 }
 
-.write-canvas-editor:focus-visible {
-  outline: 2px solid rgba(7, 57, 41, 0.28);
-  outline-offset: 8px;
-  border-radius: 8px;
-}
-
-.write-canvas-compact .write-canvas-editor {
-  min-height: 280px;
-}
-
-@media (min-width: 1024px) {
-  .write-canvas-editor {
-    min-height: 560px;
-    font-size: 1.0625rem;
-    line-height: 1.75;
-  }
-
-  .write-canvas-compact .write-canvas-editor {
-    min-height: 380px;
-  }
-}
-
-.write-canvas-editor h2,
-.write-canvas-editor h3 {
-  font-weight: 600;
+.write-article-editor p.is-editor-empty:first-child::before {
+  font-style: italic;
 }
 
 /* Lite Mode */
@@ -906,6 +895,17 @@ font-family: var(--font-inter), system-ui, sans-serif;
 .publication-detail pre { max-width: 100%; overflow-x: auto; white-space: pre; padding: 16px; background: #EFEBE2; border-radius: 8px; }
 .publication-detail table { display: block; max-width: 100%; overflow-x: auto; }
 .publication-detail :is(td, th) { border: 1px solid #E9E5DE; padding: 8px; }
+
+/* Justified text opens rivers of space in a narrow column unless long words
+   can break. The editor writes `text-align: justify` and the sanitizer
+   rewrites it as `text-align:justify`, so both spellings are matched.
+   Hyphenation also needs a document language, which app/layout.tsx sets on
+   <html>. `.tiptap` covers both write screens. */
+:is(.publication-article-body, .publication-post-body, .tiptap)
+  p:is([style*="text-align: justify"], [style*="text-align:justify"]) {
+  -webkit-hyphens: auto;
+  hyphens: auto;
+}
 .publication-follow > button { min-height: 36px; border-radius: 8px; padding: 8px 18px; font-size: 13.5px; }
 @media (max-width: 639px) {
   .publication-follow > button { min-height: 32px; padding: 6px 13px; font-size: 12px; }

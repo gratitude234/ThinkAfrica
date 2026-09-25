@@ -1,5 +1,6 @@
 import { contentKindForTitle } from "@/lib/contentModel";
 import type { PostReferenceRecord } from "@/lib/types";
+import { stripHtmlToText } from "@/lib/utils";
 
 export type ComposerMode = "new" | "draft" | "published-edit";
 
@@ -96,6 +97,33 @@ export function deriveContributionExcerpt(content: string, maxLength = 240) {
   const text = contributionText(content);
   if (text.length <= maxLength) return text;
   return `${text.slice(0, maxLength).replace(/\s+\S*$/, "")}…`;
+}
+
+/** Text as a reader sees it, for comparing a summary with the body it came from. */
+function comparableText(value: string) {
+  return stripHtmlToText(value)
+    .replace(/\s+([.,!?;:])/g, "$1")
+    .replace(/(?:…|\.{3})$/, "")
+    .trim();
+}
+
+/**
+ * Whether a stored excerpt is a summary someone wrote, as opposed to the
+ * opening of the body cut off by deriveContributionExcerpt() or by the older
+ * generateExcerpt(). A generated one repeats the first lines of the piece, so
+ * a page that prints it under the title prints the opening twice.
+ *
+ * Known limit: a generated excerpt whose body was later rewritten no longer
+ * starts the body, so it reads as written and is kept. That is what every
+ * surface does today, so it is no worse.
+ */
+export function isWrittenExcerpt(
+  excerpt: string | null | undefined,
+  content: string | null | undefined
+) {
+  const summary = comparableText(excerpt ?? "");
+  if (!summary) return false;
+  return !comparableText(content ?? "").startsWith(summary);
 }
 
 /**

@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import UniversalComposer from "@/app/(write)/write/UniversalComposer";
-import type { ContributionSnapshot } from "@/lib/contribution";
+import { isWrittenExcerpt, type ContributionSnapshot } from "@/lib/contribution";
 import type { PostReferenceRecord } from "@/lib/types";
 
 interface PageProps {
@@ -63,15 +63,19 @@ export default async function EditPage({ params }: PageProps) {
     const [{ data: referenceRows }, { data: editDraft }, { data: profile }] = await Promise.all([
       supabase.from("post_references").select("*").eq("post_id", post.id).order("display_order"),
       supabase.from("post_edit_drafts").select("*").eq("post_id", post.id).eq("author_id", user.id).maybeSingle(),
-      supabase.from("profiles").select("full_name, username, university").eq("id", user.id).maybeSingle(),
+      supabase.from("profiles").select("full_name, username, university, avatar_url").eq("id", user.id).maybeSingle(),
     ]);
     const draftReferences = Array.isArray(editDraft?.reference_snapshot)
       ? (editDraft.reference_snapshot as PostReferenceRecord[])
       : ((referenceRows ?? []) as PostReferenceRecord[]);
+    const excerpt = editDraft?.excerpt ?? post.excerpt ?? "";
+    const content = editDraft?.content ?? post.content ?? "";
     const initialSnapshot: ContributionSnapshot = {
       title: editDraft?.title ?? post.title ?? "",
-      excerpt: editDraft?.excerpt ?? post.excerpt ?? "",
-      content: editDraft?.content ?? post.content ?? "",
+      // A generated summary is dropped here, so saving the edit derives a new
+      // one from the body as it now reads. A written one is kept.
+      excerpt: isWrittenExcerpt(excerpt, content) ? excerpt : "",
+      content,
       tags: (editDraft?.tags as string[] | null) ?? (post.tags as string[] | null) ?? [],
       coverImageUrl: editDraft?.cover_image_url ?? post.cover_image_url ?? "",
       references: draftReferences,

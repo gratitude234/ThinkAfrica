@@ -52,8 +52,8 @@ Optional:
 ```
 app/
 ├── (auth)/          # Login, signup, forgot/reset-password (standalone AuthShell layout)
-├── (write)/         # Composer, no app chrome
-│   └── write/       # UniversalComposer: the one canvas for posts and articles
+├── (write)/         # Composer: app navigation on desktop, full screen on a phone
+│   └── write/       # UniversalComposer: the Post composer and the Article editor
 ├── (main)/          # Full app shell with NavigationShell
 │   ├── page.tsx     # Home feed: For You and Following
 │   ├── post/[slug]/ # Post detail and comments
@@ -166,7 +166,7 @@ Role system (`lib/roles.ts`):
 
 ### Post Workflow
 
-Posts and Articles are `draft` or `published`; the title decides which one a piece is. The editorial review workflow (Research, Policy Brief review, citation IDs) was removed from the application in the publishing reset, Phase 2A: see `PUBLISHING_RESET_PHASE2A.md`. Its tables (`post_reviews`, `post_editor_decisions`, `post_versions`, `citation_sequences`) and the `pending`, `pending_revision`, `rejected` and `withdrawn` statuses still exist for legacy rows. Phase 2I removed the last of it from the database: `guard_locked_post_write` no longer locks a publication for having been reviewed, and an author edits their own published work like any other.
+Posts and Articles are `draft` or `published`. The writer chooses which by choosing the screen, the Post composer or the Article editor, and the title still decides the stored kind: an Article has one and a Post never does (`composerSurfaceFor()` and `contentKindForTitle()` in `lib/contentModel.ts`). The editorial review workflow (Research, Policy Brief review, citation IDs) was removed from the application in the publishing reset, Phase 2A: see `PUBLISHING_RESET_PHASE2A.md`. Its tables (`post_reviews`, `post_editor_decisions`, `post_versions`, `citation_sequences`) and the `pending`, `pending_revision`, `rejected` and `withdrawn` statuses still exist for legacy rows. Phase 2I removed the last of it from the database: `guard_locked_post_write` no longer locks a publication for having been reviewed, and an author edits their own published work like any other.
 
 Phase 2B removed the other ways a publication used to be created or shaped: co-authoring, Responses as publications, campus prompt publishing and draft share links (see `PUBLISHING_RESET_PHASE2B.md`). Their data is kept and read. Existing co-authored and response publications still render, marked `LEGACY COMPATIBILITY` in code, and `lib/retiredCreationPaths.test.ts` fails if a way to create more comes back. The composer still writes the writer's own `post_authors` row, because the `post_references` read policy reaches a draft's sources only through `is_post_coauthor()`.
 
@@ -202,7 +202,7 @@ Phase 2I made the stored model match the product: a piece is a Post or an Articl
 
 ```
 components/
-├── editor/          # Editor.tsx: Tiptap wrapper (StarterKit, Image, CharacterCount, Placeholder)
+├── editor/          # Editor.tsx (Post and Article variants), extensions.ts (the schema), editorIcons.tsx
 ├── post/            # PostCard, PostFeed, PostCover
 ├── profile/         # ProfileHeader, ProfileTabs, ProfilePublicationList, ProfileAbout, relationship controls
 ├── admin/           # Admin-specific UI
@@ -216,8 +216,29 @@ The `Editor.tsx` component exposes an `EditorHandle` ref for toolbar
 integration (`toggleBold`, `toggleItalic`, `toggleH2`, `toggleH3`,
 `toggleBulletList`, `toggleOrderedList`, `toggleBlockquote`, `insertDivider`,
 `isActive`, `undo`/`redo` with `canUndo`/`canRedo`, `triggerImageUpload`,
-`insertLink`, `insertCitation`, `getSelectedImage`/`updateSelectedImage`), and
-fires `onUpdate` / `onSelectionUpdate` callbacks.
+`insertLink`, `insertCitation`, `getSelectedImage`/`updateSelectedImage`,
+`setTextAlign`/`getTextAlign`, `focus`), and fires `onUpdate` /
+`onSelectionUpdate` callbacks. It has two variants. `article` has the
+selection toolbar (desktop only) and the "+" insert menu. `post` shows no
+tools, and sends a pasted or dropped image to `onImageFile` rather than into
+the text. Both use the whole schema in `components/editor/extensions.ts`, so
+an older Post keeps any formatting it has.
+
+The composer at `/write` is two screens over one saving hook.
+`UniversalComposer` owns `useContributionDraft` (the working copy, device and
+account saves, recovery, publishing, leaving and discarding) and renders
+`PostComposer` or `ArticleEditor`, chosen by `composerSurfaceFor()` and
+`?editor=article`. A Post publishes from its button, and an Article goes
+through `PublishSettingsDialog`. The Post composer is never shown over a
+title. `/edit/[slug]` uses the same root, full screen with no navigation.
+The (write) layout draws the app navigation from md up through
+`WriteChrome`, reading the viewer with `getNavigationViewer()` from
+`lib/navigationViewer.ts`, the same lookup the (main) layout uses.
+
+An excerpt that is only the opening of the body is not printed under an
+Article's title (`isWrittenExcerpt()` in `lib/contribution.ts`), and editing a
+published piece regenerates such an excerpt from the edited body rather than
+keeping the old opening. An excerpt someone wrote is kept everywhere.
 
 Images use a `CaptionedImage` extension over Tiptap's `Image`: with a caption
 it serializes to `<figure><img><figcaption>`, without one to a bare `<img>`, so
@@ -226,7 +247,10 @@ can be pasted or dropped into the body (`handlePaste` / `handleDrop`), except
 when the clipboard also carries `text/html`, which means the writer is pasting
 from a word processor and wants the markup. `sanitizePostHtml` already allows
 `figure`, `figcaption`, `pre`, `hr`, and tables, so the pipeline supports more
-than the toolbar currently exposes.
+than the toolbar currently exposes. It also keeps `text-align` (left, center,
+right, justify) on `p`, `h2` and `h3` and no other style, and justified
+paragraphs hyphenate. Left is the default and is written as no style at all,
+so pieces saved before alignment existed keep their HTML exactly.
 
 ### UI Conventions
 

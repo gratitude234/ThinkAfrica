@@ -253,9 +253,14 @@ describe("publications-first Home: what Home reads", () => {
     expect(viewerRepository).toContain("public.user_blocks");
     expect(viewerRepository).toContain("public.follows");
 
+    // The layout reads one row per navigation. The read moved into the helper
+    // both layouts share, so the count is asserted where the read now lives.
     const layout = codeOf("app/(main)/layout.tsx");
-    expect(layout.match(/\.from\(/g) ?? []).toHaveLength(1);
-    expect(layout).not.toMatch(/\.rpc\(/);
+    expect(layout).not.toMatch(/\.from\(|\.rpc\(/);
+    expect(layout).toContain("getNavigationViewer(");
+    const navigationViewer = codeOf("lib/navigationViewer.ts");
+    expect(navigationViewer.match(/\.from\(/g) ?? []).toHaveLength(1);
+    expect(navigationViewer).not.toMatch(/\.rpc\(/);
   });
 
   it("ranks on relevance, engagement and freshness, with no retired signal", () => {

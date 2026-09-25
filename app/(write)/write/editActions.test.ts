@@ -65,6 +65,42 @@ describe("savePublishedEditDraft", () => {
     fakeSupabase.current = null;
   });
 
+  it("fills an empty summary from the opening of the edited body", async () => {
+    fakeSupabase.current = makeFakeSupabase({
+      posts: queueResults({ data: editablePost(), error: null }),
+      post_edit_drafts: queueResults({ data: { id: "edit-1" }, error: null }),
+    });
+
+    await savePublishedEditDraft({
+      postId: "post-1",
+      snapshot: snapshot({ excerpt: "", content: "<p>The new opening.</p>" }),
+    });
+
+    const payload = fakeSupabase.current.builders.post_edit_drafts[0].upsertedWith as {
+      excerpt: string;
+    };
+    // Publishing a new piece already does this. Editing one used to store the
+    // empty string, so the feed kept showing the old opening.
+    expect(payload.excerpt).toBe("The new opening.");
+  });
+
+  it("keeps a summary the writer wrote", async () => {
+    fakeSupabase.current = makeFakeSupabase({
+      posts: queueResults({ data: editablePost(), error: null }),
+      post_edit_drafts: queueResults({ data: { id: "edit-1" }, error: null }),
+    });
+
+    await savePublishedEditDraft({
+      postId: "post-1",
+      snapshot: snapshot({ excerpt: "Why the grid failed", content: "<p>The new opening.</p>" }),
+    });
+
+    const payload = fakeSupabase.current.builders.post_edit_drafts[0].upsertedWith as {
+      excerpt: string;
+    };
+    expect(payload.excerpt).toBe("Why the grid failed");
+  });
+
   it("carries each stored source's row id into the snapshot", async () => {
     fakeSupabase.current = makeFakeSupabase({
       posts: queueResults({ data: editablePost(), error: null }),

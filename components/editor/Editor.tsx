@@ -1,69 +1,35 @@
 "use client";
 
-import { useEditor, EditorContent, BubbleMenu } from "@tiptap/react";
-import { mergeAttributes } from "@tiptap/core";
-import StarterKit from "@tiptap/starter-kit";
-import Placeholder from "@tiptap/extension-placeholder";
-import CharacterCount from "@tiptap/extension-character-count";
-import Image from "@tiptap/extension-image";
-import Link from "@tiptap/extension-link";
-import Typography from "@tiptap/extension-typography";
+import { BubbleMenu, EditorContent, FloatingMenu, useEditor } from "@tiptap/react";
 import type { EditorView } from "@tiptap/pm/view";
-import type { DOMOutputSpec } from "@tiptap/pm/model";
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { uploadImage } from "@/lib/uploadImage";
+import {
+  ALIGNMENT_OPTIONS,
+  BULLETS_ICON,
+  DIVIDER_ICON,
+  IMAGE_ICON,
+  Icon,
+  NUMBERS_ICON,
+  PLUS_ICON,
+} from "./editorIcons";
+import {
+  caretInEmptyBlock,
+  editorExtensions,
+  stripPastedImages,
+  TEXT_ALIGNMENTS,
+  type TextAlignment,
+} from "./extensions";
 
-/**
- * An image on a publication is rarely just a picture. It has a source, a
- * photographer, or a chart it came from, and none of that survives in a bare
- * <img>. This renders as <figure><img><figcaption> when a caption exists and
- * as a plain <img> when it does not, so the many images already published
- * without one keep parsing and re-serializing unchanged.
- */
-const CaptionedImage = Image.extend({
-  addAttributes() {
-    return {
-      ...this.parent?.(),
-      caption: {
-        default: null,
-        parseHTML: (element) => element.getAttribute("data-caption"),
-        // The caption is rendered as figcaption text below, never as an
-        // attribute on the img itself.
-        renderHTML: () => ({}),
-      },
-    };
-  },
-
-  parseHTML() {
-    return [
-      {
-        tag: "figure",
-        getAttrs: (element) => {
-          const image = (element as HTMLElement).querySelector("img");
-          if (!image?.getAttribute("src")) return false;
-          return {
-            src: image.getAttribute("src"),
-            alt: image.getAttribute("alt"),
-            title: image.getAttribute("title"),
-            caption:
-              (element as HTMLElement).querySelector("figcaption")?.textContent?.trim() || null,
-          };
-        },
-      },
-      { tag: "img[src]" },
-    ];
-  },
-
-  renderHTML({ node, HTMLAttributes }) {
-    const image = [
-      "img",
-      mergeAttributes(this.options.HTMLAttributes, HTMLAttributes),
-    ] as DOMOutputSpec;
-    const caption = typeof node.attrs.caption === "string" ? node.attrs.caption.trim() : "";
-    return (
-      caption ? ["figure", {}, image, ["figcaption", {}, caption]] : image
-    ) as DOMOutputSpec;
-  },
-});
+export type { TextAlignment } from "./extensions";
 
 export interface SelectedImage {
   src: string;
@@ -90,13 +56,26 @@ export interface EditorHandle {
   insertCitation: (referenceId: string) => void;
   getSelectedImage: () => SelectedImage | null;
   updateSelectedImage: (attrs: { alt?: string; caption?: string }) => void;
+  setTextAlign: (alignment: TextAlignment) => void;
+  /** The alignment at the caret, or "left" when a selection spans several. */
+  getTextAlign: () => TextAlignment;
+  /** Puts the caret at the start of the body, for the title field's Enter key. */
+  focus: () => void;
 }
+
+export type EditorVariant = "post" | "article";
 
 interface EditorProps {
   content?: string;
   placeholder?: string;
-  minWords?: number;
-  onUpdate?: (html: string, wordCount: number) => void;
+  /**
+   * "article" is the full editor, with the selection toolbar and the "+"
+   * insert menu. "post" shows no tools and never places an image in the
+   * text: an image pasted or dropped into it goes to onImageFile, which
+   * attaches it to the Post instead.
+   */
+  variant?: EditorVariant;
+  onUpdate?: (html: string) => void;
   onSelectionUpdate?: () => void;
   /**
    * Reported so a host that hides this component's own chrome can still say
@@ -104,66 +83,119 @@ interface EditorProps {
    * happened until it suddenly appears.
    */
   onImageUploadingChange?: (uploading: boolean) => void;
-  canvasMode?: boolean;
+  onImageFile?: (file: File) => void;
   ariaLabel?: string;
-  showWordCount?: boolean;
-  /** Places the caret in the body on mount, for a canvas that opens body-first. */
+  /** Places the caret in the body on mount. */
   autoFocus?: boolean;
 }
+
+// The live page's own classes, so what the writer sees is what gets published.
+const EDITOR_CLASS: Record<EditorVariant, string> = {
+  article: "tiptap write-article-editor publication-article-body focus:outline-none",
+  post: "tiptap write-post-editor publication-post-body focus:outline-none",
+};
+
+type BubblePanel = "marks" | "link" | "align";
+type InsertItem = "image" | "divider" | "bullets" | "numbers";
+
+/** The "+" menu. Lists are here because the selection toolbar has no room for them. */
+const INSERT_ITEMS: ReadonlyArray<{ value: InsertItem; label: string; icon: ReactNode }> = [
+  { value: "image", label: "Image", icon: IMAGE_ICON },
+  { value: "divider", label: "Divider", icon: DIVIDER_ICON },
+  { value: "bullets", label: "Bulleted list", icon: BULLETS_ICON },
+  { value: "numbers", label: "Numbered list", icon: NUMBERS_ICON },
+];
 
 function imageFilesFrom(data: DataTransfer | null) {
   if (!data) return [];
   return Array.from(data.files).filter((file) => file.type.startsWith("image/"));
 }
 
-function countWordsFromHtml(value: string) {
-  return value
-    .replace(/<[^>]*>/g, " ")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean).length;
+/** The part of a tippy instance the menus need, without importing tippy's types. */
+interface MenuTip {
+  hide: () => void;
+  popper: Element;
 }
 
-function wordCountMessage(count: number, minWords: number) {
-  if (minWords <= 50) return "";
-  if (count < 50) return "Just getting started";
-  if (count < minWords * 0.25) return "Keep going";
-  if (count < minWords * 0.75) return "Good progress";
-  if (count < minWords) return "Almost there";
-  return "Target reached";
+/** Pressing a menu button must not move the selection it is about to format. */
+function keepSelection(event: { preventDefault: () => void }) {
+  event.preventDefault();
 }
 
-const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
-  content = "",
-  placeholder = "Start writing…",
-  minWords = 0,
-  onUpdate,
-  onSelectionUpdate,
-  onImageUploadingChange,
-  canvasMode = false,
-  ariaLabel = "Article body",
-  showWordCount = true,
-  autoFocus = false,
-}, ref) {
+/**
+ * A selection toolbar button. The toolbar appears only with a mouse or
+ * trackpad, so 36px is enough here. Touch toolbars stay at 44px.
+ */
+function BubbleButton({
+  label,
+  pressed,
+  expanded,
+  onPress,
+  children,
+}: {
+  label: string;
+  pressed?: boolean;
+  expanded?: boolean;
+  onPress: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-pressed={pressed}
+      aria-expanded={expanded}
+      title={label}
+      onMouseDown={keepSelection}
+      onClick={onPress}
+      className={`flex h-9 min-w-9 items-center justify-center rounded px-2 text-[13px] font-medium transition-colors ${
+        pressed || expanded ? "bg-white/20 text-white" : "text-white/85 hover:bg-white/10 hover:text-white"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
+  {
+    content = "",
+    placeholder = "Tell your story.",
+    variant = "article",
+    onUpdate,
+    onSelectionUpdate,
+    onImageUploadingChange,
+    onImageFile,
+    ariaLabel = "Article body",
+    autoFocus = false,
+  },
+  ref
+) {
   const [imageUploading, setImageUploading] = useState(false);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
-  const [bubbleLinkMode, setBubbleLinkMode] = useState(false);
+  const [bubblePanel, setBubblePanel] = useState<BubblePanel>("marks");
   const [bubbleLinkUrl, setBubbleLinkUrl] = useState("");
-  const [toolbarLinkOpen, setToolbarLinkOpen] = useState(false);
-  const [toolbarLinkUrl, setToolbarLinkUrl] = useState("");
-  const [isTouchDevice, setIsTouchDevice] = useState(false);
-
-  useEffect(() => {
-    setIsTouchDevice(navigator.maxTouchPoints > 0);
-  }, []);
-  const [rawWordCount, setRawWordCount] = useState(() =>
-    countWordsFromHtml(content)
-  );
-  const [displayWordCount, setDisplayWordCount] = useState(() =>
-    countWordsFromHtml(content)
-  );
+  const [insertOpen, setInsertOpen] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Tiptap captures the menus' shouldShow and the paste handlers once, when
+  // the editor is created. They read these refs so they always see the
+  // current value rather than the first one.
+  const touchRef = useRef(false);
+  const bubblePanelRef = useRef<BubblePanel>("marks");
+  const onImageFileRef = useRef(onImageFile);
+  const bubbleTipRef = useRef<MenuTip | null>(null);
+  const floatingTipRef = useRef<MenuTip | null>(null);
+
+  useEffect(() => {
+    touchRef.current = navigator.maxTouchPoints > 0;
+  }, []);
+  useEffect(() => {
+    bubblePanelRef.current = bubblePanel;
+  }, [bubblePanel]);
+  useEffect(() => {
+    onImageFileRef.current = onImageFile;
+  }, [onImageFile]);
 
   const showUploadError = useCallback((message: string) => {
     setImageUploadError(message);
@@ -173,34 +205,13 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
 
   const uploadImageFile = useCallback(
     async (file: File): Promise<string | null> => {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      try {
-        const { createClient } = await import("@/lib/supabase/client");
-        const supabase = createClient();
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        const response = await fetch("/api/upload-image", {
-          method: "POST",
-          headers: session?.access_token
-            ? { Authorization: `Bearer ${session.access_token}` }
-            : {},
-          body: formData,
-        });
-        const json = await response.json();
-        if (json.url) {
-          setImageUploadError(null);
-          return json.url as string;
-        }
-        showUploadError(json.error ?? "Upload failed. Check the file type and size.");
-        return null;
-      } catch {
-        showUploadError("Couldn't upload image. Check your connection and try again.");
-        return null;
+      const result = await uploadImage(file);
+      if (result.ok) {
+        setImageUploadError(null);
+        return result.url;
       }
+      showUploadError(result.error);
+      return null;
     },
     [showUploadError]
   );
@@ -239,31 +250,27 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
     onImageUploadingChange?.(imageUploading);
   }, [imageUploading, onImageUploadingChange]);
 
+  /** A Post's image is attached, never placed in the text. */
+  const placeImages = (view: EditorView, files: File[], at: number | null) => {
+    if (variant === "post") {
+      if (files[0]) onImageFileRef.current?.(files[0]);
+      return;
+    }
+    void insertImageFiles(view, files, at);
+  };
+
   const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Placeholder.configure({ placeholder }),
-      CharacterCount,
-      // Curly quotes, real ellipses and proper dashes, applied as the writer
-      // types. A publication set in Bodoni should not ship typewriter quotes.
-      Typography,
-      CaptionedImage.configure({ inline: false, allowBase64: false }),
-      Link.configure({
-        openOnClick: false,
-        HTMLAttributes: { rel: "noopener noreferrer", target: "_blank" },
-      }),
-    ],
+    extensions: editorExtensions({ placeholder }),
     content,
     autofocus: autoFocus ? "end" : false,
     editorProps: {
       attributes: {
-        class: canvasMode
-          ? "tiptap write-canvas-editor prose max-w-none focus:outline-none"
-          : "tiptap prose max-w-none focus:outline-none p-4",
+        class: EDITOR_CLASS[variant],
         "aria-label": ariaLabel,
         "aria-multiline": "true",
         role: "textbox",
       },
+      transformPastedHTML: (html) => (variant === "post" ? stripPastedImages(html) : html),
       handlePaste: (view, event) => {
         // Copying from a word processor puts both markup and an image on the
         // clipboard. The markup is the thing the writer meant to paste.
@@ -271,7 +278,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
         const files = imageFilesFrom(event.clipboardData);
         if (!files.length) return false;
         event.preventDefault();
-        void insertImageFiles(view, files, null);
+        placeImages(view, files, null);
         return true;
       },
       handleDrop: (view, event, _slice, moved) => {
@@ -282,20 +289,13 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
         const files = imageFilesFrom(dragEvent.dataTransfer);
         if (!files.length) return false;
         event.preventDefault();
-        const coords = view.posAtCoords({
-          left: dragEvent.clientX,
-          top: dragEvent.clientY,
-        });
-        void insertImageFiles(view, files, coords?.pos ?? null);
+        const coords = view.posAtCoords({ left: dragEvent.clientX, top: dragEvent.clientY });
+        placeImages(view, files, coords?.pos ?? null);
         return true;
       },
     },
     onUpdate({ editor }) {
-      const html = editor.getHTML();
-      const words = editor.storage.characterCount.words() as number;
-
-      setRawWordCount(words);
-      onUpdate?.(html, words);
+      onUpdate?.(editor.getHTML());
       onSelectionUpdate?.();
     },
     onSelectionUpdate() {
@@ -360,6 +360,10 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
         .insertContent(`<a href="#ref-id-${stableId}">[source]</a>`)
         .run();
     },
+    setTextAlign: (alignment) => editor?.chain().focus().setTextAlign(alignment).run(),
+    getTextAlign: () =>
+      TEXT_ALIGNMENTS.find((alignment) => editor?.isActive({ textAlign: alignment })) ?? "left",
+    focus: () => editor?.commands.focus("start"),
   }));
 
   useEffect(() => {
@@ -369,33 +373,50 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
     };
   }, [editor]);
 
+  // Tiptap hides its menus on the editor's blur, unless a mousedown inside a
+  // menu asked it not to. Menu buttons keep focus in the body so the
+  // selection they format stays put, so that blur never comes, the request is
+  // left standing, and the next real blur (opening Preview or a sheet) would
+  // leave the menu floating over the dialog. Focus moving to any control
+  // outside the menus hides them here instead; clicks are handled by
+  // onClickOutside below.
+  useEffect(() => {
+    if (!editor) return;
+    const onBlur = ({ event }: { event: FocusEvent }) => {
+      const next = event.relatedTarget;
+      if (!(next instanceof Node)) return;
+      for (const tip of [bubbleTipRef.current, floatingTipRef.current]) {
+        if (tip && !tip.popper.contains(next)) tip.hide();
+      }
+    };
+    editor.on("blur", onBlur);
+    return () => {
+      editor.off("blur", onBlur);
+    };
+  }, [editor]);
+
+  // Escape closes the "+" menu or the alignment choices and returns the caret
+  // to the body. Focus stays in the body while they are open, so the key
+  // arrives at the document rather than at the menu.
+  useEffect(() => {
+    if (!insertOpen && bubblePanel !== "align") return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setInsertOpen(false);
+      setBubblePanel((panel) => (panel === "align" ? "marks" : panel));
+      editor?.commands.focus();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [bubblePanel, editor, insertOpen]);
+
   useEffect(() => {
     if (!editor || editor.getHTML() === content) return;
-
     editor.commands.setContent(content, false);
-    const nextWordCount = countWordsFromHtml(content);
-    setRawWordCount(nextWordCount);
-    setDisplayWordCount(nextWordCount);
   }, [content, editor]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDisplayWordCount(rawWordCount);
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [rawWordCount]);
-
-  const countClasses =
-    minWords > 0 && displayWordCount >= minWords
-      ? "text-xs font-medium text-emerald-600"
-      : minWords > 0 && displayWordCount < 100
-        ? "text-xs text-amber-500"
-        : "text-xs text-gray-500";
-
-  const handleImageFileChange = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const handleImageFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
     if (!files.length || !editor) return;
 
@@ -406,119 +427,28 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
     }
   };
 
-  const countMessage =
-    minWords > 0 ? wordCountMessage(displayWordCount, minWords) : "";
+  const applyLink = () => {
+    const url = bubbleLinkUrl.trim();
+    if (url) editor?.chain().focus().setLink({ href: url }).run();
+    else editor?.chain().focus().unsetLink().run();
+    setBubbleLinkUrl("");
+    setBubblePanel("marks");
+  };
+
+  const runInsert = (item: InsertItem) => {
+    setInsertOpen(false);
+    if (item === "image") imageInputRef.current?.click();
+    else if (item === "divider") editor?.chain().focus().setHorizontalRule().run();
+    else if (item === "bullets") editor?.chain().focus().toggleBulletList().run();
+    else editor?.chain().focus().toggleOrderedList().run();
+  };
+
+  const currentAlignment =
+    ALIGNMENT_OPTIONS.find((option) => editor?.isActive({ textAlign: option.value })) ??
+    ALIGNMENT_OPTIONS[0];
 
   return (
-    <div
-      className={
-        canvasMode && displayWordCount === 0 ? "write-canvas-compact" : undefined
-      }
-    >
-      {!canvasMode ? (
-      <div className="hidden border-b border-gray-200 bg-canvas p-2 lg:block">
-        <div className="flex flex-wrap items-center gap-1">
-          <ToolbarButton
-            onClick={() => editor?.chain().focus().toggleBold().run()}
-            active={editor?.isActive("bold")}
-            title="Bold"
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 4h8a4 4 0 010 8H6zm0 8h9a4 4 0 010 8H6z" />
-            </svg>
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor?.chain().focus().toggleBulletList().run()}
-            active={editor?.isActive("bulletList")}
-            title="Bullet list"
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
-            </svg>
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => imageInputRef.current?.click()}
-            title="Insert image in article"
-          >
-            {imageUploading ? (
-              <span className="text-xs text-gray-400">...</span>
-            ) : (
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            )}
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => {
-              if (editor?.isActive("link")) {
-                editor.chain().focus().unsetLink().run();
-                return;
-              }
-              setToolbarLinkUrl(editor?.getAttributes("link").href ?? "");
-              setToolbarLinkOpen((prev) => !prev);
-            }}
-            active={editor?.isActive("link")}
-            title="Link"
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-            </svg>
-          </ToolbarButton>
-        </div>
-        {toolbarLinkOpen ? (
-          <div className="mt-2 flex items-center gap-2">
-            <input
-              type="url"
-              autoFocus
-              value={toolbarLinkUrl}
-              onChange={(e) => setToolbarLinkUrl(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  if (toolbarLinkUrl.trim()) {
-                    editor?.chain().focus().setLink({ href: toolbarLinkUrl.trim() }).run();
-                  }
-                  setToolbarLinkOpen(false);
-                  setToolbarLinkUrl("");
-                }
-                if (e.key === "Escape") setToolbarLinkOpen(false);
-              }}
-              placeholder="https://..."
-              className="w-64 max-w-full rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand"
-            />
-            <button
-              type="button"
-              onClick={() => {
-                if (toolbarLinkUrl.trim()) {
-                  editor?.chain().focus().setLink({ href: toolbarLinkUrl.trim() }).run();
-                }
-                setToolbarLinkOpen(false);
-                setToolbarLinkUrl("");
-              }}
-              className="shrink-0 text-xs font-semibold text-emerald-600"
-            >
-              Apply
-            </button>
-            <button
-              type="button"
-              onClick={() => setToolbarLinkOpen(false)}
-              className="shrink-0 text-xs text-gray-400"
-            >
-              Cancel
-            </button>
-          </div>
-        ) : null}
-      </div>
-      ) : null}
-
-      {!canvasMode ? (
-      <div className="sticky top-0 z-10 hidden border-b border-gray-100 bg-canvas px-4 py-1.5 lg:block">
-        <span className={countClasses}>
-          {displayWordCount.toLocaleString()} words
-          {countMessage ? ` · ${countMessage}` : ""}
-        </span>
-      </div>
-      ) : null}
-
+    <div>
       <input
         ref={imageInputRef}
         type="file"
@@ -529,7 +459,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
       />
 
       {imageUploadError ? (
-        <div className="border-b border-red-100 bg-red-50 px-4 py-2 text-xs text-red-700">
+        <div role="alert" className="mb-3 rounded-lg bg-red-50 px-4 py-2 text-xs text-red-700">
           {imageUploadError}
           <button
             type="button"
@@ -541,151 +471,197 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
         </div>
       ) : null}
 
-      {editor ? (
+      {editor && variant === "article" ? (
         <BubbleMenu
           editor={editor}
-          tippyOptions={{ duration: 100, placement: "top" }}
-          shouldShow={({ from, to }) => !isTouchDevice && (bubbleLinkMode || from !== to)}
-          className="flex items-center gap-0.5 rounded-xl border border-gray-100 bg-white p-1 shadow-lg shadow-gray-900/10"
+          tippyOptions={{
+            duration: 100,
+            placement: "top",
+            onCreate: (instance) => {
+              bubbleTipRef.current = instance;
+            },
+            onClickOutside: (instance) => instance.hide(),
+            onHidden: () => {
+              setBubblePanel("marks");
+              setBubbleLinkUrl("");
+            },
+          }}
+          shouldShow={({ editor: current, from, to }) =>
+            !touchRef.current &&
+            !current.isActive("image") &&
+            (bubblePanelRef.current !== "marks" || from !== to)
+          }
         >
-          {bubbleLinkMode ? (
-            <div className="flex items-center gap-1.5 px-1">
+          {bubblePanel === "link" ? (
+            <div className="flex items-center gap-1.5 rounded-md bg-emerald-brand p-1.5 shadow-lg shadow-ink/20">
               <input
                 type="url"
                 autoFocus
                 value={bubbleLinkUrl}
-                onChange={(e) => setBubbleLinkUrl(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    if (bubbleLinkUrl.trim()) editor.chain().focus().setLink({ href: bubbleLinkUrl.trim() }).run();
-                    setBubbleLinkMode(false);
-                    setBubbleLinkUrl("");
+                onChange={(event) => setBubbleLinkUrl(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    applyLink();
                   }
-                  if (e.key === "Escape") {
-                    setBubbleLinkMode(false);
+                  if (event.key === "Escape") {
                     setBubbleLinkUrl("");
+                    setBubblePanel("marks");
+                    editor.commands.focus();
                   }
                 }}
-                placeholder="https://..."
-                className="w-44 rounded-lg border border-gray-200 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+                placeholder="https://…"
+                aria-label="Link address"
+                className="h-9 w-56 rounded border-0 bg-surface px-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold"
               />
-              <button
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  if (bubbleLinkUrl.trim()) editor.chain().focus().setLink({ href: bubbleLinkUrl.trim() }).run();
-                  setBubbleLinkMode(false);
-                  setBubbleLinkUrl("");
-                }}
-                className="text-xs font-semibold text-emerald-600"
-              >
+              <BubbleButton label="Apply link" onPress={applyLink}>
                 Apply
-              </button>
-              <button
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  setBubbleLinkMode(false);
-                  setBubbleLinkUrl("");
-                }}
-                className="text-xs text-gray-400"
-              >
-                ✕
-              </button>
+              </BubbleButton>
             </div>
           ) : (
-            <>
-              <button
-                type="button"
-                onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleBold().run(); }}
-                className={`flex h-8 w-8 items-center justify-center rounded-lg text-sm font-bold transition-colors ${editor.isActive("bold") ? "bg-emerald-100 text-emerald-700" : "text-gray-700 hover:bg-gray-100"}`}
+            <div className="relative">
+              {bubblePanel === "align" ? (
+                <div
+                  role="group"
+                  aria-label="Alignment"
+                  className="absolute bottom-full right-0 mb-2 flex items-center gap-1 rounded-lg border border-card-border bg-surface p-1 shadow-lg shadow-ink/10"
+                >
+                  {ALIGNMENT_OPTIONS.map((option) => {
+                    const pressed = editor.isActive({ textAlign: option.value });
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        aria-label={option.label}
+                        aria-pressed={pressed}
+                        title={option.label}
+                        onMouseDown={keepSelection}
+                        onClick={() => {
+                          editor.chain().focus().setTextAlign(option.value).run();
+                          setBubblePanel("marks");
+                        }}
+                        className={`flex h-9 w-9 items-center justify-center rounded-md border transition-colors ${
+                          pressed
+                            ? "border-emerald-brand bg-emerald-brand text-white"
+                            : "border-card-border text-ink-muted hover:bg-canvas hover:text-ink"
+                        }`}
+                      >
+                        <Icon path={option.icon} className="h-4 w-4" />
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+              <div
+                role="toolbar"
+                aria-label="Text formatting"
+                className="flex items-center gap-0.5 rounded-md bg-emerald-brand p-1 shadow-lg shadow-ink/20"
               >
-                B
-              </button>
-              <button
-                type="button"
-                onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleItalic().run(); }}
-                className={`flex h-8 w-8 items-center justify-center rounded-lg text-sm italic font-medium transition-colors ${editor.isActive("italic") ? "bg-emerald-100 text-emerald-700" : "text-gray-700 hover:bg-gray-100"}`}
-              >
-                I
-              </button>
-              <button
-                type="button"
-                onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleHeading({ level: 2 }).run(); }}
-                className={`flex h-8 items-center justify-center rounded-lg px-2 text-xs font-bold transition-colors ${editor.isActive("heading", { level: 2 }) ? "bg-emerald-100 text-emerald-700" : "text-gray-700 hover:bg-gray-100"}`}
-              >
-                H2
-              </button>
-              <div className="mx-0.5 h-5 w-px bg-gray-200" />
-              <button
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  if (editor.isActive("link")) {
-                    editor.chain().focus().unsetLink().run();
-                  } else {
+                <BubbleButton label="Bold" pressed={editor.isActive("bold")} onPress={() => editor.chain().focus().toggleBold().run()}>
+                  <span className="font-bold">B</span>
+                </BubbleButton>
+                <BubbleButton label="Italic" pressed={editor.isActive("italic")} onPress={() => editor.chain().focus().toggleItalic().run()}>
+                  <span className="font-serif italic">I</span>
+                </BubbleButton>
+                <BubbleButton
+                  label="Link"
+                  pressed={editor.isActive("link")}
+                  onPress={() => {
+                    if (editor.isActive("link")) {
+                      editor.chain().focus().unsetLink().run();
+                      return;
+                    }
                     setBubbleLinkUrl(editor.getAttributes("link").href ?? "");
-                    setBubbleLinkMode(true);
-                  }
-                }}
-                className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${editor.isActive("link") ? "bg-emerald-100 text-emerald-700" : "text-gray-700 hover:bg-gray-100"}`}
-                title="Link"
-              >
-                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                </svg>
-              </button>
-            </>
+                    setBubblePanel("link");
+                  }}
+                >
+                  Link
+                </BubbleButton>
+                <BubbleButton
+                  label="Heading"
+                  pressed={editor.isActive("heading", { level: 2 })}
+                  onPress={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+                >
+                  H2
+                </BubbleButton>
+                <BubbleButton
+                  label="Subheading"
+                  pressed={editor.isActive("heading", { level: 3 })}
+                  onPress={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+                >
+                  H3
+                </BubbleButton>
+                <BubbleButton label="Quote" pressed={editor.isActive("blockquote")} onPress={() => editor.chain().focus().toggleBlockquote().run()}>
+                  <span className="font-serif text-lg leading-none">&ldquo;</span>
+                </BubbleButton>
+                <BubbleButton
+                  label="Alignment"
+                  expanded={bubblePanel === "align"}
+                  onPress={() => setBubblePanel((panel) => (panel === "align" ? "marks" : "align"))}
+                >
+                  <Icon path={currentAlignment.icon} className="h-4 w-4" />
+                </BubbleButton>
+              </div>
+            </div>
           )}
         </BubbleMenu>
       ) : null}
 
-      <EditorContent
-        editor={editor}
-        className={
-          canvasMode
-            ? displayWordCount === 0
-              ? "min-h-[280px] lg:min-h-[380px]"
-              : "min-h-[430px]"
-            : "min-h-[400px]"
-        }
-      />
-
-      {canvasMode && showWordCount && displayWordCount > 0 ? (
-        <div className="pb-1 text-right text-xs text-gray-400">
-          {displayWordCount.toLocaleString()} word{displayWordCount === 1 ? "" : "s"}
-        </div>
+      {editor && variant === "article" ? (
+        <FloatingMenu
+          editor={editor}
+          tippyOptions={{
+            duration: 100,
+            placement: "left-start",
+            offset: [0, 12],
+            onCreate: (instance) => {
+              floatingTipRef.current = instance;
+            },
+            onClickOutside: (instance) => instance.hide(),
+            onHidden: () => setInsertOpen(false),
+          }}
+          shouldShow={({ view, state }) => !touchRef.current && view.hasFocus() && caretInEmptyBlock(state)}
+        >
+          <div className="relative">
+            <button
+              type="button"
+              aria-label="Insert"
+              aria-haspopup="menu"
+              aria-expanded={insertOpen}
+              onMouseDown={keepSelection}
+              onClick={() => setInsertOpen((open) => !open)}
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-card-border bg-surface text-ink-muted shadow-sm transition-colors hover:border-emerald-brand hover:text-emerald-brand"
+            >
+              <Icon path={PLUS_ICON} className="h-4 w-4" />
+            </button>
+            {insertOpen ? (
+              <div
+                role="menu"
+                aria-label="Insert"
+                className="absolute left-0 top-12 z-10 w-52 rounded-lg border border-card-border bg-surface p-1 shadow-lg shadow-ink/10"
+              >
+                {INSERT_ITEMS.map((item) => (
+                  <button
+                    key={item.value}
+                    type="button"
+                    role="menuitem"
+                    onMouseDown={keepSelection}
+                    onClick={() => runInsert(item.value)}
+                    className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-sm text-ink transition-colors hover:bg-canvas"
+                  >
+                    <Icon path={item.icon} className="h-4 w-4 text-ink-muted" />
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </FloatingMenu>
       ) : null}
+
+      <EditorContent editor={editor} />
     </div>
   );
 });
 
 export default Editor;
-
-function ToolbarButton({
-  onClick,
-  active,
-  title,
-  children,
-}: {
-  onClick: () => void;
-  active?: boolean;
-  title?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      className={`rounded px-2 py-1 text-sm font-medium transition-colors ${
-        active
-          ? "bg-emerald-brand text-white"
-          : "text-gray-600 hover:bg-gray-200"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
