@@ -35,7 +35,7 @@ describe("PublishSettingsDialog", () => {
   it("publishes from its button", () => {
     const props = open();
 
-    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    fireEvent.click(screen.getByRole("button", { name: "Publish now" }));
 
     expect(props.onPublish).toHaveBeenCalled();
   });
@@ -51,7 +51,7 @@ describe("PublishSettingsDialog", () => {
   it("says Update for a piece that is already published", () => {
     open({ isUpdate: true });
 
-    expect(screen.getByRole("button", { name: "Update" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Update now" })).toBeInTheDocument();
   });
 
   it("publishes on Cmd+Enter", () => {

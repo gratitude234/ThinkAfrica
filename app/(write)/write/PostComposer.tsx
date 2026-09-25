@@ -4,12 +4,13 @@ import dynamic from "next/dynamic";
 import { useCallback, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import Button from "@/components/ui/Button";
 import UserAvatar from "@/components/ui/UserAvatar";
-import { ArticleMark, CLOSE_ICON, IMAGE_ICON, Icon } from "@/components/editor/editorIcons";
+import { CLOSE_ICON, IMAGE_ICON, Icon } from "@/components/editor/editorIcons";
 import { hasMeaningfulContribution, type ComposerMode } from "@/lib/contribution";
 import { uploadImage } from "@/lib/uploadImage";
 import ComposerMenu from "./ComposerMenu";
 import type { ContributionDraft } from "./useContributionDraft";
-import { WRITE_PRIMARY_BUTTON, WRITE_TEXT_BUTTON } from "./writeStyles";
+import WriteHeader, { writeStatus } from "./WriteHeader";
+import { WRITE_PRIMARY_BUTTON } from "./writeStyles";
 
 const Editor = dynamic(() => import("@/components/editor/Editor"), {
   ssr: false,
@@ -24,9 +25,11 @@ export interface PostComposerProps {
   authorName: string;
   avatarUrl: string | null;
   username: string | null;
+  /** /write sits under the app navigation from md up. /edit has none. */
+  hasAppNav: boolean;
   /** Shown above the byline: the device recovery notice. */
   notice?: ReactNode;
-  onCancel: () => void;
+  onBack: () => void;
   onDiscard: () => void;
   onSwitchToArticle: () => void;
   withCompleteProfile: (next: () => void) => void;
@@ -43,8 +46,9 @@ export default function PostComposer({
   authorName,
   avatarUrl,
   username,
+  hasAppNav,
   notice,
-  onCancel,
+  onBack,
   onDiscard,
   onSwitchToArticle,
   withCompleteProfile,
@@ -59,8 +63,6 @@ export default function PostComposer({
   const canPost = hasText && !imageUploading && !draft.publishing;
   const canSaveDraft = hasMeaningfulContribution(snapshot);
   const canDiscard = isEdit ? Boolean(draft.editDraftId) : Boolean(draft.draftId) || canSaveDraft;
-  const statusLabel = imageUploading ? "Adding image…" : draft.saveLabel;
-  const statusIsError = !imageUploading && draft.saveState === "error";
 
   // A Post's one image is its cover_image_url, which the feed card and the
   // Post page already show. Switching to the Article editor makes it the cover.
@@ -99,34 +101,20 @@ export default function PostComposer({
     }
   };
 
+  const heading = isEdit ? "Edit post" : "New post";
+  const status = writeStatus(draft, imageUploading);
+
   return (
-    // From md up the page sits under the app navigation, so it fills what is
-    // left of the screen rather than a whole screen's height below it.
-    <div className="min-h-dvh bg-surface md:min-h-[calc(100dvh-var(--app-nav-height))] md:bg-canvas md:px-4 md:pb-16 md:pt-14">
-      <section
-        aria-labelledby="post-composer-title"
-        onKeyDownCapture={onKeyDownCapture}
-        className="flex min-h-dvh flex-col bg-surface text-ink md:mx-auto md:min-h-0 md:max-w-[560px] md:rounded-2xl md:border md:border-card-border md:shadow-[0_10px_30px_-12px_rgba(26,26,26,0.18)]"
-      >
-        {/* A phone: Cancel, the title centred, the actions, and the status on
-            a line of its own. From md up the status sits beside the menu. */}
-        <header className="sticky top-0 z-20 grid grid-cols-[1fr_auto_1fr] items-center border-b border-divider bg-surface px-2 pt-1 md:static md:flex md:gap-2 md:rounded-t-2xl md:px-4 md:py-2">
-          <button type="button" onClick={onCancel} className={`${WRITE_TEXT_BUTTON} justify-self-start`}>
-            Cancel
-          </button>
-          <h1 id="post-composer-title" className="text-center text-[15px] font-semibold text-ink md:flex-1">
-            {isEdit ? "Edit post" : "New post"}
-          </h1>
-          {/* One status region at every size. */}
-          <p
-            aria-live="polite"
-            className={`order-last col-span-3 min-h-5 truncate px-2 pb-1.5 text-xs md:order-none md:max-w-[10rem] md:px-0 md:pb-0 md:text-right ${
-              statusIsError ? "text-red-600" : "text-ink-muted"
-            }`}
-          >
-            {statusLabel}
-          </p>
-          <div className="flex items-center gap-1 justify-self-end">
+    // Full page at every size, like the Article editor: /write has nothing
+    // behind it that a floating card could sit over.
+    <div className="min-h-dvh bg-canvas text-ink md:min-h-[calc(100dvh-var(--app-nav-height))]">
+      <section aria-label={heading} onKeyDownCapture={onKeyDownCapture}>
+        <WriteHeader
+          status={status}
+          onBack={onBack}
+          hasAppNav={hasAppNav}
+          heading={heading}
+          menu={
             <ComposerMenu
               onOpenDrafts={username ? () => void draft.requestClose(`/${username}?tab=drafts`) : undefined}
               canSaveDraft={canSaveDraft}
@@ -135,6 +123,8 @@ export default function PostComposer({
               canDiscard={canDiscard}
               onDiscard={onDiscard}
             />
+          }
+          primary={
             <Button
               type="button"
               onClick={postNow}
@@ -144,10 +134,10 @@ export default function PostComposer({
             >
               {isEdit ? "Update" : "Post"}
             </Button>
-          </div>
-        </header>
+          }
+        />
 
-        <div className="flex-1 px-4 pb-24 pt-4 md:px-5 md:pb-5 md:pt-5">
+        <main className="mx-auto w-full max-w-[680px] px-5 pb-28 pt-5 sm:px-8 md:pb-16 md:pt-10">
           {notice}
           <div className="flex items-center gap-2.5">
             <UserAvatar name={authorName} src={avatarUrl} size={32} className="shrink-0" />
@@ -168,7 +158,7 @@ export default function PostComposer({
           </div>
 
           {snapshot.coverImageUrl ? (
-            <figure className="relative mt-4 overflow-hidden rounded-xl bg-canvas">
+            <figure className="relative mt-4 overflow-hidden rounded-xl bg-surface">
               {/* At its natural shape, not cropped: a Post's image is often a
                   screenshot or a chart, and cropping loses the point of it. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -196,10 +186,11 @@ export default function PostComposer({
             </p>
           ) : null}
 
-          {/* The image button: a row inside the card from md up, and a bar on
-              the keyboard on a phone. */}
+          {/* One row under the writing, the same at every size: the image on
+              the left, the way to an Article on the right. From md up it
+              follows the text, and on a phone it rides the keyboard. */}
           <div
-            className="fixed inset-x-0 z-20 flex items-center border-t border-divider bg-surface px-2 py-0.5 md:static md:mt-3 md:border-0 md:bg-transparent md:p-0"
+            className="fixed inset-x-0 z-20 flex items-center justify-between gap-2 border-t border-divider bg-canvas px-3 py-0.5 md:static md:mt-4 md:border-0 md:bg-transparent md:p-0"
             style={{ bottom: "calc(env(safe-area-inset-bottom) + var(--mobile-visual-viewport-bottom, 0px))" }}
           >
             <button
@@ -207,9 +198,10 @@ export default function PostComposer({
               onClick={() => fileInputRef.current?.click()}
               disabled={imageUploading}
               aria-label={snapshot.coverImageUrl ? "Replace image" : "Add image"}
-              className="-ml-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-emerald-ink transition-colors hover:bg-green-wash disabled:opacity-40 md:-ml-3"
+              className="-ml-2 flex min-h-11 shrink-0 items-center gap-2 rounded-md px-2 text-sm font-semibold text-emerald-ink transition-colors hover:bg-green-wash disabled:opacity-40"
             >
-              <Icon path={IMAGE_ICON} />
+              <Icon path={IMAGE_ICON} className="h-5 w-5" />
+              Image
             </button>
             <input
               ref={fileInputRef}
@@ -222,23 +214,15 @@ export default function PostComposer({
                 if (file) void attachImage(file);
               }}
             />
+            <button
+              type="button"
+              onClick={onSwitchToArticle}
+              className="-mr-2 flex min-h-11 shrink-0 items-center rounded-md px-2 text-sm text-ink-muted underline-offset-4 transition-colors hover:text-ink hover:underline"
+            >
+              Write an article instead
+            </button>
           </div>
-
-          <button
-            type="button"
-            onClick={onSwitchToArticle}
-            className="mt-4 flex min-h-11 w-full items-center gap-3 rounded-lg bg-divider/50 px-3 py-2 text-left transition-colors hover:bg-divider/80 md:mt-3"
-          >
-            <ArticleMark />
-            <span className="min-w-0">
-              <span className="block text-sm font-semibold leading-tight text-ink">Article</span>
-              {/* On a phone, once there is writing, the card gives the room back to it. */}
-              <span className={`text-xs text-ink-muted ${hasText ? "hidden md:inline" : ""}`}>
-                Write something in depth
-              </span>
-            </span>
-          </button>
-        </div>
+        </main>
       </section>
     </div>
   );

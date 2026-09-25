@@ -197,8 +197,9 @@ export default function UniversalComposer({
           authorName={authorName}
           avatarUrl={avatarUrl}
           username={username}
+          hasAppNav={!isEdit}
           notice={notice}
-          onCancel={() => void draft.requestClose()}
+          onBack={() => void draft.requestClose()}
           onDiscard={openDiscard}
           onSwitchToArticle={switchToArticle}
           withCompleteProfile={withCompleteProfile}

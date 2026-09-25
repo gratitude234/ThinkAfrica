@@ -24,6 +24,17 @@ describe("ComposerMenu", () => {
     expect(screen.getByRole("menu", { name: "More options" })).toBeInTheDocument();
   });
 
+  it("offers the preview first when there is one", () => {
+    const { props, unmount } = openMenu({ onPreview: vi.fn() });
+    expect(screen.getAllByRole("menuitem")[0]).toHaveAccessibleName("Preview");
+    fireEvent.click(screen.getByRole("menuitem", { name: "Preview" }));
+    expect(props.onPreview).toHaveBeenCalled();
+    unmount();
+
+    openMenu();
+    expect(screen.queryByRole("menuitem", { name: "Preview" })).not.toBeInTheDocument();
+  });
+
   it("offers sources with their count, then hands focus back to the button", () => {
     const { props } = openMenu({ sourcesCount: 2, onOpenSources: vi.fn(), onOpenHistory: vi.fn() });
 

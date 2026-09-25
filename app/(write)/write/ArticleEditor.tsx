@@ -6,7 +6,7 @@ import Button from "@/components/ui/Button";
 import CoverImageUploader from "@/components/ui/CoverImageUploader";
 import ReferencesPanel from "@/components/post/ReferencesPanel";
 import type { EditorHandle, SelectedImage } from "@/components/editor/Editor";
-import { BACK_ICON, CLOSE_ICON, Icon } from "@/components/editor/editorIcons";
+import { CLOSE_ICON, Icon } from "@/components/editor/editorIcons";
 import { hasMeaningfulContribution, type ComposerMode } from "@/lib/contribution";
 import ArticleMobileToolbar, { NO_FORMATS, type FormatState } from "./ArticleMobileToolbar";
 import ArticlePreview from "./ArticlePreview";
@@ -17,7 +17,8 @@ import RevisionHistory, { type RestoredRevision } from "./RevisionHistory";
 import type { ContributionDraft } from "./useContributionDraft";
 import { useModalFocus } from "./useModalFocus";
 import WriteSheet from "./WriteSheet";
-import { WRITE_PRIMARY_BUTTON } from "./writeStyles";
+import WriteHeader, { writeStatus } from "./WriteHeader";
+import { WRITE_OUTLINE_BUTTON, WRITE_PRIMARY_BUTTON } from "./writeStyles";
 
 const Editor = dynamic(() => import("@/components/editor/Editor"), {
   ssr: false,
@@ -44,17 +45,17 @@ export interface ArticleEditorProps {
 
 type Sheet = "sources" | "history" | null;
 /** What the writer last pressed before the piece was ready for it. */
-type Nudge = "continue" | "preview" | null;
+type Nudge = "publish" | "preview" | null;
 
 function sameFormats(left: FormatState, right: FormatState) {
   return (Object.keys(left) as Array<keyof FormatState>).every((key) => left[key] === right[key]);
 }
 
 /**
- * The long-form screen: a cover, a required title and a rich body, set in the
- * live article page's type. Formatting is a selection toolbar and a "+" menu
- * on a desktop, and a toolbar on the keyboard on a phone. Continue opens
- * Publish settings.
+ * The long-form screen: a required title, a cover and a rich body, set in the
+ * live article page's type and in the order the published page shows them.
+ * Formatting is a selection toolbar and a "+" menu on a desktop, and a
+ * toolbar on the keyboard on a phone. Publish opens Publish settings.
  */
 export default function ArticleEditor({
   draft,
@@ -88,21 +89,15 @@ export default function ArticleEditor({
   const hasTitle = Boolean(snapshot.title.trim());
   const hasBody = Boolean(draft.bodyText);
   const uploading = imageUploading || coverUploading;
-  const canContinue = hasTitle && hasBody && !uploading;
-  // Continue and Preview stay pressable when the piece is not ready, and a
+  const canPublish = hasTitle && hasBody && !uploading;
+  // Publish and Preview stay pressable when the piece is not ready, and a
   // press says what is missing next to the field that is missing it. A button
   // that only turns grey tells a new writer nothing.
-  const missingTitle = !hasTitle && (hasBody || nudge === "continue");
+  const missingTitle = !hasTitle && (hasBody || nudge === "publish");
   const missingBody = !hasBody && nudge !== null;
   const canSaveDraft = hasMeaningfulContribution(snapshot);
   const canDiscard = isEdit ? Boolean(draft.editDraftId) : Boolean(draft.draftId) || canSaveDraft;
-  // An upload outranks the save state. It is the one the writer just started
-  // by hand, and a pasted photo gives no other sign until it lands.
-  const statusLabel = uploading ? "Adding image…" : draft.saveLabel;
-  const statusIsError = !uploading && draft.saveState === "error";
-  // "idle" with a label is a published edit whose changes the account holds.
-  const statusIsSaved =
-    !uploading && (draft.saveState === "cloud" || (draft.saveState === "idle" && Boolean(draft.saveLabel)));
+  const status = writeStatus(draft, uploading);
 
   const closeSheet = useCallback(() => setSheet(null), []);
   const closePublish = useCallback(() => setShowPublish(false), []);
@@ -176,114 +171,77 @@ export default function ArticleEditor({
     [setSnapshot]
   );
 
+  const openPreview = () => {
+    if (!hasBody) {
+      setNudge("preview");
+      editorRef.current?.focus();
+      return;
+    }
+    setShowPreview(true);
+  };
+
+  const openPublish = () => {
+    if (!hasTitle || !hasBody) {
+      setNudge("publish");
+      if (!hasTitle) titleRef.current?.focus();
+      else editorRef.current?.focus();
+      return;
+    }
+    withCompleteProfile(() => setShowPublish(true));
+  };
+
   return (
     <div className="min-h-dvh bg-canvas text-ink md:min-h-[calc(100dvh-var(--app-nav-height))]">
-      <header
-        className={`sticky z-30 border-b border-divider bg-canvas/95 backdrop-blur ${
-          hasAppNav ? "top-0 md:top-[var(--app-nav-height)]" : "top-0"
-        }`}
-      >
-        {/* A phone: Back, then the actions, with the status on its own row.
-            From md up: Back, the status centred, the actions on the right. */}
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-1 px-2 py-1 sm:px-4 md:grid md:grid-cols-[1fr_auto_1fr] md:gap-x-4 md:px-8 md:py-2">
+      <WriteHeader
+        status={status}
+        onBack={onBack}
+        hasAppNav={hasAppNav}
+        heading={isEdit ? "Edit article" : "New article"}
+        menu={
+          <ComposerMenu
+            onPreview={openPreview}
+            sourcesCount={snapshot.references.length}
+            onOpenSources={() => setSheet("sources")}
+            onOpenHistory={!isEdit && draft.draftId ? () => setSheet("history") : undefined}
+            onOpenDrafts={username ? () => void draft.requestClose(`/${username}?tab=drafts`) : undefined}
+            canSaveDraft={canSaveDraft}
+            onSaveDraft={() => void draft.flush({ force: true })}
+            discardLabel={isEdit ? "Discard changes" : "Discard"}
+            canDiscard={canDiscard}
+            onDiscard={onDiscard}
+          />
+        }
+        secondary={
           <button
             type="button"
-            onClick={onBack}
-            className="flex min-h-11 items-center gap-1.5 justify-self-start rounded-md px-2 text-sm text-ink-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand"
+            onClick={openPreview}
+            aria-disabled={!hasBody || undefined}
+            aria-describedby={missingBody ? "article-body-required" : undefined}
+            className={`${WRITE_OUTLINE_BUTTON} aria-disabled:border-divider aria-disabled:text-ink-muted/60 aria-disabled:hover:bg-transparent`}
           >
-            <Icon path={BACK_ICON} className="h-4 w-4" />
-            Back
+            Preview
           </button>
-          {/* One status region at every size: its own row on a phone, centred
-              between Back and the actions from md up. */}
-          <p
-            aria-live="polite"
-            className={`order-last flex min-h-5 w-full min-w-0 items-center gap-1.5 truncate px-2 pb-1 text-xs md:order-none md:w-auto md:justify-center md:pb-0 ${
-              statusIsError ? "text-red-600" : "text-ink-muted"
-            }`}
+        }
+        primary={
+          <Button
+            type="button"
+            onClick={openPublish}
+            // An image still uploading is the one wait that explains itself:
+            // the status already says "Adding image…".
+            disabled={uploading}
+            aria-disabled={!canPublish || undefined}
+            aria-describedby={
+              missingTitle ? "article-title-required" : missingBody ? "article-body-required" : undefined
+            }
+            className={WRITE_PRIMARY_BUTTON}
           >
-            {statusLabel ? (
-              // Green once the account has it, red when it failed, grey while
-              // it is on its way. Gold read as a warning on every keystroke.
-              <span
-                aria-hidden="true"
-                className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                  statusIsError ? "bg-red-600" : statusIsSaved ? "bg-emerald-brand" : "bg-ink-muted/50"
-                }`}
-              />
-            ) : null}
-            {statusLabel}
-          </p>
-          <div className="ml-auto flex items-center gap-1 md:ml-0 md:gap-2 md:justify-self-end">
-            <ComposerMenu
-              sourcesCount={snapshot.references.length}
-              onOpenSources={() => setSheet("sources")}
-              onOpenHistory={!isEdit && draft.draftId ? () => setSheet("history") : undefined}
-              onOpenDrafts={username ? () => void draft.requestClose(`/${username}?tab=drafts`) : undefined}
-              canSaveDraft={canSaveDraft}
-              onSaveDraft={() => void draft.flush({ force: true })}
-              discardLabel={isEdit ? "Discard changes" : "Discard"}
-              canDiscard={canDiscard}
-              onDiscard={onDiscard}
-            />
-            <button
-              type="button"
-              onClick={() => {
-                if (!hasBody) {
-                  setNudge("preview");
-                  editorRef.current?.focus();
-                  return;
-                }
-                setShowPreview(true);
-              }}
-              aria-disabled={!hasBody || undefined}
-              aria-describedby={missingBody ? "article-body-required" : undefined}
-              className="flex min-h-11 shrink-0 items-center justify-center rounded-md px-3 text-sm font-semibold text-emerald-ink transition-colors hover:bg-green-wash aria-disabled:text-ink-muted/60 aria-disabled:hover:bg-transparent md:border md:border-emerald-brand md:px-4 md:aria-disabled:border-divider"
-            >
-              Preview
-            </button>
-            <Button
-              type="button"
-              onClick={() => {
-                if (!hasTitle || !hasBody) {
-                  setNudge("continue");
-                  if (!hasTitle) titleRef.current?.focus();
-                  else editorRef.current?.focus();
-                  return;
-                }
-                withCompleteProfile(() => setShowPublish(true));
-              }}
-              // An image still uploading is the one wait that explains itself:
-              // the status already says "Adding image…".
-              disabled={uploading}
-              aria-disabled={!canContinue || undefined}
-              aria-describedby={
-                missingTitle ? "article-title-required" : missingBody ? "article-body-required" : undefined
-              }
-              className={WRITE_PRIMARY_BUTTON}
-            >
-              {isEdit ? "Update Article" : "Continue"}
-            </Button>
-          </div>
-        </div>
-      </header>
+            {isEdit ? "Update" : "Publish"}
+          </Button>
+        }
+      />
 
       <main className="mx-auto w-full max-w-[680px] px-5 pb-40 pt-5 sm:px-8 md:pb-28 md:pt-10">
         {notice}
-        <div className="mb-6">
-          {/* Keyed on the address so a cover restored from a device copy, or
-              carried over from a Post, shows at full size once it exists. */}
-          <CoverImageUploader
-            key={snapshot.coverImageUrl}
-            initialUrl={snapshot.coverImageUrl || undefined}
-            onUpload={(coverImageUrl) => setSnapshot((current) => ({ ...current, coverImageUrl }))}
-            onRemove={() => setSnapshot((current) => ({ ...current, coverImageUrl: "" }))}
-            onUploadingChange={setCoverUploading}
-            variant={snapshot.coverImageUrl ? "dropzone" : "compact"}
-            previewHeightClass="aspect-[16/9] h-auto"
-            emptyTitle="Add cover"
-          />
-        </div>
         <textarea
           ref={titleRef}
           autoFocus={autoFocusTitle}
@@ -304,13 +262,28 @@ export default function ArticleEditor({
           placeholder="Title"
           aria-label="Title"
           aria-describedby={missingTitle ? "article-title-required" : undefined}
-          className="publication-article-title block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-[32px] font-semibold leading-[1.16] tracking-[-0.01em] text-ink outline-none placeholder:text-ink-muted/35 sm:text-[44px]"
+          className="publication-article-title block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-[32px] font-semibold leading-[1.16] tracking-[-0.01em] text-ink outline-none placeholder:text-ink-muted/60 sm:text-[44px]"
         />
         {missingTitle ? (
           <p id="article-title-required" aria-live="polite" className="mt-2 text-sm text-red-600">
-            Add a title to continue. An Article needs one, a Post never does.
+            Add a title to publish. An Article needs one, a Post never does.
           </p>
         ) : null}
+        {/* Below the title, where the published page shows it. Keyed on the
+            address so a cover restored from a device copy, or carried over
+            from a Post, shows at full size once it exists. */}
+        <div className="mt-5">
+          <CoverImageUploader
+            key={snapshot.coverImageUrl}
+            initialUrl={snapshot.coverImageUrl || undefined}
+            onUpload={(coverImageUrl) => setSnapshot((current) => ({ ...current, coverImageUrl }))}
+            onRemove={() => setSnapshot((current) => ({ ...current, coverImageUrl: "" }))}
+            onUploadingChange={setCoverUploading}
+            variant={snapshot.coverImageUrl ? "dropzone" : "compact"}
+            previewHeightClass="aspect-[16/9] h-auto"
+            emptyTitle="Add cover"
+          />
+        </div>
         <div className="mt-6 sm:mt-8">
           <Editor
             ref={editorRef}
@@ -327,7 +300,7 @@ export default function ArticleEditor({
           />
           {missingBody ? (
             <p id="article-body-required" aria-live="polite" className="mt-3 text-sm text-red-600">
-              {nudge === "preview" ? "Write something here to preview it." : "Write something here to continue."}
+              {nudge === "preview" ? "Write something here to preview it." : "Write something here to publish."}
             </p>
           ) : null}
         </div>
@@ -366,7 +339,7 @@ export default function ArticleEditor({
         error={draft.publishError}
         publishing={draft.publishing}
         isUpdate={isEdit}
-        canPublish={canContinue}
+        canPublish={canPublish}
         onPublish={() => void draft.publish()}
       />
 

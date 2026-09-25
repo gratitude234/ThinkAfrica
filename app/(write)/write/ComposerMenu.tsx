@@ -11,6 +11,8 @@ export interface ComposerMenuProps {
   canDiscard: boolean;
   onDiscard: () => void;
   onOpenDrafts?: () => void;
+  /** The reader preview. A header button from md up, and in this menu at every size. */
+  onPreview?: () => void;
   sourcesCount?: number;
   onOpenSources?: () => void;
   onOpenHistory?: () => void;
@@ -30,8 +32,8 @@ const ITEM_SELECTOR = '[role="menuitem"]:not([aria-disabled="true"])';
 
 /**
  * The ••• menu on both write screens. What is not given is not shown: the Post
- * composer passes no sources or history, and the Article editor passes
- * history only for a draft the account holds.
+ * composer passes no preview, sources or history, and the Article editor
+ * passes history only for a draft the account holds.
  */
 export default function ComposerMenu({
   canSaveDraft,
@@ -40,6 +42,7 @@ export default function ComposerMenu({
   canDiscard,
   onDiscard,
   onOpenDrafts,
+  onPreview,
   sourcesCount = 0,
   onOpenSources,
   onOpenHistory,
@@ -66,6 +69,7 @@ export default function ComposerMenu({
   }, [close, open]);
 
   const items: MenuItem[] = [];
+  if (onPreview) items.push({ key: "preview", label: "Preview", onSelect: onPreview });
   if (onOpenSources) {
     items.push({
       key: "sources",

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ContributionSnapshot } from "@/lib/contribution";
@@ -30,7 +30,8 @@ function renderComposer(
     authorName: "Ada",
     avatarUrl: null,
     username: "ada",
-    onCancel: vi.fn(),
+    hasAppNav: true,
+    onBack: vi.fn(),
     onDiscard: vi.fn(),
     onSwitchToArticle: vi.fn(),
     withCompleteProfile: vi.fn((next: () => void) => next()),
@@ -90,12 +91,12 @@ describe("PostComposer", () => {
     expect(editorSawIt).not.toHaveBeenCalled();
   });
 
-  it("cancels through the root", () => {
+  it("goes Back through the root", () => {
     const { props } = renderComposer(text);
 
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
 
-    expect(props.onCancel).toHaveBeenCalled();
+    expect(props.onBack).toHaveBeenCalled();
   });
 
   it("says Edit post and Update for a published Post", () => {
@@ -156,7 +157,7 @@ describe("PostComposer", () => {
       fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [photo] } });
     });
     expect(screen.getByRole("button", { name: "Post" })).toBeDisabled();
-    expect(screen.getByText("Adding image…")).toBeInTheDocument();
+    expect(screen.getByText("Adding image…", { selector: "[aria-live]" })).toBeInTheDocument();
 
     await act(async () => finish({ ok: true, url: "https://cdn.example/photo.png" }));
     expect(screen.getByRole("button", { name: "Post" })).toBeEnabled();
@@ -184,20 +185,26 @@ describe("PostComposer", () => {
     expect(draft.requestClose).toHaveBeenCalledWith("/ada?tab=drafts");
   });
 
-  it("switches to the Article editor from the Article card", () => {
+  it("switches to the Article editor from a quiet link beside the image button", () => {
     const { props } = renderComposer(text);
 
-    fireEvent.click(screen.getByRole("button", { name: /^Article/ }));
+    const imageButton = screen.getByRole("button", { name: "Add image" });
+    const articleLink = screen.getByRole("button", { name: "Write an article instead" });
+    // One row, the same order at every size: the image first, then the Article.
+    expect(imageButton.parentElement).toBe(articleLink.parentElement);
+    expect(imageButton.compareDocumentPosition(articleLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(imageButton).toHaveTextContent("Image");
 
+    fireEvent.click(articleLink);
     expect(props.onSwitchToArticle).toHaveBeenCalled();
   });
 
-  it("shrinks the Article card on a phone once there is writing", () => {
-    const { unmount } = renderComposer();
-    expect(screen.getByText("Write something in depth")).not.toHaveClass("hidden");
-    unmount();
+  it("is a full page under the shared header, not a floating card", () => {
+    renderComposer();
 
-    renderComposer(text);
-    expect(screen.getByText("Write something in depth")).toHaveClass("hidden", "md:inline");
+    const section = screen.getByRole("region", { name: "New post" });
+    expect(section.className).not.toContain("rounded-2xl");
+    expect(within(section).getByRole("button", { name: "Back" })).toBeInTheDocument();
+    expect(within(section).getByRole("button", { name: "More options" })).toBeInTheDocument();
   });
 });
