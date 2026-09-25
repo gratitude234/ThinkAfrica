@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
-import { fetchCommentPage } from "@/lib/commentThread";
+import { fetchCommentPage, type CommentPage } from "@/lib/commentThread";
 import CommentThread from "./CommentThread";
+import CommentsUnavailable from "./CommentsUnavailable";
 
 interface Props {
   readOnly?: boolean;
@@ -27,11 +28,19 @@ export default async function CommentsLoader({
 }: Props) {
   const supabase = await createClient();
 
-  const page = await fetchCommentPage(supabase, {
-    postId,
-    viewerId: userId,
-    viewerProfileId: userProfileId,
-  });
+  // The comments are the last thing on the page and the least essential. A
+  // query that times out here must not take the article down with it.
+  let page: CommentPage;
+  try {
+    page = await fetchCommentPage(supabase, {
+      postId,
+      viewerId: userId,
+      viewerProfileId: userProfileId,
+    });
+  } catch (error) {
+    console.error("[post] comments did not load", error);
+    return <CommentsUnavailable />;
+  }
 
   return (
     <CommentThread
