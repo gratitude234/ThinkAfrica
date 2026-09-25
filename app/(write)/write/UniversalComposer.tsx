@@ -195,7 +195,6 @@ export default function UniversalComposer({
     snapshot,
     setSnapshot,
     saveState,
-    saveError,
     saveLabel: savedLabel,
     recovery,
     restoreRecovery,
@@ -209,6 +208,7 @@ export default function UniversalComposer({
     closeLeave,
     publish: finishPublication,
     publishing,
+    publishError,
     discardDraft,
     bodyText,
     wordCount,
@@ -729,7 +729,7 @@ export default function UniversalComposer({
               </div>
             </div>
 
-            {saveError ? <p role="alert" className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{saveError}</p> : null}
+            {publishError ? <p role="alert" className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{publishError}</p> : null}
             <Button type="button" size="lg" loading={publishing} disabled={!bodyText || coverUploading} onClick={() => void finishPublication()} className="mt-7 min-h-12 w-full rounded-full">
               {mode === "published-edit" ? "Update now" : "Publish now"}
             </Button>

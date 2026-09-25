@@ -15,6 +15,7 @@ import {
   discardPublishedEditDraft,
   savePublishedEditDraft,
 } from "./editActions";
+import { deleteOwnDraftPosts } from "./deleteActions";
 
 /**
  * Everything the composer does that is not drawing a screen: the working copy,
@@ -118,7 +119,13 @@ export function useContributionDraft({
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [recovery, setRecovery] = useState<{ snapshot: ContributionSnapshot; key: string } | null>(null);
-  const [showLeave, setShowLeave] = useState(false);
+  // Where the writer was going when the account save failed, so "Leave with
+  // device copy" goes there rather than always to returnTo.
+  const [leaveTarget, setLeaveTarget] = useState<string | null>(null);
+  const [discarding, setDiscarding] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
+  // Set while a discard runs. An autosave now would recreate what it deletes.
+  const discardedRef = useRef(false);
   const [publishing, setPublishing] = useState(false);
   const localTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cloudTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -231,6 +238,7 @@ export function useContributionDraft({
       const operation = saveQueueRef.current
         .catch(() => undefined)
         .then(async () => {
+          if (discardedRef.current) return;
           if (mode === "published-edit") {
             if (!publishedPostId) throw new Error("This publication cannot be edited.");
             const result = await savePublishedEditDraft({ postId: publishedPostId, snapshot: next });
@@ -275,6 +283,7 @@ export function useContributionDraft({
 
   useEffect(() => {
     latestRef.current = snapshot;
+    if (discardedRef.current) return;
     if (snapshotsMatch(snapshot, lastPersistedRef.current)) return;
     const revision = ++revisionRef.current;
     if (localTimerRef.current) clearTimeout(localTimerRef.current);
@@ -301,39 +310,50 @@ export function useContributionDraft({
     };
   }, [persist, snapshot]);
 
-  const flush = useCallback(async () => {
-    if (localTimerRef.current) clearTimeout(localTimerRef.current);
-    if (cloudTimerRef.current) clearTimeout(cloudTimerRef.current);
-    const current = latestRef.current;
-    // Below the cloud bar there is nothing to flush, and reporting that as a
-    // failed save would raise the "didn't save" dialog over three characters.
-    // The device copy still holds them.
-    if (!deservesCloudDraft(current) || snapshotsMatch(current, lastPersistedRef.current)) {
-      return true;
-    }
-    const revision = ++revisionRef.current;
-    await persist(current, revision);
-    await saveQueueRef.current;
-    return snapshotsMatch(current, lastPersistedRef.current);
-  }, [persist]);
+  const flush = useCallback(
+    async (options: { force?: boolean } = {}) => {
+      if (localTimerRef.current) clearTimeout(localTimerRef.current);
+      if (cloudTimerRef.current) clearTimeout(cloudTimerRef.current);
+      const current = latestRef.current;
+      // Below the cloud bar there is nothing to flush, and reporting that as a
+      // failed save would raise the "didn't save" dialog over three characters.
+      // The device copy still holds them. Save draft is the deliberate act that
+      // bar waits for, so a forced save only needs something written.
+      const worthSaving = options.force
+        ? hasMeaningfulContribution(current)
+        : deservesCloudDraft(current);
+      if (!worthSaving || snapshotsMatch(current, lastPersistedRef.current)) {
+        return true;
+      }
+      const revision = ++revisionRef.current;
+      await persist(current, revision);
+      await saveQueueRef.current;
+      return snapshotsMatch(current, lastPersistedRef.current);
+    },
+    [persist]
+  );
 
-  const navigateAway = useCallback(() => router.push(returnTo), [returnTo, router]);
-  const closeLeave = useCallback(() => setShowLeave(false), []);
+  const showLeave = leaveTarget !== null;
+  const navigateAway = useCallback(
+    () => router.push(leaveTarget ?? returnTo),
+    [leaveTarget, returnTo, router]
+  );
+  const closeLeave = useCallback(() => setLeaveTarget(null), []);
 
-  const requestClose = async () => {
+  const requestClose = async (destination: string = returnTo) => {
     if (!hasMeaningfulContribution(snapshot)) {
-      navigateAway();
+      router.push(destination);
       return;
     }
     const saved = await flush();
-    if (saved) navigateAway();
-    else setShowLeave(true);
+    if (saved) router.push(destination);
+    else setLeaveTarget(destination);
   };
 
   const publish = async () => {
     if (!contributionText(snapshot.content)) return;
     setPublishing(true);
-    setSaveError(null);
+    setPublishError(null);
     try {
       if (mode === "published-edit") {
         let targetEditDraftId = editDraftIdRef.current;
@@ -361,7 +381,7 @@ export function useContributionDraft({
         router.replace(`/post/${result.slug}?justPublished=1`);
       }
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : "We couldn't finish this publication.");
+      setPublishError(error instanceof Error ? error.message : "We couldn't finish this publication.");
       setPublishing(false);
     }
   };
@@ -383,14 +403,37 @@ export function useContributionDraft({
   };
 
   const discardDraft = async () => {
-    if (!editDraftIdRef.current) return;
-    const result = await discardPublishedEditDraft({ editDraftId: editDraftIdRef.current });
-    if (result.error) {
-      setSaveError(result.error);
-      return;
+    if (localTimerRef.current) clearTimeout(localTimerRef.current);
+    if (cloudTimerRef.current) clearTimeout(cloudTimerRef.current);
+    discardedRef.current = true;
+    setDiscarding(true);
+    setSaveError(null);
+    // An autosave already in flight may be creating the draft at this moment.
+    // Waiting for it means the id deleted below is the one it created.
+    await saveQueueRef.current.catch(() => undefined);
+
+    let error: string | null = null;
+    if (mode === "published-edit") {
+      if (editDraftIdRef.current) {
+        error = (await discardPublishedEditDraft({ editDraftId: editDraftIdRef.current })).error;
+      }
+    } else if (draftIdRef.current) {
+      const result = await deleteOwnDraftPosts({ postIds: [draftIdRef.current] });
+      if (!result.ok) error = result.error;
+    }
+
+    if (error) {
+      discardedRef.current = false;
+      if (mountedRef.current) {
+        setSaveState("error");
+        setSaveError(error);
+        setDiscarding(false);
+      }
+      return false;
     }
     localStorage.removeItem(localKeyRef.current);
-    router.push(`/post/${publishedSlug}`);
+    router.push(mode === "published-edit" ? `/post/${publishedSlug}` : returnTo);
+    return true;
   };
 
   // "Saved" is the resting state. Only the device-only case earns more words,
@@ -430,7 +473,9 @@ export function useContributionDraft({
     closeLeave,
     publish,
     publishing,
+    publishError,
     discardDraft,
+    discarding,
     bodyText,
     wordCount,
   };
