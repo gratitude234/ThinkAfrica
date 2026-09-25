@@ -1,7 +1,8 @@
 import "server-only";
 
 import { cache } from "react";
-import type { User } from "@supabase/supabase-js";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
+import { AuthUnavailableError, isRetryableAuthFailure } from "@/lib/supabase/authFailure";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -30,3 +31,23 @@ export const getCurrentUser = cache(loadCurrentUser);
 
 /** The uncached implementation, for tests. */
 export { loadCurrentUser as loadCurrentUserUncached };
+
+/**
+ * The signed-in user, for a page that sends everyone else to sign in.
+ *
+ * `getUser()` answers "no user" both for a visitor with no session and for a
+ * session Auth did not get round to checking, and redirecting on the second
+ * signs a member out because Supabase was slow. Here no session is null, and
+ * an Auth server that did not answer throws, so the route's error boundary
+ * offers a retry and the session cookie is left alone.
+ */
+export async function getUserForProtectedPage(
+  supabase: Pick<SupabaseClient, "auth">
+): Promise<User | null> {
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+  if (error && isRetryableAuthFailure(error)) throw new AuthUnavailableError(error);
+  return user ?? null;
+}

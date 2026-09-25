@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getUserForProtectedPage } from "@/lib/serverAuth";
 import UniversalComposer from "@/app/(write)/write/UniversalComposer";
 import { isWrittenExcerpt, type ContributionSnapshot } from "@/lib/contribution";
 import type { PostReferenceRecord } from "@/lib/types";
@@ -21,9 +22,7 @@ export default async function EditPage({ params }: PageProps) {
   const { slug } = await params;
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getUserForProtectedPage(supabase);
 
   if (!user) redirect(`/login?redirectTo=/edit/${slug}`);
 

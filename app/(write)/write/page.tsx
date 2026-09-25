@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getUserForProtectedPage } from "@/lib/serverAuth";
 import { parseContentKind } from "@/lib/contentModel";
 import type { ContributionSnapshot } from "@/lib/contribution";
 import type { PostReferenceRecord } from "@/lib/types";
@@ -42,7 +43,7 @@ export default async function WritePage({ searchParams }: PageProps) {
   const draftParam = value(params, "draft") ?? null;
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getUserForProtectedPage(supabase);
   const query = new URLSearchParams();
   for (const [key, raw] of Object.entries(params)) {
     const item = Array.isArray(raw) ? raw[0] : raw;
