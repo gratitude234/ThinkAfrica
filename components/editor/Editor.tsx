@@ -111,6 +111,12 @@ function imageFilesFrom(data: DataTransfer | null) {
   return Array.from(data.files).filter((file) => file.type.startsWith("image/"));
 }
 
+/** The part of a tippy instance the menus need, without importing tippy's types. */
+interface MenuTip {
+  hide: () => void;
+  popper: Element;
+}
+
 /** Pressing a menu button must not move the selection it is about to format. */
 function keepSelection(event: { preventDefault: () => void }) {
   event.preventDefault();
@@ -178,6 +184,8 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   const touchRef = useRef(false);
   const bubblePanelRef = useRef<BubblePanel>("marks");
   const onImageFileRef = useRef(onImageFile);
+  const bubbleTipRef = useRef<MenuTip | null>(null);
+  const floatingTipRef = useRef<MenuTip | null>(null);
 
   useEffect(() => {
     touchRef.current = navigator.maxTouchPoints > 0;
@@ -365,6 +373,44 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     };
   }, [editor]);
 
+  // Tiptap hides its menus on the editor's blur, unless a mousedown inside a
+  // menu asked it not to. Menu buttons keep focus in the body so the
+  // selection they format stays put, so that blur never comes, the request is
+  // left standing, and the next real blur (opening Preview or a sheet) would
+  // leave the menu floating over the dialog. Focus moving to any control
+  // outside the menus hides them here instead; clicks are handled by
+  // onClickOutside below.
+  useEffect(() => {
+    if (!editor) return;
+    const onBlur = ({ event }: { event: FocusEvent }) => {
+      const next = event.relatedTarget;
+      if (!(next instanceof Node)) return;
+      for (const tip of [bubbleTipRef.current, floatingTipRef.current]) {
+        if (tip && !tip.popper.contains(next)) tip.hide();
+      }
+    };
+    editor.on("blur", onBlur);
+    return () => {
+      editor.off("blur", onBlur);
+    };
+  }, [editor]);
+
+  // Escape closes the "+" menu or the alignment choices and returns the caret
+  // to the body. Focus stays in the body while they are open, so the key
+  // arrives at the document rather than at the menu.
+  useEffect(() => {
+    if (!insertOpen && bubblePanel !== "align") return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setInsertOpen(false);
+      setBubblePanel((panel) => (panel === "align" ? "marks" : panel));
+      editor?.commands.focus();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [bubblePanel, editor, insertOpen]);
+
   useEffect(() => {
     if (!editor || editor.getHTML() === content) return;
     editor.commands.setContent(content, false);
@@ -431,6 +477,10 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
           tippyOptions={{
             duration: 100,
             placement: "top",
+            onCreate: (instance) => {
+              bubbleTipRef.current = instance;
+            },
+            onClickOutside: (instance) => instance.hide(),
             onHidden: () => {
               setBubblePanel("marks");
               setBubbleLinkUrl("");
@@ -560,18 +610,19 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       {editor && variant === "article" ? (
         <FloatingMenu
           editor={editor}
-          tippyOptions={{ duration: 100, placement: "left-start", offset: [0, 12], onHidden: () => setInsertOpen(false) }}
+          tippyOptions={{
+            duration: 100,
+            placement: "left-start",
+            offset: [0, 12],
+            onCreate: (instance) => {
+              floatingTipRef.current = instance;
+            },
+            onClickOutside: (instance) => instance.hide(),
+            onHidden: () => setInsertOpen(false),
+          }}
           shouldShow={({ view, state }) => !touchRef.current && view.hasFocus() && caretInEmptyBlock(state)}
         >
-          <div
-            className="relative"
-            onKeyDown={(event) => {
-              if (event.key === "Escape") {
-                setInsertOpen(false);
-                editor.commands.focus();
-              }
-            }}
-          >
+          <div className="relative">
             <button
               type="button"
               aria-label="Insert"

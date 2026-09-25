@@ -271,7 +271,7 @@
 }
 
 .write-post-editor {
-  min-height: 6rem;
+  min-height: 3rem;
 }
 
 .write-article-editor :is(p, li),
