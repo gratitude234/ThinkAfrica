@@ -1,69 +1,11 @@
 "use client";
 
 import { useEditor, EditorContent, BubbleMenu } from "@tiptap/react";
-import { mergeAttributes } from "@tiptap/core";
-import StarterKit from "@tiptap/starter-kit";
-import Placeholder from "@tiptap/extension-placeholder";
-import CharacterCount from "@tiptap/extension-character-count";
-import Image from "@tiptap/extension-image";
-import Link from "@tiptap/extension-link";
-import Typography from "@tiptap/extension-typography";
 import type { EditorView } from "@tiptap/pm/view";
-import type { DOMOutputSpec } from "@tiptap/pm/model";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { editorExtensions, TEXT_ALIGNMENTS, type TextAlignment } from "./extensions";
 
-/**
- * An image on a publication is rarely just a picture. It has a source, a
- * photographer, or a chart it came from, and none of that survives in a bare
- * <img>. This renders as <figure><img><figcaption> when a caption exists and
- * as a plain <img> when it does not, so the many images already published
- * without one keep parsing and re-serializing unchanged.
- */
-const CaptionedImage = Image.extend({
-  addAttributes() {
-    return {
-      ...this.parent?.(),
-      caption: {
-        default: null,
-        parseHTML: (element) => element.getAttribute("data-caption"),
-        // The caption is rendered as figcaption text below, never as an
-        // attribute on the img itself.
-        renderHTML: () => ({}),
-      },
-    };
-  },
-
-  parseHTML() {
-    return [
-      {
-        tag: "figure",
-        getAttrs: (element) => {
-          const image = (element as HTMLElement).querySelector("img");
-          if (!image?.getAttribute("src")) return false;
-          return {
-            src: image.getAttribute("src"),
-            alt: image.getAttribute("alt"),
-            title: image.getAttribute("title"),
-            caption:
-              (element as HTMLElement).querySelector("figcaption")?.textContent?.trim() || null,
-          };
-        },
-      },
-      { tag: "img[src]" },
-    ];
-  },
-
-  renderHTML({ node, HTMLAttributes }) {
-    const image = [
-      "img",
-      mergeAttributes(this.options.HTMLAttributes, HTMLAttributes),
-    ] as DOMOutputSpec;
-    const caption = typeof node.attrs.caption === "string" ? node.attrs.caption.trim() : "";
-    return (
-      caption ? ["figure", {}, image, ["figcaption", {}, caption]] : image
-    ) as DOMOutputSpec;
-  },
-});
+export type { TextAlignment } from "./extensions";
 
 export interface SelectedImage {
   src: string;
@@ -90,6 +32,9 @@ export interface EditorHandle {
   insertCitation: (referenceId: string) => void;
   getSelectedImage: () => SelectedImage | null;
   updateSelectedImage: (attrs: { alt?: string; caption?: string }) => void;
+  setTextAlign: (alignment: TextAlignment) => void;
+  /** The alignment at the caret, or "left" when a selection spans several. */
+  getTextAlign: () => TextAlignment;
 }
 
 interface EditorProps {
@@ -240,19 +185,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
   }, [imageUploading, onImageUploadingChange]);
 
   const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Placeholder.configure({ placeholder }),
-      CharacterCount,
-      // Curly quotes, real ellipses and proper dashes, applied as the writer
-      // types. A publication set in Bodoni should not ship typewriter quotes.
-      Typography,
-      CaptionedImage.configure({ inline: false, allowBase64: false }),
-      Link.configure({
-        openOnClick: false,
-        HTMLAttributes: { rel: "noopener noreferrer", target: "_blank" },
-      }),
-    ],
+    extensions: editorExtensions({ placeholder }),
     content,
     autofocus: autoFocus ? "end" : false,
     editorProps: {
@@ -360,6 +293,9 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
         .insertContent(`<a href="#ref-id-${stableId}">[source]</a>`)
         .run();
     },
+    setTextAlign: (alignment) => editor?.chain().focus().setTextAlign(alignment).run(),
+    getTextAlign: () =>
+      TEXT_ALIGNMENTS.find((alignment) => editor?.isActive({ textAlign: alignment })) ?? "left",
   }));
 
   useEffect(() => {

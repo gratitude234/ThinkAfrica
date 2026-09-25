@@ -906,6 +906,17 @@ font-family: var(--font-inter), system-ui, sans-serif;
 .publication-detail pre { max-width: 100%; overflow-x: auto; white-space: pre; padding: 16px; background: #EFEBE2; border-radius: 8px; }
 .publication-detail table { display: block; max-width: 100%; overflow-x: auto; }
 .publication-detail :is(td, th) { border: 1px solid #E9E5DE; padding: 8px; }
+
+/* Justified text opens rivers of space in a narrow column unless long words
+   can break. The editor writes `text-align: justify` and the sanitizer
+   rewrites it as `text-align:justify`, so both spellings are matched.
+   Hyphenation also needs a document language, which app/layout.tsx sets on
+   <html>. `.tiptap` covers both write screens. */
+:is(.publication-article-body, .publication-post-body, .tiptap)
+  p:is([style*="text-align: justify"], [style*="text-align:justify"]) {
+  -webkit-hyphens: auto;
+  hyphens: auto;
+}
 .publication-follow > button { min-height: 36px; border-radius: 8px; padding: 8px 18px; font-size: 13.5px; }
 @media (max-width: 639px) {
   .publication-follow > button { min-height: 32px; padding: 6px 13px; font-size: 12px; }
