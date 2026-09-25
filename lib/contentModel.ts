@@ -1,9 +1,11 @@
 /**
  * The content model, entire.
  *
- * A piece of writing is a Post or an Article, and its title decides which: no
- * title is a Post, a title is an Article. There is no type picker, no format
- * picker, and no third kind. See docs/content-model.md.
+ * A piece of writing is a Post or an Article. The writer chooses which by
+ * choosing the screen they write on, the Post composer or the Article editor,
+ * and a title still makes a piece an Article: `content_kind` is derived from
+ * the title on every write, and the Post composer has no title field. There is
+ * no format picker and no third kind. See docs/content-model.md.
  *
  * This module used to carry the transition it was named for: three kinds, two
  * article genres, a legacy `posts.type` column to fall back to, and a set of
@@ -58,6 +60,22 @@ export function resolveContentKind(record: {
  */
 export function contentKindForTitle(title: string | null | undefined): ContentKind {
   return title?.trim() ? "article" : "post";
+}
+
+/**
+ * Which screen a piece opens on. A titled piece is an Article wherever it came
+ * from, so it always opens in the Article editor. Otherwise the writer's own
+ * choice, carried as `?editor=article`, decides, and anything else is a Post.
+ */
+export function composerSurfaceFor({
+  title,
+  requested,
+}: {
+  title: string | null | undefined;
+  requested?: unknown;
+}): ContentKind {
+  if (contentKindForTitle(title) === "article") return "article";
+  return parseContentKind(requested) ?? "post";
 }
 
 export const CONTENT_KIND_LABELS: Record<ContentKind, string> = {

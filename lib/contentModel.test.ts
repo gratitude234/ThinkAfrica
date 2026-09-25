@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  composerSurfaceFor,
   CONTENT_KIND_LABELS,
   contentKindForTitle,
   contentKindRequiresTitle,
@@ -83,7 +84,7 @@ describe("resolveContentKind", () => {
 });
 
 describe("contentKindForTitle", () => {
-  it("is the product rule: a title makes it an Article", () => {
+  it("a title makes it an Article, whichever screen it was written on", () => {
     expect(contentKindForTitle("On the price of maize")).toBe("article");
     expect(contentKindForTitle(null)).toBe("post");
     expect(contentKindForTitle(undefined)).toBe("post");
@@ -129,6 +130,24 @@ describe("labels", () => {
     ].join(" ");
     for (const gone of ["Research", "Essay", "Policy Brief", "Citable", "Reviewed"]) {
       expect(rendered, gone).not.toContain(gone);
+    }
+  });
+});
+
+describe("composerSurfaceFor", () => {
+  it("opens a titled piece in the Article editor, whatever was asked for", () => {
+    expect(composerSurfaceFor({ title: "On the price of maize", requested: "post" })).toBe("article");
+    expect(composerSurfaceFor({ title: "On the price of maize", requested: null })).toBe("article");
+  });
+
+  it("honours the writer's choice for an untitled piece", () => {
+    expect(composerSurfaceFor({ title: "", requested: "article" })).toBe("article");
+    expect(composerSurfaceFor({ title: "  ", requested: "post" })).toBe("post");
+  });
+
+  it("opens anything else as a Post", () => {
+    for (const requested of [undefined, null, "", "research", "ARTICLE", ["article"]]) {
+      expect(composerSurfaceFor({ title: null, requested }), JSON.stringify(requested)).toBe("post");
     }
   });
 });

@@ -53,7 +53,7 @@ Optional:
 app/
 ├── (auth)/          # Login, signup, forgot/reset-password (standalone AuthShell layout)
 ├── (write)/         # Composer, no app chrome
-│   └── write/       # UniversalComposer: the one canvas for posts and articles
+│   └── write/       # UniversalComposer: the Post composer and the Article editor
 ├── (main)/          # Full app shell with NavigationShell
 │   ├── page.tsx     # Home feed: For You and Following
 │   ├── post/[slug]/ # Post detail and comments
@@ -166,7 +166,7 @@ Role system (`lib/roles.ts`):
 
 ### Post Workflow
 
-Posts and Articles are `draft` or `published`; the title decides which one a piece is. The editorial review workflow (Research, Policy Brief review, citation IDs) was removed from the application in the publishing reset, Phase 2A: see `PUBLISHING_RESET_PHASE2A.md`. Its tables (`post_reviews`, `post_editor_decisions`, `post_versions`, `citation_sequences`) and the `pending`, `pending_revision`, `rejected` and `withdrawn` statuses still exist for legacy rows. Phase 2I removed the last of it from the database: `guard_locked_post_write` no longer locks a publication for having been reviewed, and an author edits their own published work like any other.
+Posts and Articles are `draft` or `published`. The writer chooses which by choosing the screen, the Post composer or the Article editor, and the title still decides the stored kind: an Article has one and a Post never does (`composerSurfaceFor()` and `contentKindForTitle()` in `lib/contentModel.ts`). The editorial review workflow (Research, Policy Brief review, citation IDs) was removed from the application in the publishing reset, Phase 2A: see `PUBLISHING_RESET_PHASE2A.md`. Its tables (`post_reviews`, `post_editor_decisions`, `post_versions`, `citation_sequences`) and the `pending`, `pending_revision`, `rejected` and `withdrawn` statuses still exist for legacy rows. Phase 2I removed the last of it from the database: `guard_locked_post_write` no longer locks a publication for having been reviewed, and an author edits their own published work like any other.
 
 Phase 2B removed the other ways a publication used to be created or shaped: co-authoring, Responses as publications, campus prompt publishing and draft share links (see `PUBLISHING_RESET_PHASE2B.md`). Their data is kept and read. Existing co-authored and response publications still render, marked `LEGACY COMPATIBILITY` in code, and `lib/retiredCreationPaths.test.ts` fails if a way to create more comes back. The composer still writes the writer's own `post_authors` row, because the `post_references` read policy reaches a draft's sources only through `is_post_coauthor()`.
 
