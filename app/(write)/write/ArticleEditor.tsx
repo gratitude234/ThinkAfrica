@@ -165,7 +165,7 @@ export default function ArticleEditor({
   );
 
   return (
-    <div className="min-h-dvh bg-canvas text-ink">
+    <div className="min-h-dvh bg-canvas text-ink md:min-h-[calc(100dvh-var(--app-nav-height))]">
       <header
         className={`sticky z-30 border-b border-divider bg-canvas/95 backdrop-blur ${
           hasAppNav ? "top-0 md:top-[var(--app-nav-height)]" : "top-0"

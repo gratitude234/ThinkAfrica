@@ -97,7 +97,9 @@ export default function PostComposer({
   };
 
   return (
-    <div className="min-h-dvh bg-surface md:bg-canvas md:px-4 md:pb-16 md:pt-14">
+    // From md up the page sits under the app navigation, so it fills what is
+    // left of the screen rather than a whole screen's height below it.
+    <div className="min-h-dvh bg-surface md:min-h-[calc(100dvh-var(--app-nav-height))] md:bg-canvas md:px-4 md:pb-16 md:pt-14">
       <section
         aria-labelledby="post-composer-title"
         onKeyDown={onKeyDown}

@@ -1,130 +1,20 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Button from "@/components/ui/Button";
-import CoverImageUploader from "@/components/ui/CoverImageUploader";
 import ProfileGate from "@/components/ui/ProfileGate";
-import TagInput from "@/components/ui/TagInput";
-import ReferencesPanel from "@/components/post/ReferencesPanel";
-import type { EditorHandle, SelectedImage } from "@/components/editor/Editor";
-import {
-  deriveContributionExcerpt,
-  type ComposerMode,
-  type ContributionSnapshot,
-} from "@/lib/contribution";
-import ArticlePreview, { readingMinutes } from "./ArticlePreview";
-import RevisionHistory, { type RestoredRevision } from "./RevisionHistory";
+import { composerSurfaceFor, type ContentKind } from "@/lib/contentModel";
+import type { ComposerMode, ContributionSnapshot } from "@/lib/contribution";
+import ArticleEditor from "./ArticleEditor";
+import PostComposer from "./PostComposer";
 import { useContributionDraft } from "./useContributionDraft";
 import { useModalFocus } from "./useModalFocus";
-
-const Editor = dynamic(() => import("@/components/editor/Editor"), {
-  ssr: false,
-  loading: () => (
-    <div className="min-h-[360px] animate-pulse rounded-xl bg-canvas motion-reduce:animate-none" />
-  ),
-});
-
-type PanelName = "format" | "link" | "sources" | "more";
-type FormatAction =
-  | "bold"
-  | "italic"
-  | "heading"
-  | "heading3"
-  | "bulletList"
-  | "orderedList"
-  | "blockquote"
-  | "divider";
-
-function Icon({ path, className = "h-5 w-5" }: { path: ReactNode; className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-    >
-      {path}
-    </svg>
-  );
-}
-
-/**
- * The bottom bar is drawn in icons, so this row is too. It stays available on
- * every device rather than deferring to the selection bubble on desktop: the
- * bubble needs a selection, while this row also works from a collapsed caret,
- * which is how someone turns on bold and then types.
- */
-const FORMAT_ACTIONS: ReadonlyArray<{
-  label: string;
-  mark: FormatAction;
-  path?: ReactNode;
-  /** Headings are drawn as text, because two sizes of the same "H" glyph are
-      indistinguishable at toolbar size and a writer needs to know which
-      level they are about to apply. */
-  text?: string;
-}> = [
-  { label: "Bold", mark: "bold", path: <path d="M7 5h6a3.5 3.5 0 0 1 0 7H7zm0 7h7a3.5 3.5 0 0 1 0 7H7z" /> },
-  { label: "Italic", mark: "italic", path: <path d="M15 5h-5m4 14H9M14 5l-4 14" /> },
-  { label: "Heading", mark: "heading", text: "H2" },
-  { label: "Subheading", mark: "heading3", text: "H3" },
-  {
-    label: "Bullets",
-    mark: "bulletList",
-    path: <><path d="M9 6h11M9 12h11M9 18h11" /><circle cx="4.5" cy="6" r="1.1" fill="currentColor" stroke="none" /><circle cx="4.5" cy="12" r="1.1" fill="currentColor" stroke="none" /><circle cx="4.5" cy="18" r="1.1" fill="currentColor" stroke="none" /></>,
-  },
-  {
-    label: "Numbers",
-    mark: "orderedList",
-    path: <><path d="M10 6h10M10 12h10M10 18h10" /><path d="M4 5.5h1V9M3.6 15.2a1.2 1.2 0 1 1 1.9 1.4L3.6 18.6H5.6" /></>,
-  },
-  { label: "Quote", mark: "blockquote", path: <path d="M5 5v14M10 8h9M10 12h9M10 16h6" /> },
-  { label: "Divider", mark: "divider", path: <path d="M4 12h16" /> },
-];
-
-const UNDO_ICON = <path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3" />;
-const REDO_ICON = <path d="m15 14 5-5-5-5M20 9H10a6 6 0 0 0 0 12h3" />;
-const SOURCES_ICON = (
-  <>
-    <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H5.5A1.5 1.5 0 0 1 4 15.5z" />
-    <path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H14a2 2 0 0 0-2 2v13a2 2 0 0 1 2-2h4.5a1.5 1.5 0 0 0 1.5-1.5z" />
-  </>
-);
-const PREVIEW_ICON = (
-  <>
-    <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12" />
-    <circle cx="12" cy="12" r="2.75" />
-  </>
-);
-
-const CLOSE_ICON = <path d="M6 6l12 12M18 6 6 18" />;
-const PLUS_ICON = <path d="M12 5v14M5 12h14" />;
-const MORE_ICON = (
-  <>
-    <circle cx="5" cy="12" r="1.3" fill="currentColor" stroke="none" />
-    <circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none" />
-    <circle cx="19" cy="12" r="1.3" fill="currentColor" stroke="none" />
-  </>
-);
-const IMAGE_ICON = (
-  <>
-    <rect x="3.5" y="4" width="17" height="16" rx="2" />
-    <path d="m5.5 17 4.25-4.25 3 3 2.25-2.25 3.5 3.5" />
-    <circle cx="15.5" cy="9" r="1.25" />
-  </>
-);
-const LINK_ICON = (
-  <path d="M10 13a5 5 0 0 0 7.54.54l2-2a5 5 0 0 0-7.07-7.07l-1.15 1.15M14 11a5 5 0 0 0-7.54-.54l-2 2a5 5 0 0 0 7.07 7.07l1.15-1.15" />
-);
 
 interface WriterProfile {
   full_name: string | null;
   username: string | null;
   university: string | null;
+  avatar_url?: string | null;
 }
 
 interface UniversalComposerProps {
@@ -132,6 +22,8 @@ interface UniversalComposerProps {
   userId: string;
   profile: WriterProfile | null;
   initialSnapshot: ContributionSnapshot;
+  /** The screen asked for with `?editor=article`. A title overrides it. */
+  initialSurface?: ContentKind | null;
   draftId?: string | null;
   editDraftId?: string | null;
   publishedPostId?: string | null;
@@ -141,650 +33,248 @@ interface UniversalComposerProps {
   returnTo: string;
 }
 
+/**
+ * Keeps the chosen screen in the address beside any `draft` id, so a refresh
+ * reopens the same one. Shallow, for the same reason the first autosave's
+ * address update is: a server re-render would remount the editor under the
+ * writer's cursor.
+ */
+function rememberSurface(surface: ContentKind) {
+  const url = new URL(window.location.href);
+  if (surface === "article") url.searchParams.set("editor", "article");
+  else url.searchParams.delete("editor");
+  window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+}
+
+/**
+ * The composer: the Post composer or the Article editor over one saving hook.
+ * The writer chooses the screen, and a title still makes a piece an Article
+ * (lib/contentModel.ts). This root holds only what both screens share: the
+ * choice between them, the recovery notice, and the leave, discard and profile
+ * dialogs.
+ */
 export default function UniversalComposer({
   mode,
   userId,
   profile: initialProfile,
   initialSnapshot,
-  draftId: initialDraftId = null,
-  editDraftId: initialEditDraftId = null,
+  initialSurface = null,
+  draftId = null,
+  editDraftId = null,
   publishedPostId = null,
   publishedSlug = null,
   draftUpdatedAt = null,
   returnTo,
 }: UniversalComposerProps) {
-  const editorRef = useRef<EditorHandle>(null);
-  const titleRef = useRef<HTMLTextAreaElement>(null);
-  const subtitleRef = useRef<HTMLTextAreaElement>(null);
-  const publishDialogRef = useRef<HTMLDivElement>(null);
-  const leaveDialogRef = useRef<HTMLDivElement>(null);
-  const discardDialogRef = useRef<HTMLDivElement>(null);
-  const previewDialogRef = useRef<HTMLDivElement>(null);
-  const imagePanelRef = useRef<HTMLDivElement>(null);
   const [profile, setProfile] = useState(initialProfile);
-  const [showTitle, setShowTitle] = useState(Boolean(initialSnapshot.title.trim()));
-  const [showSubtitle, setShowSubtitle] = useState(Boolean(initialSnapshot.excerpt.trim()));
-  // One drawer at a time. Independent toggles let a writer stack the format
-  // row, the link field, the source list and the drawer all at once, which
-  // pushes the canvas off screen behind its own controls.
-  const [panel, setPanel] = useState<PanelName | null>(null);
-  const [showPreview, setShowPreview] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
-  const [imageUploading, setImageUploading] = useState(false);
-  const [history, setHistory] = useState({ canUndo: false, canRedo: false });
-  const [linkUrl, setLinkUrl] = useState("");
-  const [activeMarks, setActiveMarks] = useState<Record<string, boolean>>({});
-  const [showPublish, setShowPublish] = useState(false);
+  const [surface, setSurface] = useState<ContentKind>(() =>
+    composerSurfaceFor({ title: initialSnapshot.title, requested: initialSurface })
+  );
+  // Back returns to the Post composer only for an Article started from it
+  // during this visit.
+  const [openedFromPost, setOpenedFromPost] = useState(false);
   const [showProfileGate, setShowProfileGate] = useState(false);
   const [showDiscard, setShowDiscard] = useState(false);
-  const [coverUploading, setCoverUploading] = useState(false);
+  const afterProfileRef = useRef<(() => void) | null>(null);
+  const leaveDialogRef = useRef<HTMLDivElement>(null);
+  const discardDialogRef = useRef<HTMLDivElement>(null);
 
-  // A different draft arriving resets the screen along with the saving state.
-  const resetScreen = useCallback((next: ContributionSnapshot) => {
-    setShowTitle(Boolean(next.title.trim()));
-    setShowSubtitle(Boolean(next.excerpt.trim()));
-    setShowPublish(false);
-    setShowPreview(false);
-    setPanel(null);
-    setSelectedImage(null);
-    setImageUploading(false);
-    setHistory({ canUndo: false, canRedo: false });
-  }, []);
+  const resetForDocument = useCallback(
+    (next: ContributionSnapshot) => {
+      setSurface(composerSurfaceFor({ title: next.title, requested: initialSurface }));
+      setOpenedFromPost(false);
+      setShowDiscard(false);
+    },
+    [initialSurface]
+  );
 
-  const {
-    snapshot,
-    setSnapshot,
-    saveState,
-    saveLabel: savedLabel,
-    recovery,
-    restoreRecovery,
-    dismissRecovery,
-    draftId,
-    editDraftId,
-    documentKey,
-    requestClose,
-    navigateAway,
-    showLeave,
-    closeLeave,
-    publish: finishPublication,
-    publishing,
-    publishError,
-    discardDraft,
-    bodyText,
-    wordCount,
-  } = useContributionDraft({
+  const draft = useContributionDraft({
     mode,
     userId,
     initialSnapshot,
-    draftId: initialDraftId,
-    editDraftId: initialEditDraftId,
+    draftId,
+    editDraftId,
     publishedPostId,
     publishedSlug,
     draftUpdatedAt,
     returnTo,
-    onDocumentChange: resetScreen,
+    onDocumentChange: resetForDocument,
   });
 
-  const closePublish = useCallback(() => setShowPublish(false), []);
-  const closeDiscard = useCallback(() => setShowDiscard(false), []);
-  const closePreview = useCallback(() => setShowPreview(false), []);
-  const togglePanel = useCallback(
-    (next: PanelName) => setPanel((current) => (current === next ? null : next)),
-    []
-  );
-  useModalFocus(showPublish, publishDialogRef, closePublish, publishing);
-  useModalFocus(showLeave, leaveDialogRef, closeLeave);
-  useModalFocus(showDiscard, discardDialogRef, closeDiscard);
-  useModalFocus(showPreview, previewDialogRef, closePreview);
+  // The Post composer has no title field, so it is never shown over a title
+  // nobody could see or clear there. A title restored from a device copy or a
+  // version moves the piece to the Article editor.
+  const titled = Boolean(draft.snapshot.title.trim());
+  useEffect(() => {
+    if (!titled || surface === "article") return;
+    setSurface("article");
+    rememberSurface("article");
+  }, [surface, titled]);
+  const shown: ContentKind = titled ? "article" : surface;
 
-  const openPublishSheet = () => {
-    if (!profile?.full_name?.trim() || !profile.username?.trim()) {
-      setShowProfileGate(true);
+  const switchToArticle = useCallback(() => {
+    setSurface("article");
+    setOpenedFromPost(true);
+    rememberSurface("article");
+  }, []);
+
+  const handleBack = () => {
+    if (openedFromPost && !titled) {
+      setSurface("post");
+      setOpenedFromPost(false);
+      rememberSurface("post");
       return;
     }
-    // The subtitle is written on the canvas now, so nothing is auto-filled
-    // into it here. An empty one still becomes a feed summary, derived from
-    // the opening on the server at publish time, which is why the sheet shows
-    // that derived line rather than writing it into the writer's own field.
-    setShowPublish(true);
+    void draft.requestClose();
   };
 
-  // This runs on every keystroke, so each piece of derived state is compared
-  // before it is set. Returning the previous value keeps a typing session from
-  // re-rendering the toolbar and the caption panel on every character.
-  const handleSelectionUpdate = useCallback(() => {
-    const editor = editorRef.current;
-    if (!editor) return;
-    setActiveMarks({
-      bold: editor.isActive("bold"),
-      italic: editor.isActive("italic"),
-      heading: editor.isActive("heading", { level: 2 }),
-      heading3: editor.isActive("heading", { level: 3 }),
-      bulletList: editor.isActive("bulletList"),
-      orderedList: editor.isActive("orderedList"),
-      blockquote: editor.isActive("blockquote"),
-      link: editor.isActive("link"),
-    });
-
-    const canUndo = editor.canUndo();
-    const canRedo = editor.canRedo();
-    setHistory((current) =>
-      current.canUndo === canUndo && current.canRedo === canRedo
-        ? current
-        : { canUndo, canRedo }
-    );
-
-    const image = editor.getSelectedImage();
-    setSelectedImage((current) => {
-      if (!image) return current === null ? current : null;
-      if (
-        current &&
-        current.src === image.src &&
-        current.alt === image.alt &&
-        current.caption === image.caption
-      ) {
-        return current;
+  const withCompleteProfile = useCallback(
+    (next: () => void) => {
+      if (profile?.full_name?.trim() && profile.username?.trim()) {
+        next();
+        return;
       }
-      return image;
-    });
-  }, []);
+      afterProfileRef.current = next;
+      setShowProfileGate(true);
+    },
+    [profile]
+  );
 
-  const handleFormat = useCallback((format: FormatAction) => {
-    const editor = editorRef.current;
-    if (!editor) return;
+  const closeDiscard = useCallback(() => setShowDiscard(false), []);
+  const openDiscard = useCallback(() => setShowDiscard(true), []);
+  useModalFocus(draft.showLeave, leaveDialogRef, draft.closeLeave);
+  useModalFocus(showDiscard, discardDialogRef, closeDiscard, draft.discarding);
 
-    if (format === "bold") editor.toggleBold();
-    else if (format === "italic") editor.toggleItalic();
-    else if (format === "heading") editor.toggleH2();
-    else if (format === "heading3") editor.toggleH3();
-    else if (format === "bulletList") editor.toggleBulletList();
-    else if (format === "orderedList") editor.toggleOrderedList();
-    else if (format === "divider") editor.insertDivider();
-    else editor.toggleBlockquote();
-  }, []);
-
-  const applyImageAttribute = useCallback((attrs: { alt?: string; caption?: string }) => {
-    editorRef.current?.updateSelectedImage(attrs);
-    setSelectedImage((current) => (current ? { ...current, ...attrs } : current));
-  }, []);
-
-  const restoreRevision = useCallback((revision: RestoredRevision) => {
-    setSnapshot((current) => ({
-      ...current,
-      title: revision.title,
-      excerpt: revision.excerpt,
-      content: revision.content,
-    }));
-    setShowTitle(Boolean(revision.title.trim()));
-    setShowSubtitle(Boolean(revision.excerpt.trim()));
-    setPanel(null);
-  }, [setSnapshot]);
-
-  // A one-line textarea with overflow hidden clips its second line, and a
-  // title long enough to wrap is exactly the kind someone wants to read back.
-  useEffect(() => {
-    const field = titleRef.current;
-    if (!field) return;
-    field.style.height = "auto";
-    field.style.height = `${field.scrollHeight}px`;
-  }, [showTitle, snapshot.title]);
-
-  useEffect(() => {
-    const field = subtitleRef.current;
-    if (!field) return;
-    field.style.height = "auto";
-    field.style.height = `${field.scrollHeight}px`;
-  }, [showSubtitle, snapshot.excerpt]);
-
-  // The caption panel renders below the toolbar, which on a long piece is well
-  // past the image that opened it. Keyed on presence rather than contents, so
-  // it fires when the panel appears and not on every keystroke inside it.
-  const hasSelectedImage = Boolean(selectedImage);
-  useEffect(() => {
-    if (!hasSelectedImage) return;
-    imagePanelRef.current?.scrollIntoView({ block: "nearest" });
-  }, [hasSelectedImage]);
-
-  // An upload outranks the save state here. It is the only one of the two the
-  // writer just started by hand, and a pasted photo gives no other sign that
-  // anything is happening until it lands.
-  const saveLabel = imageUploading ? "Adding image…" : savedLabel;
+  const isEdit = mode === "published-edit";
   const authorName = profile?.full_name?.trim() || profile?.username?.trim() || "You";
-  // What the feed will carry. An unwritten subtitle still becomes one, derived
-  // from the opening on the server, so the sheet shows the result either way
-  // rather than leaving the writer to guess.
-  const feedSummary = snapshot.excerpt.trim() || deriveContributionExcerpt(snapshot.content);
-  const minutes = readingMinutes(wordCount);
+  const avatarUrl = profile?.avatar_url ?? null;
+  const username = profile?.username?.trim() || null;
+
+  const notice = draft.recovery ? (
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gold/30 bg-gold-tint px-4 py-3 text-sm">
+      <p className="text-gold-ink">This device has an unsaved copy of your writing.</p>
+      <div className="flex gap-2">
+        <button type="button" onClick={draft.restoreRecovery} className="min-h-11 rounded-lg bg-gold-ink px-4 font-semibold text-white">
+          Restore
+        </button>
+        <button type="button" onClick={draft.dismissRecovery} className="min-h-11 rounded-lg px-3 font-semibold text-gold-ink">
+          Discard
+        </button>
+      </div>
+    </div>
+  ) : null;
+
+  const discardCopy = isEdit
+    ? { title: "Discard your changes?", body: "Your live publication will stay unchanged.", action: "Discard changes" }
+    : draft.draftId
+      ? { title: "Discard this draft?", body: "It will be deleted from your drafts.", action: "Discard" }
+      : { title: "Discard this writing?", body: "It will be cleared from this device.", action: "Discard" };
 
   return (
-    <div className={`${mode === "published-edit" ? "fixed inset-0 z-[70]" : "min-h-dvh"} bg-surface text-ink`}>
-      <header className="sticky top-0 z-30 border-b border-divider bg-surface/95 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-4xl items-center gap-3 px-4 sm:px-6">
-          <button
-            type="button"
-            onClick={() => void requestClose()}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-canvas hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand"
-            aria-label="Close editor"
-          >
-            <Icon path={CLOSE_ICON} />
-          </button>
-          <p aria-live="polite" className={`min-w-0 flex-1 truncate text-xs ${saveState === "error" ? "text-red-600" : "text-ink-muted"}`}>
-            {saveLabel}
-          </p>
-          <Button
-            type="button"
-            onClick={openPublishSheet}
-            disabled={!bodyText || coverUploading}
-            className="min-h-11 rounded-full px-5"
-          >
-            {mode === "published-edit" ? "Update" : "Publish"}
-          </Button>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-3xl px-5 pb-32 pt-7 sm:px-8 sm:pt-11">
-        {recovery ? (
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gold/30 bg-gold-tint px-4 py-3 text-sm">
-            <p className="text-gold-ink">This device has an unsaved copy of your writing.</p>
-            <div className="flex gap-2">
-              {/* Both actions clear the key the copy actually came from, which
-                  is not always this canvas's own key. */}
-              <button type="button" onClick={() => { const restored = restoreRecovery(); if (restored) setShowTitle(Boolean(restored.title.trim())); }} className="min-h-11 rounded-lg bg-gold-ink px-4 font-semibold text-white">Restore</button>
-              <button type="button" onClick={dismissRecovery} className="min-h-11 rounded-lg px-3 font-semibold text-gold-ink">Discard</button>
-            </div>
-          </div>
-        ) : null}
-
-        {showTitle ? (
-          <div className="mb-4 flex items-start gap-2">
-            <textarea
-              ref={titleRef}
-              autoFocus={!initialSnapshot.title}
-              rows={1}
-              value={snapshot.title}
-              onChange={(event) => setSnapshot((current) => ({ ...current, title: event.target.value }))}
-              placeholder="Title"
-              aria-label="Title"
-              className="min-h-14 flex-1 resize-none overflow-hidden border-0 bg-transparent font-display text-3xl font-semibold leading-tight text-ink outline-none placeholder:text-ink-muted/40 sm:text-4xl"
-            />
-            <button
-              type="button"
-              onClick={() => {
-                // The subtitle belongs to the title and its field is drawn only
-                // when a title exists, so it has to go too. Left behind it would
-                // sit in `excerpt`, invisible on the canvas and unreachable, and
-                // still ship as the feed summary.
-                setSnapshot((current) => ({ ...current, title: "", excerpt: "" }));
-                setShowTitle(false);
-                setShowSubtitle(false);
-              }}
-              // The subtitle carries an identical button. Screen reader users
-              // hear these as a list, where two bare "Remove"s are a coin toss.
-              aria-label="Remove title"
-              className="mt-1 min-h-11 rounded-lg px-2 text-xs font-semibold text-ink-muted hover:bg-canvas hover:text-ink"
-            >
-              Remove
-            </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setShowTitle(true)}
-            className="mb-5 -ml-1 flex min-h-11 items-center gap-1.5 rounded-lg px-1 text-sm font-semibold text-ink-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand"
-          >
-            <Icon path={PLUS_ICON} className="h-4 w-4" />
-            Add title
-          </button>
-        )}
-
-        {/* A subtitle only means something under a headline, so it is offered
-            only once there is one. It is the same field the feed reads as the
-            summary: one value, written where the writer can see it against the
-            title instead of buried in the publish step. */}
-        {showTitle ? (
-          showSubtitle ? (
-            <div className="mb-5 flex items-start gap-2">
-              <textarea
-                ref={subtitleRef}
-                rows={1}
-                value={snapshot.excerpt}
-                onChange={(event) =>
-                  setSnapshot((current) => ({ ...current, excerpt: event.target.value }))
-                }
-                placeholder="Add a subtitle"
-                aria-label="Subtitle"
-                className="min-h-11 flex-1 resize-none overflow-hidden border-0 bg-transparent text-lg leading-relaxed text-ink-muted outline-none placeholder:text-ink-muted/40 sm:text-xl"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  setSnapshot((current) => ({ ...current, excerpt: "" }));
-                  setShowSubtitle(false);
-                }}
-                aria-label="Remove subtitle"
-                className="mt-1 min-h-11 rounded-lg px-2 text-xs font-semibold text-ink-muted hover:bg-canvas hover:text-ink"
-              >
-                Remove
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => {
-                setShowSubtitle(true);
-                requestAnimationFrame(() => subtitleRef.current?.focus());
-              }}
-              className="mb-5 -ml-1 flex min-h-11 items-center gap-1.5 rounded-lg px-1 text-sm font-semibold text-ink-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand"
-            >
-              <Icon path={PLUS_ICON} className="h-4 w-4" />
-              Add subtitle
-            </button>
-          )
-        ) : null}
-
-        <Editor
-          key={documentKey}
-          ref={editorRef}
-          content={snapshot.content}
-          placeholder="Start writing…"
-          ariaLabel="Publication body"
-          variant="article"
-          // Body-first means the caret starts in the body. Adding a title is
-          // the deliberate detour, and it takes focus when it opens.
-          autoFocus={mode !== "published-edit" && !initialSnapshot.title}
-          onUpdate={(content) => setSnapshot((current) => current.content === content ? current : { ...current, content })}
-          onSelectionUpdate={handleSelectionUpdate}
-          onImageUploadingChange={setImageUploading}
+    // /edit/[slug] is full screen with no app navigation. /write sits under
+    // the (write) layout's navigation from md up.
+    <div className={isEdit ? "fixed inset-0 z-[70] overflow-y-auto bg-canvas" : undefined}>
+      {shown === "article" ? (
+        <ArticleEditor
+          key={draft.documentKey}
+          draft={draft}
+          mode={mode}
+          authorName={authorName}
+          avatarUrl={avatarUrl}
+          username={username}
+          hasAppNav={!isEdit}
+          autoFocusTitle={!titled}
+          notice={notice}
+          onBack={handleBack}
+          onDiscard={openDiscard}
+          withCompleteProfile={withCompleteProfile}
         />
+      ) : (
+        <PostComposer
+          key={draft.documentKey}
+          draft={draft}
+          mode={mode}
+          authorName={authorName}
+          avatarUrl={avatarUrl}
+          username={username}
+          notice={notice}
+          onCancel={() => void draft.requestClose()}
+          onDiscard={openDiscard}
+          onSwitchToArticle={switchToArticle}
+          withCompleteProfile={withCompleteProfile}
+        />
+      )}
 
-        {/* Six controls, which is what fits at a 44px touch target inside the
-            canvas measure on the narrowest phone still in common use. Anything
-            that does not earn a place here sits one tap deeper: link goes with
-            the other text marks under Aa, and Preview goes in the drawer. A bar
-            wider than the screen is a bar whose last button does not exist. */}
-        <div
-          className="sticky z-20 mt-8 flex w-fit max-w-full items-center gap-1 rounded-2xl border border-card-border bg-surface p-1.5 shadow-lg shadow-ink/10"
-          style={{ bottom: "calc(env(safe-area-inset-bottom) + 0.75rem + var(--mobile-visual-viewport-bottom, 0px))" }}
-        >
-          {/* Undo belongs in the bar, not only on the keyboard. A phone has no
-              Cmd+Z, and a paragraph lost to a stray gesture is otherwise gone
-              for good. */}
-          <button type="button" onClick={() => editorRef.current?.undo()} disabled={!history.canUndo} className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-ink-muted transition-colors hover:bg-canvas hover:text-ink disabled:pointer-events-none disabled:opacity-30" aria-label="Undo">
-            <Icon path={UNDO_ICON} />
-          </button>
-          <button type="button" onClick={() => editorRef.current?.redo()} disabled={!history.canRedo} className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-ink-muted transition-colors hover:bg-canvas hover:text-ink disabled:pointer-events-none disabled:opacity-30" aria-label="Redo">
-            <Icon path={REDO_ICON} />
-          </button>
-          <span className="mx-0.5 h-6 w-px shrink-0 bg-divider" aria-hidden="true" />
-          <button type="button" onClick={() => togglePanel("format")} aria-expanded={panel === "format"} className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl px-3 text-sm font-semibold transition-colors ${panel === "format" ? "bg-canvas text-ink" : "text-ink-muted hover:bg-canvas hover:text-ink"}`} aria-label="Formatting">Aa</button>
-          <button type="button" onClick={() => editorRef.current?.triggerImageUpload()} className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-ink-muted transition-colors hover:bg-canvas hover:text-ink" aria-label="Insert image">
-            <Icon path={IMAGE_ICON} />
-          </button>
-          {/* Citing a source is the one thing this editor does that a general
-              blogging tool does not. It gets a place in the bar rather than a
-              line inside an overflow menu. */}
-          <button type="button" onClick={() => togglePanel("sources")} aria-expanded={panel === "sources"} className={`relative flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl transition-colors ${panel === "sources" ? "bg-canvas text-ink" : "text-ink-muted hover:bg-canvas hover:text-ink"}`} aria-label={snapshot.references.length ? `Sources, ${snapshot.references.length} added` : "Sources"}>
-            <Icon path={SOURCES_ICON} />
-            {snapshot.references.length ? (
-              <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-brand px-1 text-[10px] font-semibold leading-none text-white">
-                {snapshot.references.length}
-              </span>
-            ) : null}
-          </button>
-          <button type="button" onClick={() => togglePanel("more")} aria-expanded={panel === "more"} className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl transition-colors ${panel === "more" ? "bg-canvas text-ink" : "text-ink-muted hover:bg-canvas hover:text-ink"}`} aria-label="More writing options">
-            <Icon path={MORE_ICON} />
-          </button>
-        </div>
-
-        {panel === "format" ? (
-          <div className="mt-3 flex flex-wrap gap-1 rounded-xl border border-card-border bg-surface p-2">
-            {FORMAT_ACTIONS.map(({ label, mark, path, text }) => (
-              <button
-                key={mark}
-                type="button"
-                onClick={() => handleFormat(mark)}
-                aria-label={label}
-                // A divider is inserted, not toggled on, so it carries no
-                // pressed state to announce.
-                aria-pressed={mark === "divider" ? undefined : Boolean(activeMarks[mark])}
-                title={label}
-                className={`flex min-h-11 min-w-11 items-center justify-center rounded-lg transition-colors ${text ? "text-xs font-bold" : ""} ${activeMarks[mark] ? "bg-green-tint text-emerald-ink" : "text-ink-muted hover:bg-canvas hover:text-ink"}`}
-              >
-                {text ? text : <Icon path={path} />}
-              </button>
-            ))}
-            {/* A link is a text mark like the rest of this row, and moving it
-                here is what keeps the bar above down to one screen's width. */}
-            <button
-              type="button"
-              onClick={() => setPanel("link")}
-              aria-label="Add link"
-              aria-pressed={Boolean(activeMarks.link)}
-              title="Link"
-              className={`flex min-h-11 min-w-11 items-center justify-center rounded-lg transition-colors ${activeMarks.link ? "bg-green-tint text-emerald-ink" : "text-ink-muted hover:bg-canvas hover:text-ink"}`}
-            >
-              <Icon path={LINK_ICON} />
-            </button>
-          </div>
-        ) : null}
-        {panel === "link" ? (
-          <div className="mt-3 flex gap-2 rounded-xl border border-card-border bg-surface p-2">
-            <input autoFocus type="url" value={linkUrl} onChange={(event) => setLinkUrl(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { editorRef.current?.insertLink(linkUrl); setPanel(null); setLinkUrl(""); } if (event.key === "Escape") setPanel("format"); }} placeholder="https://…" className="min-h-11 min-w-0 flex-1 rounded-lg border border-card-border bg-surface px-3 text-sm text-ink outline-none focus:ring-2 focus:ring-emerald-brand" />
-            <Button type="button" onClick={() => { editorRef.current?.insertLink(linkUrl); setPanel(null); setLinkUrl(""); }}>Apply</Button>
-          </div>
-        ) : null}
-
-        {/* An image carries a credit, a source, or a chart it came from, and
-            none of that survives in a bare picture. The panel appears on
-            selection rather than living permanently on screen. */}
-        {selectedImage ? (
-          <div ref={imagePanelRef} className="mt-3 space-y-3 rounded-xl border border-card-border bg-surface p-3">
-            <p className="text-kicker font-semibold uppercase text-ink-muted">Selected image</p>
-            <div>
-              <label htmlFor="image-caption" className="mb-1.5 block text-sm font-semibold text-ink">
-                Caption
-              </label>
-              <input
-                id="image-caption"
-                type="text"
-                value={selectedImage.caption}
-                onChange={(event) => applyImageAttribute({ caption: event.target.value })}
-                placeholder="What this shows, and who it is by"
-                className="min-h-11 w-full rounded-lg border border-card-border bg-surface px-3 text-sm text-ink outline-none focus:ring-2 focus:ring-emerald-brand"
-              />
-            </div>
-            <div>
-              <label htmlFor="image-alt" className="mb-1.5 block text-sm font-semibold text-ink">
-                Alt text
-              </label>
-              <input
-                id="image-alt"
-                type="text"
-                value={selectedImage.alt}
-                onChange={(event) => applyImageAttribute({ alt: event.target.value })}
-                placeholder="Describe the image"
-                className="min-h-11 w-full rounded-lg border border-card-border bg-surface px-3 text-sm text-ink outline-none focus:ring-2 focus:ring-emerald-brand"
-              />
-              <p className="mt-1.5 text-meta text-ink-muted">
-                Read aloud by screen readers, and shown when the image cannot load.
-              </p>
-            </div>
-          </div>
-        ) : null}
-
-        {panel === "sources" ? (
-          <section className="mt-6 border-t border-divider pt-6">
-            <h2 className="mb-1.5 text-kicker font-semibold uppercase text-ink-muted">Sources</h2>
-            <p className="mb-3 text-meta text-ink-muted">
-              Add a source, then place a citation in the body where it belongs.
-            </p>
-            <ReferencesPanel references={snapshot.references} onChange={(references) => setSnapshot((current) => ({ ...current, references }))} onInsertCitation={(id) => editorRef.current?.insertCitation(id)} />
-          </section>
-        ) : null}
-
-        {panel === "more" ? (
-          <section className="mt-6 space-y-7 border-t border-divider pt-6">
-            <button
-              type="button"
-              onClick={() => setShowPreview(true)}
-              disabled={!bodyText}
-              className="flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm font-semibold text-ink transition-colors hover:bg-canvas disabled:opacity-40"
-            >
-              <Icon path={PREVIEW_ICON} className="h-4 w-4" />
-              Preview as a reader
-            </button>
-            {/* Version history describes a draft that exists on the account, so
-                it is not offered until the first autosave has minted one, and it
-                does not apply to editing something already published. */}
-            {mode !== "published-edit" && draftId ? (
-              <div>
-                <h2 className="mb-3 text-kicker font-semibold uppercase text-ink-muted">Version history</h2>
-                <RevisionHistory
-                  postId={draftId}
-                  currentSnapshot={{
-                    title: snapshot.title,
-                    excerpt: snapshot.excerpt,
-                    content: snapshot.content,
-                  }}
-                  onRestore={restoreRevision}
-                />
-              </div>
-            ) : null}
-            {mode === "published-edit" && editDraftId ? (
-              <button type="button" onClick={() => setShowDiscard(true)} className="min-h-11 rounded-lg px-2 text-sm font-semibold text-red-600 hover:bg-red-50">Discard edit draft</button>
-            ) : null}
-          </section>
-        ) : null}
-      </main>
-
-      {showPublish ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 sm:items-center sm:p-6">
-          <button type="button" className="absolute inset-0" onClick={closePublish} aria-label="Close publish preview" />
+      {draft.showLeave ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-ink/50 px-4">
           <div
-            ref={publishDialogRef}
-            role="dialog"
+            ref={leaveDialogRef}
+            role="alertdialog"
             aria-modal="true"
-            aria-labelledby="publish-title"
-            // Cmd/Ctrl+Enter is the muscle memory for "send this", and the
-            // sheet is the only place where that is unambiguous.
-            onKeyDown={(event) => {
-              if ((event.metaKey || event.ctrlKey) && event.key === "Enter" && bodyText && !coverUploading && !publishing) {
-                event.preventDefault();
-                void finishPublication();
-              }
-            }}
-            className="relative max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-surface p-5 text-ink shadow-2xl sm:rounded-3xl sm:p-7"
+            aria-labelledby="leave-title"
+            className="w-full max-w-sm rounded-2xl bg-surface p-6 text-ink shadow-2xl"
           >
-            <div className="flex items-center justify-between gap-4">
-              <h2 id="publish-title" className="font-display text-xl font-semibold">Preview</h2>
-              <button type="button" onClick={closePublish} disabled={publishing} className="flex h-11 w-11 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-canvas hover:text-ink" aria-label="Close">
-                <Icon path={CLOSE_ICON} />
-              </button>
-            </div>
-
-            {/* The piece as it will actually read, not as it will be listed.
-                The card told a writer how the feed would summarise them, which
-                is not the question anyone opens a preview to answer. */}
-            <div className="mt-5 max-h-[46dvh] overflow-y-auto rounded-2xl border border-card-border bg-card p-5">
-              <ArticlePreview
-                snapshot={snapshot}
-                authorName={authorName}
-                wordCount={wordCount}
-              />
-            </div>
-
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-              {/* The canvas stays free of a running count. Here, at the moment
-                  of committing, the length is information rather than pressure. */}
-              <p className="text-meta text-ink-muted">
-                {wordCount === 1 ? "1 word" : `${wordCount.toLocaleString()} words`}
-                {snapshot.title.trim() ? " · full article presentation" : " · compact presentation"}
-                {minutes ? ` · ${minutes} min read` : ""}
-              </p>
-              <button
-                type="button"
-                onClick={() => setShowPreview(true)}
-                className="min-h-9 rounded-lg px-2 text-xs font-semibold text-emerald-ink underline underline-offset-2"
-              >
-                Read full preview
-              </button>
-            </div>
-
-            {feedSummary ? (
-              <p className="mt-2 line-clamp-2 text-meta text-ink-muted">
-                In the feed: {feedSummary}
-              </p>
-            ) : null}
-
-            <div className="mt-6 space-y-5">
-              <div>
-                <p className="mb-2 text-sm font-semibold text-ink">Topics <span className="font-normal text-ink-muted">(optional)</span></p>
-                <TagInput value={snapshot.tags} onChange={(tags) => setSnapshot((current) => ({ ...current, tags }))} showLabel={false} maxTags={5} placeholder="Add a topic" disabled={publishing} />
-              </div>
-              <div>
-                <p className="mb-2 text-sm font-semibold text-ink">Cover <span className="font-normal text-ink-muted">(optional)</span></p>
-                <CoverImageUploader initialUrl={snapshot.coverImageUrl} onUpload={(coverImageUrl) => setSnapshot((current) => ({ ...current, coverImageUrl }))} onRemove={() => setSnapshot((current) => ({ ...current, coverImageUrl: "" }))} onUploadingChange={setCoverUploading} variant="compact" emptyTitle="Add cover" />
-              </div>
-            </div>
-
-            {publishError ? <p role="alert" className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{publishError}</p> : null}
-            <Button type="button" size="lg" loading={publishing} disabled={!bodyText || coverUploading} onClick={() => void finishPublication()} className="mt-7 min-h-12 w-full rounded-full">
-              {mode === "published-edit" ? "Update now" : "Publish now"}
-            </Button>
-          </div>
-        </div>
-      ) : null}
-
-      {/* Reading the piece back at full size, in the type it will actually be
-          set in. Sits above the publish sheet so it can be opened from there
-          without losing the sheet underneath. */}
-      {showPreview ? (
-        <div
-          ref={previewDialogRef}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Reader preview"
-          className="fixed inset-0 z-[75] overflow-y-auto overscroll-contain bg-surface"
-        >
-          <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-divider bg-surface/95 px-4 py-3 backdrop-blur sm:px-6">
-            <p className="text-kicker font-semibold uppercase text-ink-muted">
-              How this reads
-            </p>
-            <button
-              type="button"
-              onClick={closePreview}
-              className="flex h-11 w-11 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-canvas hover:text-ink"
-              aria-label="Close preview"
-            >
-              <Icon path={CLOSE_ICON} />
-            </button>
-          </div>
-          <ArticlePreview snapshot={snapshot} authorName={authorName} wordCount={wordCount} />
-        </div>
-      ) : null}
-
-      {showLeave ? (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-ink/40 px-4">
-          <div ref={leaveDialogRef} role="alertdialog" aria-modal="true" aria-labelledby="leave-title" className="w-full max-w-sm rounded-2xl bg-surface p-6 text-ink shadow-2xl">
-            <h2 id="leave-title" className="font-display text-lg font-semibold">Your account copy didn’t save</h2>
+            <h2 id="leave-title" className="publication-article-title text-xl font-semibold">Your account copy didn’t save</h2>
             <p className="mt-2 text-sm text-ink-muted">This device still has a recovery copy.</p>
-            <div className="mt-5 flex gap-3"><Button type="button" variant="secondary" onClick={closeLeave} className="flex-1 min-h-11">Keep writing</Button><Button type="button" variant="danger" onClick={navigateAway} className="flex-1 min-h-11">Leave with device copy</Button></div>
+            <div className="mt-5 flex gap-3">
+              <Button type="button" variant="secondary" onClick={draft.closeLeave} className="min-h-11 flex-1 rounded-md">
+                Keep writing
+              </Button>
+              <Button type="button" variant="danger" onClick={() => draft.navigateAway()} className="min-h-11 flex-1 rounded-md">
+                Leave with device copy
+              </Button>
+            </div>
           </div>
         </div>
       ) : null}
 
-      {showDiscard && editDraftId ? (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-ink/40 px-4">
-          <div ref={discardDialogRef} role="alertdialog" aria-modal="true" aria-labelledby="discard-title" className="w-full max-w-sm rounded-2xl bg-surface p-6 text-ink shadow-2xl">
-            <h2 id="discard-title" className="font-display text-lg font-semibold">Discard this edit draft?</h2>
-            <p className="mt-2 text-sm text-ink-muted">Your live publication will stay unchanged.</p>
-            <div className="mt-5 flex gap-3"><Button type="button" variant="secondary" onClick={closeDiscard} className="flex-1 min-h-11">Cancel</Button><Button type="button" variant="danger" onClick={() => void discardDraft()} className="flex-1 min-h-11">Discard</Button></div>
+      {showDiscard ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-ink/50 px-4">
+          <div
+            ref={discardDialogRef}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="discard-title"
+            aria-describedby="discard-body"
+            className="w-full max-w-sm rounded-2xl bg-surface p-6 text-ink shadow-2xl"
+          >
+            <h2 id="discard-title" className="publication-article-title text-xl font-semibold">{discardCopy.title}</h2>
+            <p id="discard-body" className="mt-2 text-sm text-ink-muted">{discardCopy.body}</p>
+            <div className="mt-5 flex gap-3">
+              <Button type="button" variant="secondary" onClick={closeDiscard} disabled={draft.discarding} className="min-h-11 flex-1 rounded-md">
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                loading={draft.discarding}
+                onClick={() => void draft.discardDraft()}
+                className="min-h-11 flex-1 rounded-md"
+              >
+                {discardCopy.action}
+              </Button>
+            </div>
           </div>
         </div>
       ) : null}
 
       {showProfileGate ? (
-        <ProfileGate open userId={userId} initialProfile={profile} onClose={() => setShowProfileGate(false)} onComplete={(next) => { setProfile(next); setShowProfileGate(false); setShowPublish(true); }} />
+        <ProfileGate
+          open
+          userId={userId}
+          initialProfile={profile}
+          onClose={() => {
+            afterProfileRef.current = null;
+            setShowProfileGate(false);
+          }}
+          onComplete={(next) => {
+            setProfile((current) => ({ ...next, avatar_url: current?.avatar_url ?? null }));
+            setShowProfileGate(false);
+            const run = afterProfileRef.current;
+            afterProfileRef.current = null;
+            run?.();
+          }}
+        />
       ) : null}
     </div>
   );
