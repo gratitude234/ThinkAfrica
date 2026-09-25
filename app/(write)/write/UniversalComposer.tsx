@@ -1,15 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-  type RefObject,
-} from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Button from "@/components/ui/Button";
 import CoverImageUploader from "@/components/ui/CoverImageUploader";
 import ProfileGate from "@/components/ui/ProfileGate";
@@ -17,21 +9,14 @@ import TagInput from "@/components/ui/TagInput";
 import ReferencesPanel from "@/components/post/ReferencesPanel";
 import type { EditorHandle, SelectedImage } from "@/components/editor/Editor";
 import {
-  contributionText,
   deriveContributionExcerpt,
-  deservesCloudDraft,
-  hasMeaningfulContribution,
   type ComposerMode,
   type ContributionSnapshot,
 } from "@/lib/contribution";
-import { ensureContributionDraft, publishContribution } from "./actions";
-import {
-  applyPublishedEditDraft,
-  discardPublishedEditDraft,
-  savePublishedEditDraft,
-} from "./editActions";
 import ArticlePreview, { readingMinutes } from "./ArticlePreview";
 import RevisionHistory, { type RestoredRevision } from "./RevisionHistory";
+import { useContributionDraft } from "./useContributionDraft";
+import { useModalFocus } from "./useModalFocus";
 
 const Editor = dynamic(() => import("@/components/editor/Editor"), {
   ssr: false,
@@ -40,7 +25,6 @@ const Editor = dynamic(() => import("@/components/editor/Editor"), {
   ),
 });
 
-type SaveState = "idle" | "saving" | "cloud" | "device" | "error";
 type PanelName = "format" | "link" | "sources" | "more";
 type FormatAction =
   | "bold"
@@ -157,104 +141,6 @@ interface UniversalComposerProps {
   returnTo: string;
 }
 
-const LOCAL_PREFIX = "indegenius:contribution-draft:v1";
-const LOCAL_DELAY = 350;
-const CLOUD_DELAY = 2000;
-const FOCUSABLE =
-  'button:not([disabled]), [href], input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
-function snapshotsMatch(left: ContributionSnapshot, right: ContributionSnapshot) {
-  return JSON.stringify(left) === JSON.stringify(right);
-}
-
-function safeSnapshot(value: unknown, fallback: ContributionSnapshot) {
-  if (!value || typeof value !== "object") return null;
-  const record = value as Record<string, unknown>;
-  const data =
-    record.data && typeof record.data === "object"
-      ? (record.data as Record<string, unknown>)
-      : record;
-  const body = typeof data.body === "string" ? data.body : null;
-  const content = typeof data.content === "string" ? data.content : body ? textToHtml(body) : fallback.content;
-  const snapshot: ContributionSnapshot = {
-    ...fallback,
-    title: typeof data.title === "string" ? data.title : fallback.title,
-    content,
-    excerpt: typeof data.excerpt === "string" ? data.excerpt : fallback.excerpt,
-    tags: Array.isArray(data.tags)
-      ? data.tags.filter((tag): tag is string => typeof tag === "string")
-      : Array.isArray(data.topics)
-        ? data.topics.filter((tag): tag is string => typeof tag === "string")
-        : fallback.tags,
-    coverImageUrl:
-      typeof data.coverImageUrl === "string"
-        ? data.coverImageUrl
-        : typeof data.imageUrl === "string"
-          ? data.imageUrl
-          : fallback.coverImageUrl,
-    references: Array.isArray(data.references)
-      ? (data.references as ContributionSnapshot["references"])
-      : fallback.references,
-  };
-  return hasMeaningfulContribution(snapshot) ? snapshot : null;
-}
-
-function textToHtml(value: string) {
-  return value
-    .split(/\n{2,}/)
-    .map((paragraph) =>
-      `<p>${paragraph
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/\n/g, "<br>")}</p>`
-    )
-    .join("");
-}
-
-function useModalFocus(
-  open: boolean,
-  dialogRef: RefObject<HTMLDivElement | null>,
-  onClose: () => void,
-  busy = false
-) {
-  useEffect(() => {
-    if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const frame = requestAnimationFrame(() => {
-      dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
-    });
-    const onKeyDown = (event: KeyboardEvent) => {
-      const dialog = dialogRef.current;
-      if (!dialog) return;
-      if (event.key === "Escape" && !busy) {
-        event.preventDefault();
-        onClose();
-        return;
-      }
-      if (event.key !== "Tab") return;
-      const controls = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE));
-      if (!controls.length) return;
-      const first = controls[0];
-      const last = controls[controls.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      cancelAnimationFrame(frame);
-      document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [busy, dialogRef, onClose, open]);
-}
-
 export default function UniversalComposer({
   mode,
   userId,
@@ -267,7 +153,6 @@ export default function UniversalComposer({
   draftUpdatedAt = null,
   returnTo,
 }: UniversalComposerProps) {
-  const router = useRouter();
   const editorRef = useRef<EditorHandle>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const subtitleRef = useRef<HTMLTextAreaElement>(null);
@@ -276,15 +161,7 @@ export default function UniversalComposer({
   const discardDialogRef = useRef<HTMLDivElement>(null);
   const previewDialogRef = useRef<HTMLDivElement>(null);
   const imagePanelRef = useRef<HTMLDivElement>(null);
-  const [snapshot, setSnapshot] = useState(initialSnapshot);
   const [profile, setProfile] = useState(initialProfile);
-  const [draftId, setDraftId] = useState(initialDraftId);
-  const [editDraftId, setEditDraftId] = useState(initialEditDraftId);
-  const draftIdRef = useRef(initialDraftId);
-  const editDraftIdRef = useRef(initialEditDraftId);
-  const [saveState, setSaveState] = useState<SaveState>("idle");
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [recovery, setRecovery] = useState<{ snapshot: ContributionSnapshot; key: string } | null>(null);
   const [showTitle, setShowTitle] = useState(Boolean(initialSnapshot.title.trim()));
   const [showSubtitle, setShowSubtitle] = useState(Boolean(initialSnapshot.excerpt.trim()));
   // One drawer at a time. Independent toggles let a writer stack the format
@@ -299,29 +176,56 @@ export default function UniversalComposer({
   const [activeMarks, setActiveMarks] = useState<Record<string, boolean>>({});
   const [showPublish, setShowPublish] = useState(false);
   const [showProfileGate, setShowProfileGate] = useState(false);
-  const [showLeave, setShowLeave] = useState(false);
   const [showDiscard, setShowDiscard] = useState(false);
-  const [publishing, setPublishing] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
-  const localTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const cloudTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const revisionRef = useRef(0);
-  const latestRef = useRef(snapshot);
-  const lastPersistedRef = useRef(initialSnapshot);
-  const saveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
-  const mountedRef = useRef(true);
-  const localKeyRef = useRef(
-    `${LOCAL_PREFIX}:${userId}:${mode}:${publishedPostId ?? initialDraftId ?? "new"}`
-  );
-  // The document this canvas is currently editing. It picks up an id when the
-  // first autosave mints a draft, so a later arrival of that same id reads as
-  // "still the same piece" rather than as a switch to a different one.
-  const documentIdRef = useRef(publishedPostId ?? initialDraftId ?? null);
-  const [documentKey, setDocumentKey] = useState(publishedPostId ?? initialDraftId ?? "new");
-  const scannedRef = useRef(false);
+
+  // A different draft arriving resets the screen along with the saving state.
+  const resetScreen = useCallback((next: ContributionSnapshot) => {
+    setShowTitle(Boolean(next.title.trim()));
+    setShowSubtitle(Boolean(next.excerpt.trim()));
+    setShowPublish(false);
+    setShowPreview(false);
+    setPanel(null);
+    setSelectedImage(null);
+    setImageUploading(false);
+    setHistory({ canUndo: false, canRedo: false });
+  }, []);
+
+  const {
+    snapshot,
+    setSnapshot,
+    saveState,
+    saveError,
+    saveLabel: savedLabel,
+    recovery,
+    restoreRecovery,
+    dismissRecovery,
+    draftId,
+    editDraftId,
+    documentKey,
+    requestClose,
+    navigateAway,
+    showLeave,
+    closeLeave,
+    publish: finishPublication,
+    publishing,
+    discardDraft,
+    bodyText,
+    wordCount,
+  } = useContributionDraft({
+    mode,
+    userId,
+    initialSnapshot,
+    draftId: initialDraftId,
+    editDraftId: initialEditDraftId,
+    publishedPostId,
+    publishedSlug,
+    draftUpdatedAt,
+    returnTo,
+    onDocumentChange: resetScreen,
+  });
 
   const closePublish = useCallback(() => setShowPublish(false), []);
-  const closeLeave = useCallback(() => setShowLeave(false), []);
   const closeDiscard = useCallback(() => setShowDiscard(false), []);
   const closePreview = useCallback(() => setShowPreview(false), []);
   const togglePanel = useCallback(
@@ -333,198 +237,6 @@ export default function UniversalComposer({
   useModalFocus(showDiscard, discardDialogRef, closeDiscard);
   useModalFocus(showPreview, previewDialogRef, closePreview);
 
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-      if (localTimerRef.current) clearTimeout(localTimerRef.current);
-      if (cloudTimerRef.current) clearTimeout(cloudTimerRef.current);
-    };
-  }, []);
-
-  // Resuming another draft from the drafts panel is a client-side navigation
-  // into this same component instance, so none of the state below re-derives on
-  // its own. Without this the canvas would keep the previous draft's text and
-  // keep autosaving it to the previous draft, under the new draft's address.
-  useEffect(() => {
-    const incoming = publishedPostId ?? initialDraftId ?? null;
-    if (!incoming || incoming === documentIdRef.current) return;
-    documentIdRef.current = incoming;
-    draftIdRef.current = initialDraftId;
-    editDraftIdRef.current = initialEditDraftId;
-    revisionRef.current += 1;
-    latestRef.current = initialSnapshot;
-    lastPersistedRef.current = initialSnapshot;
-    localKeyRef.current = `${LOCAL_PREFIX}:${userId}:${mode}:${incoming}`;
-    scannedRef.current = false;
-    setSnapshot(initialSnapshot);
-    setDraftId(initialDraftId);
-    setEditDraftId(initialEditDraftId);
-    setShowTitle(Boolean(initialSnapshot.title.trim()));
-    setShowSubtitle(Boolean(initialSnapshot.excerpt.trim()));
-    setRecovery(null);
-    setSaveState("idle");
-    setSaveError(null);
-    setShowPublish(false);
-    setShowPreview(false);
-    setPanel(null);
-    setSelectedImage(null);
-    setImageUploading(false);
-    setHistory({ canUndo: false, canRedo: false });
-    setDocumentKey(incoming);
-  }, [initialDraftId, initialEditDraftId, initialSnapshot, mode, publishedPostId, userId]);
-
-  useEffect(() => {
-    if (scannedRef.current) return;
-    scannedRef.current = true;
-    const candidates = [localKeyRef.current, `indegenius:post-draft:${userId}`];
-    for (let index = 0; index < localStorage.length; index += 1) {
-      const key = localStorage.key(index);
-      if (key?.startsWith(`indegenius:article-draft:v2:${encodeURIComponent(userId)}:`)) {
-        candidates.push(key);
-      }
-    }
-    const accountSavedAt = draftUpdatedAt ? Date.parse(draftUpdatedAt) : Number.NaN;
-    for (const key of candidates) {
-      if (localStorage.getItem(key) === null) continue;
-      try {
-        const raw = JSON.parse(localStorage.getItem(key) ?? "null") as { savedAt?: unknown } | null;
-        const parsed = safeSnapshot(raw, initialSnapshot);
-        // A copy too small to have earned a draft is too small to interrupt
-        // for, so a stray keystroke cannot leave a banner waiting on every
-        // future visit.
-        if (!parsed || snapshotsMatch(parsed, initialSnapshot) || !deservesCloudDraft(parsed)) {
-          // Nothing this copy could add back, so it stops asking. Keys written
-          // by the composers this one replaced are otherwise permanent: they
-          // are never rewritten, so they would offer the same stale writing on
-          // every visit forever.
-          localStorage.removeItem(key);
-          continue;
-        }
-        const deviceSavedAt = typeof raw?.savedAt === "string" ? Date.parse(raw.savedAt) : Number.NaN;
-        if (
-          Number.isFinite(accountSavedAt) &&
-          Number.isFinite(deviceSavedAt) &&
-          deviceSavedAt <= accountSavedAt
-        ) {
-          // The account copy is provably the newer one, so restoring this would
-          // be a downgrade, not a recovery.
-          localStorage.removeItem(key);
-          continue;
-        }
-        setRecovery({ snapshot: parsed, key });
-        return;
-      } catch {
-        // A damaged device copy should never block the account copy.
-        localStorage.removeItem(key);
-      }
-    }
-  }, [draftUpdatedAt, initialSnapshot, userId]);
-
-  const persist = useCallback(
-    (next: ContributionSnapshot, revision: number) => {
-      setSaveState("saving");
-      setSaveError(null);
-      const operation = saveQueueRef.current
-        .catch(() => undefined)
-        .then(async () => {
-          if (mode === "published-edit") {
-            if (!publishedPostId) throw new Error("This publication cannot be edited.");
-            const result = await savePublishedEditDraft({ postId: publishedPostId, snapshot: next });
-            if (result.error || !result.editDraftId) throw new Error(result.error ?? "We couldn't save this edit.");
-            editDraftIdRef.current = result.editDraftId;
-            if (mountedRef.current) setEditDraftId(result.editDraftId);
-          } else {
-            const targetDraftId = draftIdRef.current;
-            const result = await ensureContributionDraft({ draftId: targetDraftId, snapshot: next });
-            if (result.error || !result.draftId) throw new Error(result.error ?? "We couldn't save this draft.");
-            draftIdRef.current = result.draftId;
-            documentIdRef.current = result.draftId;
-            if (!targetDraftId && mountedRef.current) {
-              setDraftId(result.draftId);
-              const url = new URL(window.location.href);
-              url.searchParams.set("draft", result.draftId);
-              // Deliberately a shallow URL update rather than router.replace.
-              // Re-rendering the server page here would flip `mode` from "new"
-              // to "draft" and hand the canvas a draft id, remounting the
-              // editor under the writer's cursor about two seconds into every
-              // new piece. The address still survives a refresh or a back.
-              window.history.replaceState(null, "", `${url.pathname}${url.search}`);
-            }
-          }
-          if (!mountedRef.current) return;
-          lastPersistedRef.current = next;
-          if (revision === revisionRef.current) {
-            localStorage.removeItem(localKeyRef.current);
-            setSaveState("cloud");
-          }
-        })
-        .catch((error: unknown) => {
-          if (!mountedRef.current) return;
-          setSaveState("error");
-          setSaveError(error instanceof Error ? error.message : "We couldn't save your changes.");
-        });
-      saveQueueRef.current = operation;
-      return operation;
-    },
-    [mode, publishedPostId]
-  );
-
-  useEffect(() => {
-    latestRef.current = snapshot;
-    if (snapshotsMatch(snapshot, lastPersistedRef.current)) return;
-    const revision = ++revisionRef.current;
-    if (localTimerRef.current) clearTimeout(localTimerRef.current);
-    if (cloudTimerRef.current) clearTimeout(cloudTimerRef.current);
-
-    localTimerRef.current = setTimeout(() => {
-      try {
-        localStorage.setItem(
-          localKeyRef.current,
-          JSON.stringify({ version: 1, savedAt: new Date().toISOString(), data: snapshot })
-        );
-        if (mountedRef.current) setSaveState("device");
-      } catch {
-        // Cloud persistence below remains available when storage is blocked.
-      }
-    }, LOCAL_DELAY);
-
-    if (deservesCloudDraft(snapshot)) {
-      cloudTimerRef.current = setTimeout(() => void persist(snapshot, revision), CLOUD_DELAY);
-    }
-    return () => {
-      if (localTimerRef.current) clearTimeout(localTimerRef.current);
-      if (cloudTimerRef.current) clearTimeout(cloudTimerRef.current);
-    };
-  }, [persist, snapshot]);
-
-  const flush = useCallback(async () => {
-    if (localTimerRef.current) clearTimeout(localTimerRef.current);
-    if (cloudTimerRef.current) clearTimeout(cloudTimerRef.current);
-    const current = latestRef.current;
-    // Below the cloud bar there is nothing to flush, and reporting that as a
-    // failed save would raise the "didn't save" dialog over three characters.
-    // The device copy still holds them.
-    if (!deservesCloudDraft(current) || snapshotsMatch(current, lastPersistedRef.current)) {
-      return true;
-    }
-    const revision = ++revisionRef.current;
-    await persist(current, revision);
-    await saveQueueRef.current;
-    return snapshotsMatch(current, lastPersistedRef.current);
-  }, [persist]);
-
-  const navigateAway = useCallback(() => router.push(returnTo), [returnTo, router]);
-  const requestClose = async () => {
-    if (!hasMeaningfulContribution(snapshot)) {
-      navigateAway();
-      return;
-    }
-    const saved = await flush();
-    if (saved) navigateAway();
-    else setShowLeave(true);
-  };
-
   const openPublishSheet = () => {
     if (!profile?.full_name?.trim() || !profile.username?.trim()) {
       setShowProfileGate(true);
@@ -535,42 +247,6 @@ export default function UniversalComposer({
     // the opening on the server at publish time, which is why the sheet shows
     // that derived line rather than writing it into the writer's own field.
     setShowPublish(true);
-  };
-
-  const finishPublication = async () => {
-    if (!contributionText(snapshot.content)) return;
-    setPublishing(true);
-    setSaveError(null);
-    try {
-      if (mode === "published-edit") {
-        let targetEditDraftId = editDraftIdRef.current;
-        if (!targetEditDraftId) {
-          if (!publishedPostId) throw new Error("This publication cannot be edited.");
-          const created = await savePublishedEditDraft({ postId: publishedPostId, snapshot });
-          if (created.error || !created.editDraftId) throw new Error(created.error ?? "We couldn't save this edit.");
-          targetEditDraftId = created.editDraftId;
-          editDraftIdRef.current = created.editDraftId;
-          setEditDraftId(created.editDraftId);
-        } else {
-          const saved = await flush();
-          if (!saved) throw new Error(saveError ?? "We couldn't save this edit.");
-          targetEditDraftId = editDraftIdRef.current;
-        }
-        if (!targetEditDraftId) throw new Error("We couldn't resolve this edit draft.");
-        const result = await applyPublishedEditDraft({ editDraftId: targetEditDraftId });
-        if (result.error) throw new Error(result.error);
-        localStorage.removeItem(localKeyRef.current);
-        router.replace(`/post/${result.slug ?? publishedSlug}`);
-      } else {
-        const result = await publishContribution({ draftId: draftIdRef.current, snapshot });
-        if (result.error || !result.slug) throw new Error(result.error ?? "We couldn't publish this.");
-        localStorage.removeItem(localKeyRef.current);
-        router.replace(`/post/${result.slug}?justPublished=1`);
-      }
-    } catch (error) {
-      setSaveError(error instanceof Error ? error.message : "We couldn't finish this publication.");
-      setPublishing(false);
-    }
   };
 
   // This runs on every keystroke, so each piece of derived state is compared
@@ -642,7 +318,7 @@ export default function UniversalComposer({
     setShowTitle(Boolean(revision.title.trim()));
     setShowSubtitle(Boolean(revision.excerpt.trim()));
     setPanel(null);
-  }, []);
+  }, [setSnapshot]);
 
   // A one-line textarea with overflow hidden clips its second line, and a
   // title long enough to wrap is exactly the kind someone wants to read back.
@@ -669,26 +345,10 @@ export default function UniversalComposer({
     imagePanelRef.current?.scrollIntoView({ block: "nearest" });
   }, [hasSelectedImage]);
 
-  // "Saved" is the resting state. Only the device-only case earns more words,
-  // because it is the only one that carries a consequence for the writer.
   // An upload outranks the save state here. It is the only one of the two the
   // writer just started by hand, and a pasted photo gives no other sign that
   // anything is happening until it lands.
-  const saveLabel = imageUploading
-    ? "Adding image…"
-    : saveState === "saving"
-      ? "Saving…"
-      : saveState === "cloud"
-        ? "Saved"
-        : saveState === "device"
-          ? "Saved on this device"
-          : saveState === "error"
-            ? saveError ?? "Save failed"
-            : mode === "published-edit" && editDraftId
-              ? "Saved"
-              : "";
-  const bodyText = contributionText(snapshot.content);
-  const wordCount = bodyText ? bodyText.split(/\s+/).filter(Boolean).length : 0;
+  const saveLabel = imageUploading ? "Adding image…" : savedLabel;
   const authorName = profile?.full_name?.trim() || profile?.username?.trim() || "You";
   // What the feed will carry. An unwritten subtitle still becomes one, derived
   // from the opening on the server, so the sheet shows the result either way
@@ -729,8 +389,8 @@ export default function UniversalComposer({
             <div className="flex gap-2">
               {/* Both actions clear the key the copy actually came from, which
                   is not always this canvas's own key. */}
-              <button type="button" onClick={() => { localStorage.removeItem(recovery.key); setSnapshot(recovery.snapshot); setShowTitle(Boolean(recovery.snapshot.title.trim())); setRecovery(null); }} className="min-h-11 rounded-lg bg-gold-ink px-4 font-semibold text-white">Restore</button>
-              <button type="button" onClick={() => { localStorage.removeItem(recovery.key); setRecovery(null); }} className="min-h-11 rounded-lg px-3 font-semibold text-gold-ink">Discard</button>
+              <button type="button" onClick={() => { const restored = restoreRecovery(); if (restored) setShowTitle(Boolean(restored.title.trim())); }} className="min-h-11 rounded-lg bg-gold-ink px-4 font-semibold text-white">Restore</button>
+              <button type="button" onClick={dismissRecovery} className="min-h-11 rounded-lg px-3 font-semibold text-gold-ink">Discard</button>
             </div>
           </div>
         ) : null}
@@ -1120,7 +780,7 @@ export default function UniversalComposer({
           <div ref={discardDialogRef} role="alertdialog" aria-modal="true" aria-labelledby="discard-title" className="w-full max-w-sm rounded-2xl bg-surface p-6 text-ink shadow-2xl">
             <h2 id="discard-title" className="font-display text-lg font-semibold">Discard this edit draft?</h2>
             <p className="mt-2 text-sm text-ink-muted">Your live publication will stay unchanged.</p>
-            <div className="mt-5 flex gap-3"><Button type="button" variant="secondary" onClick={closeDiscard} className="flex-1 min-h-11">Cancel</Button><Button type="button" variant="danger" onClick={async () => { const result = await discardPublishedEditDraft({ editDraftId }); if (!result.error) { localStorage.removeItem(localKeyRef.current); router.push(`/post/${publishedSlug}`); } else setSaveError(result.error); }} className="flex-1 min-h-11">Discard</Button></div>
+            <div className="mt-5 flex gap-3"><Button type="button" variant="secondary" onClick={closeDiscard} className="flex-1 min-h-11">Cancel</Button><Button type="button" variant="danger" onClick={() => void discardDraft()} className="flex-1 min-h-11">Discard</Button></div>
           </div>
         </div>
       ) : null}
