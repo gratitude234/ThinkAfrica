@@ -66,18 +66,50 @@ describe("ArticleEditor", () => {
   });
 
   it("asks for a title once there is a body, and holds Continue until there is one", () => {
-    renderEditor({ content: "<p>A body with no title yet.</p>" });
+    const { props } = renderEditor({ content: "<p>A body with no title yet.</p>" });
 
     const message = screen.getByText("Add a title to continue. An Article needs one, a Post never does.");
     expect(screen.getByLabelText("Title")).toHaveAttribute("aria-describedby", message.id);
-    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+    const continueButton = screen.getByRole("button", { name: "Continue" });
+    expect(continueButton).toHaveAttribute("aria-disabled", "true");
+
+    fireEvent.click(continueButton);
+    expect(screen.getByLabelText("Title")).toHaveFocus();
+    expect(props.withCompleteProfile).not.toHaveBeenCalled();
   });
 
-  it("holds Continue until there is a body", () => {
+  it("holds Continue until there is a body, and says so when pressed", () => {
+    const { props } = renderEditor({ title: "A title" });
+
+    const continueButton = screen.getByRole("button", { name: "Continue" });
+    expect(continueButton).toHaveAttribute("aria-disabled", "true");
+    expect(continueButton).toBeEnabled();
+    expect(screen.queryByText(/Add a title to continue/)).not.toBeInTheDocument();
+
+    fireEvent.click(continueButton);
+
+    expect(screen.getByText("Write something here to continue.")).toBeInTheDocument();
+    expect(editorMock.handle.focus).toHaveBeenCalled();
+    expect(props.withCompleteProfile).not.toHaveBeenCalled();
+  });
+
+  it("names everything missing when Continue is pressed on an empty page", () => {
+    renderEditor();
+
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(screen.getByText("Add a title to continue. An Article needs one, a Post never does.")).toBeInTheDocument();
+    expect(screen.getByText("Write something here to continue.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Title")).toHaveFocus();
+  });
+
+  it("says what Preview needs instead of opening an empty preview", () => {
     renderEditor({ title: "A title" });
 
-    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
-    expect(screen.queryByText(/Add a title to continue/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+
+    expect(screen.getByText("Write something here to preview it.")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Reader preview" })).not.toBeInTheDocument();
   });
 
   it("goes on to Publish settings, then publishes", () => {
@@ -160,9 +192,22 @@ describe("ArticleEditor", () => {
     expect(screen.getByRole("dialog", { name: "Reader preview" })).toBeInTheDocument();
   });
 
+  it("shows the phone toolbar only while the body has focus", () => {
+    renderEditor(titled);
+    expect(screen.queryByRole("toolbar", { name: "Formatting" })).not.toBeInTheDocument();
+
+    fireEvent.focus(screen.getByLabelText("Publication body"));
+    expect(screen.getByRole("toolbar", { name: "Formatting" })).toBeInTheDocument();
+
+    fireEvent.blur(screen.getByLabelText("Publication body"));
+    fireEvent.focus(screen.getByLabelText("Title"));
+    expect(screen.queryByRole("toolbar", { name: "Formatting" })).not.toBeInTheDocument();
+  });
+
   it("aligns text through the editor", () => {
     renderEditor(titled);
 
+    fireEvent.focus(screen.getByLabelText("Publication body"));
     fireEvent.click(screen.getByRole("button", { name: "More formatting" }));
     fireEvent.click(screen.getByRole("button", { name: "Justify" }));
 

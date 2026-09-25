@@ -43,6 +43,8 @@ export interface ArticleEditorProps {
 }
 
 type Sheet = "sources" | "history" | null;
+/** What the writer last pressed before the piece was ready for it. */
+type Nudge = "continue" | "preview" | null;
 
 function sameFormats(left: FormatState, right: FormatState) {
   return (Object.keys(left) as Array<keyof FormatState>).every((key) => left[key] === right[key]);
@@ -79,19 +81,28 @@ export default function ArticleEditor({
   const [sheet, setSheet] = useState<Sheet>(null);
   const [showPublish, setShowPublish] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [bodyFocused, setBodyFocused] = useState(false);
+  const [nudge, setNudge] = useState<Nudge>(null);
 
   const isEdit = mode === "published-edit";
   const hasTitle = Boolean(snapshot.title.trim());
   const hasBody = Boolean(draft.bodyText);
   const uploading = imageUploading || coverUploading;
   const canContinue = hasTitle && hasBody && !uploading;
-  const missingTitle = hasBody && !hasTitle;
+  // Continue and Preview stay pressable when the piece is not ready, and a
+  // press says what is missing next to the field that is missing it. A button
+  // that only turns grey tells a new writer nothing.
+  const missingTitle = !hasTitle && (hasBody || nudge === "continue");
+  const missingBody = !hasBody && nudge !== null;
   const canSaveDraft = hasMeaningfulContribution(snapshot);
   const canDiscard = isEdit ? Boolean(draft.editDraftId) : Boolean(draft.draftId) || canSaveDraft;
   // An upload outranks the save state. It is the one the writer just started
   // by hand, and a pasted photo gives no other sign until it lands.
   const statusLabel = uploading ? "Adding image…" : draft.saveLabel;
   const statusIsError = !uploading && draft.saveState === "error";
+  // "idle" with a label is a published edit whose changes the account holds.
+  const statusIsSaved =
+    !uploading && (draft.saveState === "cloud" || (draft.saveState === "idle" && Boolean(draft.saveLabel)));
 
   const closeSheet = useCallback(() => setSheet(null), []);
   const closePublish = useCallback(() => setShowPublish(false), []);
@@ -121,6 +132,7 @@ export default function ArticleEditor({
       bulletList: editor.isActive("bulletList"),
       orderedList: editor.isActive("orderedList"),
       link: editor.isActive("link"),
+      hasSelection: editor.hasSelection(),
       align: editor.getTextAlign(),
     };
     setFormats((current) => (sameFormats(current, next) ? current : next));
@@ -191,9 +203,13 @@ export default function ArticleEditor({
             }`}
           >
             {statusLabel ? (
+              // Green once the account has it, red when it failed, grey while
+              // it is on its way. Gold read as a warning on every keystroke.
               <span
                 aria-hidden="true"
-                className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusIsError ? "bg-red-600" : "bg-gold"}`}
+                className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                  statusIsError ? "bg-red-600" : statusIsSaved ? "bg-emerald-brand" : "bg-ink-muted/50"
+                }`}
               />
             ) : null}
             {statusLabel}
@@ -212,16 +228,38 @@ export default function ArticleEditor({
             />
             <button
               type="button"
-              onClick={() => setShowPreview(true)}
-              disabled={!hasBody}
-              className="flex min-h-11 shrink-0 items-center justify-center rounded-md px-3 text-sm font-semibold text-emerald-ink transition-colors hover:bg-green-wash disabled:cursor-not-allowed disabled:text-ink-muted/60 md:border md:border-emerald-brand md:px-4 md:disabled:border-divider"
+              onClick={() => {
+                if (!hasBody) {
+                  setNudge("preview");
+                  editorRef.current?.focus();
+                  return;
+                }
+                setShowPreview(true);
+              }}
+              aria-disabled={!hasBody || undefined}
+              aria-describedby={missingBody ? "article-body-required" : undefined}
+              className="flex min-h-11 shrink-0 items-center justify-center rounded-md px-3 text-sm font-semibold text-emerald-ink transition-colors hover:bg-green-wash aria-disabled:text-ink-muted/60 aria-disabled:hover:bg-transparent md:border md:border-emerald-brand md:px-4 md:aria-disabled:border-divider"
             >
               Preview
             </button>
             <Button
               type="button"
-              onClick={() => withCompleteProfile(() => setShowPublish(true))}
-              disabled={!canContinue}
+              onClick={() => {
+                if (!hasTitle || !hasBody) {
+                  setNudge("continue");
+                  if (!hasTitle) titleRef.current?.focus();
+                  else editorRef.current?.focus();
+                  return;
+                }
+                withCompleteProfile(() => setShowPublish(true));
+              }}
+              // An image still uploading is the one wait that explains itself:
+              // the status already says "Adding image…".
+              disabled={uploading}
+              aria-disabled={!canContinue || undefined}
+              aria-describedby={
+                missingTitle ? "article-title-required" : missingBody ? "article-body-required" : undefined
+              }
               className={WRITE_PRIMARY_BUTTON}
             >
               {isEdit ? "Update Article" : "Continue"}
@@ -269,7 +307,7 @@ export default function ArticleEditor({
           className="publication-article-title block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-[32px] font-semibold leading-[1.16] tracking-[-0.01em] text-ink outline-none placeholder:text-ink-muted/35 sm:text-[44px]"
         />
         {missingTitle ? (
-          <p id="article-title-required" className="mt-2 text-sm text-red-600">
+          <p id="article-title-required" aria-live="polite" className="mt-2 text-sm text-red-600">
             Add a title to continue. An Article needs one, a Post never does.
           </p>
         ) : null}
@@ -285,11 +323,17 @@ export default function ArticleEditor({
             }
             onSelectionUpdate={handleSelectionUpdate}
             onImageUploadingChange={setImageUploading}
+            onFocusChange={setBodyFocused}
           />
+          {missingBody ? (
+            <p id="article-body-required" aria-live="polite" className="mt-3 text-sm text-red-600">
+              {nudge === "preview" ? "Write something here to preview it." : "Write something here to continue."}
+            </p>
+          ) : null}
         </div>
       </main>
 
-      <ArticleMobileToolbar editorRef={editorRef} formats={formats} history={history} />
+      <ArticleMobileToolbar editorRef={editorRef} formats={formats} history={history} active={bodyFocused} />
       {selectedImage ? <ImageDetailsPanel image={selectedImage} onChange={updateImage} /> : null}
 
       <WriteSheet open={sheet === "sources"} title="Sources" onClose={closeSheet}>

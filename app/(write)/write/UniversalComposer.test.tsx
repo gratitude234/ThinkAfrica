@@ -400,14 +400,15 @@ describe("the screen", () => {
     expect(screen.queryByText(/Continue where you left off/i)).not.toBeInTheDocument();
   });
 
-  it("rests on a one-word save status and elaborates only for a device-only copy", async () => {
+  it("says Saving while the account copy is on its way, then Draft saved", async () => {
     open();
     fireEvent.change(screen.getByLabelText("Publication body"), { target: { value: "<p>Something worth saving to the account.</p>" } });
 
     await act(async () => { await vi.advanceTimersByTimeAsync(400); });
-    expect(screen.getByText("Saved on this device")).toBeInTheDocument();
+    expect(screen.getByText("Saving…")).toBeInTheDocument();
+    expect(screen.queryByText(/this device/)).not.toBeInTheDocument();
 
     await act(async () => { await vi.advanceTimersByTimeAsync(2100); });
-    expect(screen.getByText("Saved")).toBeInTheDocument();
+    expect(screen.getByText("Draft saved")).toBeInTheDocument();
   });
 });

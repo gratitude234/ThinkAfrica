@@ -220,9 +220,14 @@ The `Editor.tsx` component exposes an `EditorHandle` ref for toolbar
 integration (`toggleBold`, `toggleItalic`, `toggleH2`, `toggleH3`,
 `toggleBulletList`, `toggleOrderedList`, `toggleBlockquote`, `insertDivider`,
 `isActive`, `undo`/`redo` with `canUndo`/`canRedo`, `triggerImageUpload`,
-`insertLink`, `insertCitation`, `getSelectedImage`/`updateSelectedImage`,
-`setTextAlign`/`getTextAlign`, `focus`), and fires `onUpdate` /
-`onSelectionUpdate` callbacks. It has two variants. `article` has the
+`insertLink` with `hasSelection` and `getLinkHref`, `insertCitation`,
+`getSelectedImage`/`updateSelectedImage`, `setTextAlign`/`getTextAlign`,
+`focus`/`returnFocus`), and fires `onUpdate`, `onSelectionUpdate` and
+`onFocusChange` callbacks. A link is made only from selected text or an
+existing link, and only to an address `normalizeLinkUrl()` in
+`lib/linkUrl.ts` accepts, which adds a missing `https://`
+(`linkSelection()` in `extensions.ts`). The phone toolbar shows only while
+the body has focus. It has two variants. `article` has the
 selection toolbar (desktop only) and the "+" insert menu. `post` shows no
 tools, and sends a pasted or dropped image to `onImageFile` rather than into
 the text. Both use the whole schema in `components/editor/extensions.ts`, so

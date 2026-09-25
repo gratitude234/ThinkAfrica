@@ -15,18 +15,32 @@ const editor = {
   toggleBlockquote: vi.fn(),
   insertDivider: vi.fn(),
   triggerImageUpload: vi.fn(),
-  insertLink: vi.fn(),
+  insertLink: vi.fn(() => "linked"),
+  getLinkHref: vi.fn((): string | null => null),
+  returnFocus: vi.fn(),
   setTextAlign: vi.fn(),
 };
 const editorRef = { current: editor as unknown as EditorHandle };
 
-function show(formats: Partial<FormatState> = {}, history = { canUndo: true, canRedo: false }) {
-  render(<ArticleMobileToolbar editorRef={editorRef} formats={{ ...NO_FORMATS, ...formats }} history={history} />);
+function show(
+  formats: Partial<FormatState> = {},
+  history = { canUndo: true, canRedo: false },
+  active = true
+) {
+  return render(
+    <ArticleMobileToolbar
+      editorRef={editorRef}
+      formats={{ ...NO_FORMATS, ...formats }}
+      history={history}
+      active={active}
+    />
+  );
 }
 
 describe("ArticleMobileToolbar", () => {
   beforeEach(() => {
     for (const fn of Object.values(editor)) fn.mockClear();
+    editor.insertLink.mockImplementation(() => "linked");
   });
 
   it("puts undo and redo first, since a phone has no Cmd+Z", () => {
@@ -86,16 +100,89 @@ describe("ArticleMobileToolbar", () => {
     expect(screen.queryByRole("button", { name: "Divider" })).not.toBeInTheDocument();
   });
 
-  it("swaps the row for a link field", () => {
-    show();
+  it("swaps the row for a link field when there is text to link", () => {
+    show({ hasSelection: true });
 
     fireEvent.click(screen.getByRole("button", { name: "Link" }));
     expect(screen.queryByRole("toolbar", { name: "Formatting" })).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Link address"), { target: { value: "https://example.com" } });
+    fireEvent.change(screen.getByLabelText("Link address"), { target: { value: "example.com" } });
     fireEvent.click(screen.getByRole("button", { name: "Apply" }));
 
-    expect(editor.insertLink).toHaveBeenCalledWith("https://example.com");
+    expect(editor.insertLink).toHaveBeenCalledWith("example.com");
     expect(screen.getByRole("toolbar", { name: "Formatting" })).toBeInTheDocument();
+  });
+
+  it("asks for a selection instead of linking nothing", () => {
+    show({ hasSelection: false });
+
+    fireEvent.click(screen.getByRole("button", { name: "Link" }));
+
+    expect(screen.getByRole("status")).toHaveTextContent("Select the words you want to link first.");
+    expect(screen.queryByLabelText("Link address")).not.toBeInTheDocument();
+    expect(editor.insertLink).not.toHaveBeenCalled();
+  });
+
+  it("opens an existing link with its address", () => {
+    editor.getLinkHref.mockReturnValueOnce("https://example.com/story");
+    show({ link: true });
+
+    fireEvent.click(screen.getByRole("button", { name: "Link" }));
+
+    expect(screen.getByLabelText("Link address")).toHaveValue("https://example.com/story");
+  });
+
+  it("keeps the field open and says why when the address is not a link", () => {
+    editor.insertLink.mockImplementation(() => "invalid-address");
+    show({ hasSelection: true });
+
+    fireEvent.click(screen.getByRole("button", { name: "Link" }));
+    fireEvent.change(screen.getByLabelText("Link address"), { target: { value: "hrbdbf" } });
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Enter a web address, like example.com.");
+    expect(screen.getByLabelText("Link address")).toHaveAttribute("aria-invalid", "true");
+
+    fireEvent.change(screen.getByLabelText("Link address"), { target: { value: "hrbdbf.com" } });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("returns the caret to the body on Cancel", () => {
+    show({ hasSelection: true });
+
+    fireEvent.click(screen.getByRole("button", { name: "Link" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(editor.returnFocus).toHaveBeenCalled();
+    expect(screen.getByRole("toolbar", { name: "Formatting" })).toBeInTheDocument();
+  });
+
+  it("stays out of the way while the body does not have focus", () => {
+    show({}, undefined, false);
+
+    expect(screen.queryByRole("toolbar", { name: "Formatting" })).not.toBeInTheDocument();
+  });
+
+  it("stays up while its own link field has focus, and closes its menus when the body loses it", () => {
+    const view = show({ hasSelection: true });
+
+    fireEvent.click(screen.getByRole("button", { name: "Link" }));
+    view.rerender(
+      <ArticleMobileToolbar editorRef={editorRef} formats={{ ...NO_FORMATS, hasSelection: true }} history={{ canUndo: true, canRedo: false }} active={false} />
+    );
+    expect(screen.getByLabelText("Link address")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    view.rerender(
+      <ArticleMobileToolbar editorRef={editorRef} formats={NO_FORMATS} history={{ canUndo: true, canRedo: false }} active />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "More formatting" }));
+    view.rerender(
+      <ArticleMobileToolbar editorRef={editorRef} formats={NO_FORMATS} history={{ canUndo: true, canRedo: false }} active={false} />
+    );
+    view.rerender(
+      <ArticleMobileToolbar editorRef={editorRef} formats={NO_FORMATS} history={{ canUndo: true, canRedo: false }} active />
+    );
+    expect(screen.queryByRole("button", { name: "Subheading" })).not.toBeInTheDocument();
   });
 });

@@ -11,6 +11,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { INVALID_LINK_MESSAGE } from "@/lib/linkUrl";
 import { uploadImage } from "@/lib/uploadImage";
 import {
   ALIGNMENT_OPTIONS,
@@ -24,12 +25,14 @@ import {
 import {
   caretInEmptyBlock,
   editorExtensions,
+  linkSelection,
   stripPastedImages,
   TEXT_ALIGNMENTS,
+  type LinkResult,
   type TextAlignment,
 } from "./extensions";
 
-export type { TextAlignment } from "./extensions";
+export type { LinkResult, TextAlignment } from "./extensions";
 
 export interface SelectedImage {
   src: string;
@@ -52,7 +55,12 @@ export interface EditorHandle {
   canUndo: () => boolean;
   canRedo: () => boolean;
   triggerImageUpload: () => void;
-  insertLink: (url: string) => void;
+  /** Links the selection, or the whole link under the caret, to the address typed. */
+  insertLink: (url: string) => LinkResult;
+  /** Whether any text is selected. */
+  hasSelection: () => boolean;
+  /** The address of the link under the caret, if there is one. */
+  getLinkHref: () => string | null;
   insertCitation: (referenceId: string) => void;
   getSelectedImage: () => SelectedImage | null;
   updateSelectedImage: (attrs: { alt?: string; caption?: string }) => void;
@@ -61,6 +69,8 @@ export interface EditorHandle {
   getTextAlign: () => TextAlignment;
   /** Puts the caret at the start of the body, for the title field's Enter key. */
   focus: () => void;
+  /** Gives the body its focus back with the selection it had. */
+  returnFocus: () => void;
 }
 
 export type EditorVariant = "post" | "article";
@@ -84,6 +94,8 @@ interface EditorProps {
    */
   onImageUploadingChange?: (uploading: boolean) => void;
   onImageFile?: (file: File) => void;
+  /** Whether the body has focus, for a host that shows tools only while writing in it. */
+  onFocusChange?: (focused: boolean) => void;
   ariaLabel?: string;
   /** Places the caret in the body on mount. */
   autoFocus?: boolean;
@@ -166,6 +178,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     onSelectionUpdate,
     onImageUploadingChange,
     onImageFile,
+    onFocusChange,
     ariaLabel = "Article body",
     autoFocus = false,
   },
@@ -175,6 +188,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
   const [bubblePanel, setBubblePanel] = useState<BubblePanel>("marks");
   const [bubbleLinkUrl, setBubbleLinkUrl] = useState("");
+  const [bubbleLinkInvalid, setBubbleLinkInvalid] = useState(false);
   const [insertOpen, setInsertOpen] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -184,6 +198,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   const touchRef = useRef(false);
   const bubblePanelRef = useRef<BubblePanel>("marks");
   const onImageFileRef = useRef(onImageFile);
+  const onFocusChangeRef = useRef(onFocusChange);
   const bubbleTipRef = useRef<MenuTip | null>(null);
   const floatingTipRef = useRef<MenuTip | null>(null);
 
@@ -196,6 +211,9 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   useEffect(() => {
     onImageFileRef.current = onImageFile;
   }, [onImageFile]);
+  useEffect(() => {
+    onFocusChangeRef.current = onFocusChange;
+  }, [onFocusChange]);
 
   const showUploadError = useCallback((message: string) => {
     setImageUploadError(message);
@@ -344,12 +362,12 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
         ...(caption !== undefined ? { caption: kept(caption) } : {}),
       });
     },
-    insertLink: (url: string) => {
-      if (!url.trim()) {
-        editor?.chain().focus().unsetLink().run();
-        return;
-      }
-      editor?.chain().focus().setLink({ href: url.trim() }).run();
+    insertLink: (url: string): LinkResult => (editor ? linkSelection(editor, url) : "nothing-selected"),
+    hasSelection: () => (editor ? !editor.state.selection.empty : false),
+    getLinkHref: () => {
+      if (!editor?.isActive("link")) return null;
+      const href = editor.getAttributes("link").href;
+      return typeof href === "string" ? href : null;
     },
     insertCitation: (referenceId: string) => {
       const stableId = referenceId.replace(/^temp-/, "").trim();
@@ -364,6 +382,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     getTextAlign: () =>
       TEXT_ALIGNMENTS.find((alignment) => editor?.isActive({ textAlign: alignment })) ?? "left",
     focus: () => editor?.commands.focus("start"),
+    returnFocus: () => editor?.commands.focus(),
   }));
 
   useEffect(() => {
@@ -391,6 +410,18 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     };
     editor.on("blur", onBlur);
     return () => {
+      editor.off("blur", onBlur);
+    };
+  }, [editor]);
+
+  useEffect(() => {
+    if (!editor) return;
+    const onFocus = () => onFocusChangeRef.current?.(true);
+    const onBlur = () => onFocusChangeRef.current?.(false);
+    editor.on("focus", onFocus);
+    editor.on("blur", onBlur);
+    return () => {
+      editor.off("focus", onFocus);
       editor.off("blur", onBlur);
     };
   }, [editor]);
@@ -428,10 +459,12 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   };
 
   const applyLink = () => {
-    const url = bubbleLinkUrl.trim();
-    if (url) editor?.chain().focus().setLink({ href: url }).run();
-    else editor?.chain().focus().unsetLink().run();
+    if (editor && linkSelection(editor, bubbleLinkUrl) === "invalid-address") {
+      setBubbleLinkInvalid(true);
+      return;
+    }
     setBubbleLinkUrl("");
+    setBubbleLinkInvalid(false);
     setBubblePanel("marks");
   };
 
@@ -484,6 +517,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
             onHidden: () => {
               setBubblePanel("marks");
               setBubbleLinkUrl("");
+              setBubbleLinkInvalid(false);
             },
           }}
           shouldShow={({ editor: current, from, to }) =>
@@ -493,30 +527,43 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
           }
         >
           {bubblePanel === "link" ? (
-            <div className="flex items-center gap-1.5 rounded-md bg-emerald-brand p-1.5 shadow-lg shadow-ink/20">
-              <input
-                type="url"
-                autoFocus
-                value={bubbleLinkUrl}
-                onChange={(event) => setBubbleLinkUrl(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    applyLink();
-                  }
-                  if (event.key === "Escape") {
-                    setBubbleLinkUrl("");
-                    setBubblePanel("marks");
-                    editor.commands.focus();
-                  }
-                }}
-                placeholder="https://…"
-                aria-label="Link address"
-                className="h-9 w-56 rounded border-0 bg-surface px-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold"
-              />
-              <BubbleButton label="Apply link" onPress={applyLink}>
-                Apply
-              </BubbleButton>
+            <div className="rounded-md bg-emerald-brand p-1.5 shadow-lg shadow-ink/20">
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="url"
+                  autoFocus
+                  value={bubbleLinkUrl}
+                  onChange={(event) => {
+                    setBubbleLinkUrl(event.target.value);
+                    setBubbleLinkInvalid(false);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      applyLink();
+                    }
+                    if (event.key === "Escape") {
+                      setBubbleLinkUrl("");
+                      setBubbleLinkInvalid(false);
+                      setBubblePanel("marks");
+                      editor.commands.focus();
+                    }
+                  }}
+                  placeholder="Paste or type a link"
+                  aria-label="Link address"
+                  aria-invalid={bubbleLinkInvalid || undefined}
+                  aria-describedby={bubbleLinkInvalid ? "bubble-link-error" : undefined}
+                  className="h-9 w-56 rounded border-0 bg-surface px-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold"
+                />
+                <BubbleButton label="Apply link" onPress={applyLink}>
+                  Apply
+                </BubbleButton>
+              </div>
+              {bubbleLinkInvalid ? (
+                <p id="bubble-link-error" role="alert" className="px-1 pb-0.5 pt-1.5 text-xs text-white">
+                  {INVALID_LINK_MESSAGE}
+                </p>
+              ) : null}
             </div>
           ) : (
             <div className="relative">

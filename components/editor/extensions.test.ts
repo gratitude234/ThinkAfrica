@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { Editor } from "@tiptap/core";
 import { afterEach, describe, expect, it } from "vitest";
 import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
-import { caretInEmptyBlock, editorExtensions, stripPastedImages } from "./extensions";
+import { caretInEmptyBlock, editorExtensions, linkSelection, stripPastedImages } from "./extensions";
 
 /**
  * The schema tested through @tiptap/core directly. Component tests replace the
@@ -97,5 +97,52 @@ describe("pasting into a Post", () => {
       '<p>From <strong>Word</strong></p><img src="https://x/a.png"><figure><img src="https://x/b.png"><figcaption>Chart</figcaption></figure><p>After</p>';
 
     expect(stripPastedImages(pasted)).toBe("<p>From <strong>Word</strong></p><p>After</p>");
+  });
+});
+
+describe("linking a selection", () => {
+  function select(editor: ReturnType<typeof editorWith>, text: string) {
+    let from = -1;
+    editor.state.doc.descendants((node, pos) => {
+      if (from < 0 && node.isText && node.text?.includes(text)) from = pos + node.text.indexOf(text);
+    });
+    editor.commands.setTextSelection({ from, to: from + text.length });
+  }
+
+  it("links the selected words, adding the scheme the writer left off", () => {
+    const editor = editorWith("<p>Read the report today.</p>");
+    select(editor, "the report");
+
+    expect(linkSelection(editor, "example.com/report")).toBe("linked");
+    expect(editor.getHTML()).toContain('<a target="_blank" rel="noopener noreferrer" href="https://example.com/report">the report</a>');
+  });
+
+  it("links nothing without a selection, so what is typed next is not a hidden link", () => {
+    const editor = editorWith("<p>Read the report today.</p>");
+    editor.commands.setTextSelection(3);
+
+    expect(linkSelection(editor, "example.com")).toBe("nothing-selected");
+    editor.commands.insertContent("x");
+    expect(editor.getHTML()).not.toContain("<a");
+  });
+
+  it("changes nothing for an address that is not a link", () => {
+    const editor = editorWith("<p>Read the report today.</p>");
+    select(editor, "report");
+
+    expect(linkSelection(editor, "hrbdbf")).toBe("invalid-address");
+    expect(editor.getHTML()).toBe("<p>Read the report today.</p>");
+  });
+
+  it("edits the whole link under the caret, and removes it for an empty address", () => {
+    const editor = editorWith('<p>Read <a href="https://old.example.com">the report</a> today.</p>');
+    select(editor, "rep");
+    editor.commands.setTextSelection(editor.state.selection.from);
+
+    expect(linkSelection(editor, "new.example.com")).toBe("linked");
+    expect(editor.getHTML()).toContain('href="https://new.example.com">the report</a>');
+
+    expect(linkSelection(editor, "")).toBe("unlinked");
+    expect(editor.getHTML()).toBe("<p>Read the report today.</p>");
   });
 });
