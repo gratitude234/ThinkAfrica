@@ -3,6 +3,7 @@
 import { useEditor, EditorContent, BubbleMenu } from "@tiptap/react";
 import type { EditorView } from "@tiptap/pm/view";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { uploadImage } from "@/lib/uploadImage";
 import { editorExtensions, TEXT_ALIGNMENTS, type TextAlignment } from "./extensions";
 
 export type { TextAlignment } from "./extensions";
@@ -118,34 +119,13 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
 
   const uploadImageFile = useCallback(
     async (file: File): Promise<string | null> => {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      try {
-        const { createClient } = await import("@/lib/supabase/client");
-        const supabase = createClient();
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        const response = await fetch("/api/upload-image", {
-          method: "POST",
-          headers: session?.access_token
-            ? { Authorization: `Bearer ${session.access_token}` }
-            : {},
-          body: formData,
-        });
-        const json = await response.json();
-        if (json.url) {
-          setImageUploadError(null);
-          return json.url as string;
-        }
-        showUploadError(json.error ?? "Upload failed. Check the file type and size.");
-        return null;
-      } catch {
-        showUploadError("Couldn't upload image. Check your connection and try again.");
-        return null;
+      const result = await uploadImage(file);
+      if (result.ok) {
+        setImageUploadError(null);
+        return result.url;
       }
+      showUploadError(result.error);
+      return null;
     },
     [showUploadError]
   );
