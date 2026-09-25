@@ -68,4 +68,40 @@ describe("sanitizePostHtml", () => {
     expect(outbound).not.toContain("target");
     expect(outbound).not.toContain("rel=");
   });
+  it("keeps an alignment the editor can set on paragraphs and headings", () => {
+    const result = sanitizePostHtml(
+      '<p style="text-align: justify">A</p><h2 style="text-align: center">B</h2><h3 style="text-align: right">C</h3>'
+    );
+
+    // sanitize-html rebuilds the style attribute, so the space after the colon
+    // goes. The article CSS matches both spellings.
+    expect(result).toContain('<p style="text-align:justify">A</p>');
+    expect(result).toContain('<h2 style="text-align:center">B</h2>');
+    expect(result).toContain('<h3 style="text-align:right">C</h3>');
+  });
+
+  it("drops every other style, and any alignment the editor cannot set", () => {
+    const result = sanitizePostHtml(
+      '<p style="text-align: center; color: red; background: url(https://x/a.png)">A</p><p style="text-align: start">B</p>'
+    );
+
+    expect(result).toContain('<p style="text-align:center">A</p>');
+    expect(result).toContain("<p>B</p>");
+    expect(result).not.toContain("color");
+    expect(result).not.toContain("url(");
+  });
+
+  it("keeps no style on any other tag", () => {
+    const result = sanitizePostHtml(
+      '<blockquote style="text-align: center"><p>Q</p></blockquote><span style="text-align: center">S</span><img src="https://x/a.png" style="float: left">'
+    );
+
+    expect(result).not.toContain("style=");
+  });
+
+  it("leaves a piece with no alignment exactly as it was", () => {
+    const html = '<h2>Section</h2><p>Plain <strong>text</strong> and <a href="#ref-id-abc">[source]</a>.</p>';
+
+    expect(sanitizePostHtml(html)).toBe(html);
+  });
 });

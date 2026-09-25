@@ -15,6 +15,14 @@ const allowedTags = [
   "u",
 ];
 
+/**
+ * Alignment is the one style a writer can set, and only on the blocks the
+ * editor's TextAlign extension covers. Every other property, and any value
+ * outside these four, is removed, so a pasted `color` or `background:url()`
+ * never reaches a published page.
+ */
+const ALIGNMENT_STYLE = { "text-align": [/^(left|center|right|justify)$/] };
+
 function normalizeAnchor(
   tagName: string,
   attribs: sanitizeHtml.Attributes
@@ -73,6 +81,14 @@ export function sanitizePostHtml(content: string | null | undefined): string {
     allowedAttributes: {
       a: ["href"],
       img: ["alt", "src", "title"],
+      p: ["style"],
+      h2: ["style"],
+      h3: ["style"],
+    },
+    allowedStyles: {
+      p: ALIGNMENT_STYLE,
+      h2: ALIGNMENT_STYLE,
+      h3: ALIGNMENT_STYLE,
     },
     allowedSchemes: ["http", "https", "mailto"],
     allowedSchemesByTag: {
