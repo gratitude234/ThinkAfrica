@@ -5,6 +5,7 @@ import {
   deriveContributionExcerpt,
   derivePresentationClassification,
   hasMeaningfulContribution,
+  isWrittenExcerpt,
   type ContributionSnapshot,
 } from "./contribution";
 
@@ -87,3 +88,34 @@ describe("abandoned scraps", () => {
     expect(isAbandonedScrap({ title: null, word_count: 1, updated_at: daysAgo(2) })).toBe(false);
   });
 })
+
+describe("isWrittenExcerpt", () => {
+  const body =
+    "<p>Solar microgrids are changing <strong>Jos</strong>. Here is how the first ones were paid for.</p>";
+
+  it("recognises the opening of the body as generated", () => {
+    expect(isWrittenExcerpt(deriveContributionExcerpt(body), body)).toBe(false);
+    // Cut short, it ends in an ellipsis and is still the opening.
+    expect(isWrittenExcerpt(deriveContributionExcerpt(body, 30), body)).toBe(false);
+  });
+
+  it("recognises the older generator's three-dot cut", () => {
+    expect(isWrittenExcerpt("Solar microgrids are changing Jos. Here is...", body)).toBe(false);
+  });
+
+  it("keeps a summary the writer wrote", () => {
+    expect(isWrittenExcerpt("How a city paid for its first solar microgrids", body)).toBe(true);
+  });
+
+  it("treats a missing or blank summary as not written", () => {
+    for (const blank of ["", "   ", null, undefined]) {
+      expect(isWrittenExcerpt(blank, body), String(blank)).toBe(false);
+    }
+  });
+
+  it("compares text, not markup or entities", () => {
+    const quoted = "<p>Tom &amp; Jerry&#39;s <em>last</em> stand.</p>";
+
+    expect(isWrittenExcerpt("Tom & Jerry's last stand.", quoted)).toBe(false);
+  });
+});

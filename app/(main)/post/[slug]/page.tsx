@@ -36,6 +36,7 @@ import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
 import { stripLeadingEmptyParagraphs } from "@/lib/articleTypography";
 import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
 import { resolveContentKind } from "@/lib/contentModel";
+import { isWrittenExcerpt } from "@/lib/contribution";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -575,6 +576,12 @@ export default async function PostPage({ params }: PageProps) {
   const author = getPostAuthor(post);
   const sanitizedContent = sanitizePostHtml(post.content);
   const sanitizedExcerpt = sanitizePostExcerpt(post.excerpt);
+  // Printed under the title only when someone wrote it. A generated excerpt is
+  // the body's own opening, and printing it would show those lines twice.
+  const writtenExcerpt =
+    sanitizedExcerpt && isWrittenExcerpt(sanitizedExcerpt, sanitizedContent)
+      ? sanitizedExcerpt
+      : null;
   const readTime = estimateReadTime(sanitizedContent);
   const wordCount = countWords(sanitizedContent);
   const headedContent = injectHeadingIds(stripLeadingEmptyParagraphs(sanitizedContent));
@@ -665,9 +672,9 @@ export default async function PostPage({ params }: PageProps) {
               </h1>
             ) : null}
 
-            {sanitizedExcerpt ? (
+            {writtenExcerpt ? (
               <p className="mt-3 max-w-[690px] font-public-sans text-[16px] leading-[1.5] sm:mt-4 sm:leading-[1.55] text-[#4B5550] sm:text-[19px]">
-                {sanitizedExcerpt}
+                {writtenExcerpt}
               </p>
             ) : null}
 
