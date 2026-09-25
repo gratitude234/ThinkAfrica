@@ -223,6 +223,8 @@ describe("publications-first Home: what Home reads", () => {
         "next",
         "next/navigation",
         "@/lib/supabase/server",
+        // Tells a session check Auth did not answer apart from no session.
+        "@/lib/supabase/authFailure",
         "@/components/post/FeedSkeleton",
         "@/components/retention/RetentionEventTracker",
         "./PostsFeedSection",
@@ -293,7 +295,13 @@ describe("publications-first Home: the writer's dashboard", () => {
     // Drafts tab. The address stays, as a redirect, so old links still land.
     const dashboard = codeOf("app/(main)/dashboard/page.tsx");
     expect(importsOf(dashboard)).toEqual(
-      ["next/navigation", "@/lib/profileUsername", "@/lib/supabase/server"].sort()
+      [
+        "next/navigation",
+        "@/lib/profileUsername",
+        "@/lib/supabase/server",
+        // getUserForProtectedPage: a slow Auth server is not a signed-out visitor.
+        "@/lib/serverAuth",
+      ].sort()
     );
     // A temporary (307) redirect: the destination is per account, and a
     // permanent one could be cached by the browser across sign-ins.

@@ -1,12 +1,11 @@
 import { redirect } from "next/navigation";
 import { getUsableProfileUsername } from "@/lib/profileUsername";
 import { createClient } from "@/lib/supabase/server";
+import { getUserForProtectedPage } from "@/lib/serverAuth";
 
 export default async function MeRedirect() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getUserForProtectedPage(supabase);
 
   if (!user) redirect("/login?redirectTo=/me");
 

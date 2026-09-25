@@ -163,6 +163,7 @@ Role system (`lib/roles.ts`):
 - `canPublish()` → editor, admin
 - Admin is granted when the user's email matches `ADMIN_EMAIL`
 - Admin route guards live in `lib/adminAccess.ts` (`requireAdminHubAccess()`)
+- An Auth server that did not answer is not a signed-out visitor. A page that sends signed-out visitors to `/login` reads the user with `getUserForProtectedPage()` from `lib/serverAuth.ts`, which throws `AuthUnavailableError` on a timeout instead of answering null, and Home does the same for `getClaims()`. Redirecting on that null is what signed members out on 2026-09-25
 
 ### Post Workflow
 
@@ -195,6 +196,7 @@ Phase 2I made the stored model match the product: a piece is a Post or an Articl
 | `lib/postBySlug.ts` | The one core post lookup for `/post/[slug]`, memoised per render with React `cache()` |
 | `lib/serverAuth.ts` | `getCurrentUser()`, the session validation memoised per render |
 | `lib/supabase/fetchTimeout.ts` | Fail-fast deadline on PostgREST and Auth calls |
+| `lib/supabase/authFetch.ts` | Keeps the last good signing keys for `getClaims()`, and stops a Supabase 5xx on a token refresh from deleting the session |
 | `lib/db/` | The provider boundary: repository contracts, the Supabase implementation, and the direct-SQL one |
 | `lib/contentModel.ts` | The content model, entire: two kinds, and the rule that a title makes a piece an Article |
 

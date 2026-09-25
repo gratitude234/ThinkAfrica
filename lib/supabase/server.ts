@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { withAuthResilience } from "@/lib/supabase/authFetch";
 import { withSupabaseTimeout } from "@/lib/supabase/fetchTimeout";
 
 export async function createClient() {
@@ -12,8 +13,10 @@ export async function createClient() {
       // A database that has stopped answering must not be able to hold a
       // Vercel function open until the 300-second ceiling. See
       // lib/supabase/fetchTimeout.ts: PostgREST and Auth get a deadline,
-      // storage transfers do not, and nothing is retried.
-      global: { fetch: withSupabaseTimeout() },
+      // storage transfers do not, and nothing is retried. Outside that,
+      // lib/supabase/authFetch.ts keeps a slow or failing Auth server from
+      // reading as a signed-out visitor.
+      global: { fetch: withAuthResilience(withSupabaseTimeout()) },
       cookies: {
         getAll() {
           return cookieStore.getAll();

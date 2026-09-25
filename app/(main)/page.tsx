@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { AuthUnavailableError, isRetryableAuthFailure } from "@/lib/supabase/authFailure";
 import { createClient } from "@/lib/supabase/server";
 import FeedSkeleton from "@/components/post/FeedSkeleton";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
@@ -56,6 +57,11 @@ export default async function HomePage({ searchParams }: PageProps) {
   const supabase = await createClient();
 
   const claimsResult = await supabase.auth.getClaims();
+  // An Auth server that did not answer is not a signed-out visitor. Sending
+  // one to /landing reads as being signed out straight after signing in.
+  if (claimsResult.error && isRetryableAuthFailure(claimsResult.error)) {
+    throw new AuthUnavailableError(claimsResult.error);
+  }
   const claims = claimsResult.data?.claims ?? null;
   const userId = typeof claims?.sub === "string" ? claims.sub : null;
 

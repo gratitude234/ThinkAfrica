@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { loadProfileSettings } from "@/lib/profileSettingsData";
 import { createClient } from "@/lib/supabase/server";
+import { getUserForProtectedPage } from "@/lib/serverAuth";
 import ProfileSettings from "./ProfileSettings";
 
 export const metadata: Metadata = {
@@ -18,9 +19,7 @@ export const metadata: Metadata = {
  */
 export default async function EditProfilePage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getUserForProtectedPage(supabase);
   if (!user) redirect("/login?redirectTo=%2Fsettings%2Fprofile");
 
   const model = await loadProfileSettings(supabase, user.id);

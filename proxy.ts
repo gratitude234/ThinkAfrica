@@ -1,6 +1,8 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { APP_DOMAIN } from "@/lib/site";
+import { withAuthResilience } from "@/lib/supabase/authFetch";
+import { isRetryableAuthFailure } from "@/lib/supabase/authFailure";
 import { withSupabaseTimeout } from "@/lib/supabase/fetchTimeout";
 import { FREEZE_RESPONSE, shouldRefuseWrite } from "@/lib/writeFreeze";
 
@@ -14,20 +16,6 @@ function hasSupabaseAuthCookie(request: NextRequest) {
   return request.cookies
     .getAll()
     .some(({ name }) => /^sb-.+-auth-token(?:\.\d+)?$/.test(name));
-}
-
-function isRetryableAuthFailure(error: unknown) {
-  const source = error as { name?: unknown; status?: unknown; message?: unknown } | null;
-  const name = typeof source?.name === "string" ? source.name : "";
-  const message = typeof source?.message === "string" ? source.message : "";
-  return (
-    source?.status === 0 ||
-    source?.status === 409 ||
-    name.includes("Retryable") ||
-    name.includes("Timeout") ||
-    message.includes("did not respond within") ||
-    message.includes("concurrent token refresh")
-  );
 }
 
 export async function proxy(request: NextRequest) {
@@ -106,7 +94,7 @@ export async function proxy(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      global: { fetch: withSupabaseTimeout() },
+      global: { fetch: withAuthResilience(withSupabaseTimeout()) },
       cookies: {
         getAll() {
           return request.cookies.getAll();

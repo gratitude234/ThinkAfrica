@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getUserForProtectedPage } from "@/lib/serverAuth";
 import { IN_APP_PREF_DEFAULTS } from "@/lib/notificationPreferences";
 import AccountForm from "./AccountForm";
 import NotificationsForm, { type NotificationPrefs } from "./NotificationsForm";
@@ -35,9 +36,7 @@ export default async function SettingsPage({ searchParams }: PageProps) {
     : "account";
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getUserForProtectedPage(supabase);
 
   if (!user) redirect("/login?redirectTo=/settings");
 

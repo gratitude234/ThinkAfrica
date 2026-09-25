@@ -4,12 +4,11 @@ import { fetchNotificationRows } from "@/lib/notificationData";
 import { mutedNotificationTypes } from "@/lib/notificationPreferences";
 import { normalizeMyPrivateProfile } from "@/lib/profilePrivate";
 import { createClient } from "@/lib/supabase/server";
+import { getUserForProtectedPage } from "@/lib/serverAuth";
 
 export default async function NotificationsPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getUserForProtectedPage(supabase);
 
   if (!user) redirect("/login?redirectTo=/notifications");
 
