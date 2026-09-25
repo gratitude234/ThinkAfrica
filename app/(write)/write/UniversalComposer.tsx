@@ -690,7 +690,6 @@ export default function UniversalComposer({
                 snapshot={snapshot}
                 authorName={authorName}
                 wordCount={wordCount}
-                variant="compact"
               />
             </div>
 
