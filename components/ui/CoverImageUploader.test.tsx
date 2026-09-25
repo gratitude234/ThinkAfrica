@@ -1,7 +1,8 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { createRef } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import CoverImageUploader from "@/components/ui/CoverImageUploader";
+import CoverImageUploader, { type CoverImageUploaderHandle } from "@/components/ui/CoverImageUploader";
 
 const mockGetUser = vi.fn();
 const mockUpload = vi.fn();
@@ -214,5 +215,19 @@ describe("CoverImageUploader", () => {
       "src",
       "https://cdn.example/b.png"
     );
+  });
+
+  it("opens its file picker for a caller that offers the upload elsewhere", () => {
+    const click = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
+    const ref = createRef<CoverImageUploaderHandle>();
+    const { container } = render(
+      <CoverImageUploader ref={ref} onUpload={vi.fn()} onRemove={vi.fn()} variant="compact" emptyTitle="Add cover" />
+    );
+
+    ref.current?.open();
+
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(click.mock.contexts[0]).toBe(container.querySelector('input[type="file"]'));
+    click.mockRestore();
   });
 });

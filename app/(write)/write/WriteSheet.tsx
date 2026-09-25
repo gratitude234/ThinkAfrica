@@ -15,8 +15,12 @@ interface WriteSheetProps {
   open: boolean;
   title: string;
   onClose: () => void;
-  /** From md up: "side" is a 420px panel on the right, "dialog" a centred 480px dialog. Both are bottom sheets on a phone. */
-  desktop?: "side" | "dialog";
+  /**
+   * From md up: "side" is a 420px panel on the right, "dialog" a centred 480px
+   * dialog, and "wide" a centred dialog with room for two columns. All three
+   * are bottom sheets on a phone.
+   */
+  desktop?: "side" | "dialog" | "wide";
   /** While true, Escape and the close controls do nothing. */
   busy?: boolean;
   /** A dialog whose footer already has a Cancel button leaves out the close button. */
@@ -30,6 +34,8 @@ const FRAME = {
   side: "md:inset-y-0 md:bottom-auto md:left-auto md:right-0 md:h-dvh md:max-h-none md:w-[420px] md:rounded-none md:border-l",
   dialog:
     "md:inset-x-auto md:bottom-auto md:left-1/2 md:top-1/2 md:max-h-[85dvh] md:w-[480px] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl",
+  wide:
+    "md:inset-x-auto md:bottom-auto md:left-1/2 md:top-1/2 md:max-h-[85dvh] md:w-[min(880px,calc(100vw-48px))] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl",
 } as const;
 
 /**

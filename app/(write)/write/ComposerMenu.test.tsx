@@ -35,6 +35,19 @@ describe("ComposerMenu", () => {
     expect(screen.queryByRole("menuitem", { name: "Preview" })).not.toBeInTheDocument();
   });
 
+  it("offers a cover only when there is a way to add one", () => {
+    const { props, unmount } = openMenu({ onPreview: vi.fn(), onAddCover: vi.fn() });
+    expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
+      "Preview", "Add cover", "Save draft", "Discard",
+    ]);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Add cover" }));
+    expect(props.onAddCover).toHaveBeenCalled();
+    unmount();
+
+    openMenu();
+    expect(screen.queryByRole("menuitem", { name: "Add cover" })).not.toBeInTheDocument();
+  });
+
   it("offers sources with their count, then hands focus back to the button", () => {
     const { props } = openMenu({ sourcesCount: 2, onOpenSources: vi.fn(), onOpenHistory: vi.fn() });
 

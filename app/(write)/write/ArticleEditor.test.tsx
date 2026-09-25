@@ -50,28 +50,52 @@ const titled = { title: "Power to the people", content: "<p>Solar microgrids are
 describe("ArticleEditor", () => {
   beforeEach(() => resetEditorMock());
 
-  it("is a titled page with a cover and a body", () => {
+  it("is a title and a body on a blank page, and nothing else", () => {
     renderEditor();
 
-    expect(screen.getByRole("button", { name: "Add cover" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add cover" })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Title")).toHaveAttribute("placeholder", "Title");
     expect(screen.getByLabelText("Publication body")).toHaveAttribute("placeholder", "Tell your story.");
     expect(screen.getByLabelText("Publication body")).toHaveAttribute("data-variant", "article");
     expect(screen.getByRole("heading", { name: "New article" })).toHaveClass("sr-only");
   });
 
-  it("puts the title first and the cover under it", () => {
-    renderEditor();
+  it("puts the title first and a cover under it", () => {
+    renderEditor({ ...titled, coverImageUrl: "https://cdn.example/cover.png" });
 
     const title = screen.getByLabelText("Title");
-    const cover = screen.getByRole("button", { name: "Add cover" });
+    const cover = screen.getByRole("button", { name: "Cover https://cdn.example/cover.png" });
     expect(title.compareDocumentPosition(cover) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("shows a cover it already has", () => {
+  it("shows a cover it already has, and no Add cover in the menu", () => {
     renderEditor({ ...titled, coverImageUrl: "https://cdn.example/cover.png" });
 
     expect(screen.getByRole("button", { name: "Cover https://cdn.example/cover.png" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "More options" }));
+    expect(screen.queryByRole("menuitem", { name: "Add cover" })).not.toBeInTheDocument();
+  });
+
+  it("adds a cover from the ••• menu", () => {
+    renderEditor(titled);
+
+    fireEvent.click(screen.getByRole("button", { name: "More options" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Add cover" }));
+
+    expect(screen.getByRole("button", { name: "Add cover" })).toBeInTheDocument();
+  });
+
+  it("shows the feed card in Publish settings, summarised from the opening lines", () => {
+    const { draft } = renderEditor(titled);
+
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    const card = within(screen.getByRole("dialog", { name: "Publish settings" })).getByRole("group", { name: "In the feed" });
+    expect(within(card).getByText("Power to the people")).toBeInTheDocument();
+    expect(within(card).getByText("Solar microgrids are changing Jos.")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/Summary/), { target: { value: "A city on sunlight." } });
+    const update = (draft.setSnapshot as Mock).mock.calls.at(-1)?.[0] as (s: ContributionSnapshot) => ContributionSnapshot;
+    expect(update(emptySnapshot).excerpt).toBe("A city on sunlight.");
   });
 
   it("asks for a title once there is a body, and holds Publish until there is one", () => {

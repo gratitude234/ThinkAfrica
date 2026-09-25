@@ -1,13 +1,13 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Button from "@/components/ui/Button";
-import CoverImageUploader from "@/components/ui/CoverImageUploader";
+import CoverImageUploader, { type CoverImageUploaderHandle } from "@/components/ui/CoverImageUploader";
 import ReferencesPanel from "@/components/post/ReferencesPanel";
 import type { EditorHandle, SelectedImage } from "@/components/editor/Editor";
 import { CLOSE_ICON, Icon } from "@/components/editor/editorIcons";
-import { hasMeaningfulContribution, type ComposerMode } from "@/lib/contribution";
+import { deriveContributionExcerpt, hasMeaningfulContribution, type ComposerMode } from "@/lib/contribution";
 import ArticleMobileToolbar, { NO_FORMATS, type FormatState } from "./ArticleMobileToolbar";
 import ArticlePreview from "./ArticlePreview";
 import ComposerMenu from "./ComposerMenu";
@@ -36,7 +36,7 @@ export interface ArticleEditorProps {
   /** /write sits under the app navigation from md up. /edit has none. */
   hasAppNav: boolean;
   autoFocusTitle: boolean;
-  /** Shown above the cover: the device recovery notice. */
+  /** Shown above the title: the device recovery notice. */
   notice?: ReactNode;
   onBack: () => void;
   onDiscard: () => void;
@@ -52,10 +52,12 @@ function sameFormats(left: FormatState, right: FormatState) {
 }
 
 /**
- * The long-form screen: a required title, a cover and a rich body, set in the
- * live article page's type and in the order the published page shows them.
- * Formatting is a selection toolbar and a "+" menu on a desktop, and a
- * toolbar on the keyboard on a phone. Publish opens Publish settings.
+ * The long-form screen: a required title and a rich body, set in the live
+ * article page's type. A blank page is those two and nothing else. A cover is
+ * added from Publish settings or the ••• menu, and once there is one it shows
+ * under the title, where the published page shows it. Formatting is a
+ * selection toolbar and a "+" menu on a desktop, and a toolbar on the keyboard
+ * on a phone. Publish opens Publish settings, which shows the feed card.
  */
 export default function ArticleEditor({
   draft,
@@ -73,12 +75,16 @@ export default function ArticleEditor({
   const { snapshot, setSnapshot } = draft;
   const editorRef = useRef<EditorHandle>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
+  const coverRef = useRef<CoverImageUploaderHandle>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const [formats, setFormats] = useState<FormatState>(NO_FORMATS);
   const [history, setHistory] = useState({ canUndo: false, canRedo: false });
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
+  // Add cover from the ••• menu shows the cover slot even before a file is
+  // chosen, so an upload in progress, or one that failed, has somewhere to say so.
+  const [coverAsked, setCoverAsked] = useState(false);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [showPublish, setShowPublish] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -98,6 +104,14 @@ export default function ArticleEditor({
   const canSaveDraft = hasMeaningfulContribution(snapshot);
   const canDiscard = isEdit ? Boolean(draft.editDraftId) : Boolean(draft.draftId) || canSaveDraft;
   const status = writeStatus(draft, uploading);
+  const hasCover = Boolean(snapshot.coverImageUrl);
+  // What the feed carries with no summary, and the server derives it the same
+  // way at publish. Only worked out while Publish settings is open: this
+  // component re-renders on every keystroke.
+  const openingLines = useMemo(
+    () => (showPublish ? deriveContributionExcerpt(snapshot.content) : ""),
+    [showPublish, snapshot.content]
+  );
 
   const closeSheet = useCallback(() => setSheet(null), []);
   const closePublish = useCallback(() => setShowPublish(false), []);
@@ -171,6 +185,17 @@ export default function ArticleEditor({
     [setSnapshot]
   );
 
+  const setCover = (coverImageUrl: string) => {
+    if (!coverImageUrl) setCoverAsked(false);
+    setSnapshot((current) => ({ ...current, coverImageUrl }));
+  };
+
+  const addCover = () => {
+    setCoverAsked(true);
+    // Still inside the menu item's click, which a file picker needs.
+    coverRef.current?.open();
+  };
+
   const openPreview = () => {
     if (!hasBody) {
       setNudge("preview");
@@ -200,6 +225,7 @@ export default function ArticleEditor({
         menu={
           <ComposerMenu
             onPreview={openPreview}
+            onAddCover={hasCover ? undefined : addCover}
             sourcesCount={snapshot.references.length}
             onOpenSources={() => setSheet("sources")}
             onOpenHistory={!isEdit && draft.draftId ? () => setSheet("history") : undefined}
@@ -269,17 +295,21 @@ export default function ArticleEditor({
             Add a title to publish. An Article needs one, a Post never does.
           </p>
         ) : null}
-        {/* Below the title, where the published page shows it. Keyed on the
-            address so a cover restored from a device copy, or carried over
-            from a Post, shows at full size once it exists. */}
-        <div className="mt-5">
+        {/* Below the title, where the published page shows it, and only once
+            there is one or the writer asked for one: a blank page is a title
+            and a body. Hidden rather than left out, so the menu can open its
+            file picker. Keyed on the address so a cover restored from a device
+            copy, carried over from a Post or added in Publish settings shows
+            at full size once it exists. */}
+        <div hidden={!hasCover && !coverAsked} className="mt-5">
           <CoverImageUploader
+            ref={coverRef}
             key={snapshot.coverImageUrl}
             initialUrl={snapshot.coverImageUrl || undefined}
-            onUpload={(coverImageUrl) => setSnapshot((current) => ({ ...current, coverImageUrl }))}
-            onRemove={() => setSnapshot((current) => ({ ...current, coverImageUrl: "" }))}
+            onUpload={setCover}
+            onRemove={() => setCover("")}
             onUploadingChange={setCoverUploading}
-            variant={snapshot.coverImageUrl ? "dropzone" : "compact"}
+            variant={hasCover ? "dropzone" : "compact"}
             previewHeightClass="aspect-[16/9] h-auto"
             emptyTitle="Add cover"
           />
@@ -333,6 +363,15 @@ export default function ArticleEditor({
       <PublishSettingsDialog
         open={showPublish}
         onClose={closePublish}
+        title={snapshot.title.trim()}
+        authorName={authorName}
+        avatarUrl={avatarUrl}
+        summary={snapshot.excerpt}
+        openingLines={openingLines}
+        onSummaryChange={(excerpt) => setSnapshot((current) => ({ ...current, excerpt }))}
+        coverImageUrl={snapshot.coverImageUrl}
+        onCoverChange={setCover}
+        onCoverUploadingChange={setCoverUploading}
         tags={snapshot.tags}
         onTagsChange={(tags) => setSnapshot((current) => ({ ...current, tags }))}
         wordCount={draft.wordCount}
