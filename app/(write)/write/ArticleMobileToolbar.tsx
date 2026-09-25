@@ -74,8 +74,8 @@ function ToolButton({
       disabled={disabled}
       onMouseDown={keepFocus}
       onClick={onPress}
-      className={`flex h-11 min-w-11 shrink-0 items-center justify-center rounded-lg px-2.5 text-[13px] font-medium transition-colors disabled:opacity-35 ${
-        pressed || expanded ? "bg-white/20 text-white" : "text-white/90 active:bg-white/10"
+      className={`flex h-11 min-w-11 shrink-0 items-center justify-center rounded-lg px-2.5 text-[13px] font-semibold text-emerald-ink transition-colors disabled:opacity-35 ${
+        pressed || expanded ? "bg-green-tint" : "active:bg-canvas"
       }`}
     >
       {children}
@@ -210,7 +210,9 @@ export default function ArticleMobileToolbar({ editorRef, formats, history, acti
 
   return (
     <div
-      className="fixed inset-x-0 z-40 bg-emerald-brand text-white shadow-[0_-4px_16px_rgba(0,0,0,0.12)] md:hidden"
+      // A light bar: it is on screen for as long as the writer writes, and a
+      // block of brand green that size outweighed the writing on a phone.
+      className="fixed inset-x-0 z-40 border-t border-divider bg-surface text-ink shadow-[0_-4px_16px_rgba(0,0,0,0.06)] md:hidden"
       style={{
         bottom: "var(--mobile-visual-viewport-bottom, 0px)",
         paddingBottom: "env(safe-area-inset-bottom)",
@@ -289,7 +291,7 @@ export default function ArticleMobileToolbar({ editorRef, formats, history, acti
       {drawer === "link" ? (
         <div className="px-2 py-1">
           {linkInvalid ? (
-            <p id="toolbar-link-error" role="alert" className="px-1 pb-1 pt-0.5 text-xs text-white">
+            <p id="toolbar-link-error" role="alert" className="px-1 pb-1 pt-0.5 text-xs text-red-600">
               {INVALID_LINK_MESSAGE}
             </p>
           ) : null}
@@ -313,12 +315,12 @@ export default function ArticleMobileToolbar({ editorRef, formats, history, acti
               aria-label="Link address"
               aria-invalid={linkInvalid || undefined}
               aria-describedby={linkInvalid ? "toolbar-link-error" : undefined}
-              className="h-11 min-w-0 flex-1 rounded-lg border-0 bg-surface px-3 text-sm text-ink outline-none focus:ring-2 focus:ring-gold"
+              className="h-11 min-w-0 flex-1 rounded-lg border border-card-border bg-canvas px-3 text-sm text-ink outline-none focus:border-emerald-brand focus:ring-2 focus:ring-gold"
             />
-            <button type="button" onClick={applyLink} className="h-11 shrink-0 rounded-lg px-3 text-sm font-semibold">
+            <button type="button" onClick={applyLink} className="h-11 shrink-0 rounded-lg px-3 text-sm font-semibold text-emerald-ink">
               Apply
             </button>
-            <button type="button" onClick={cancelLink} className="h-11 shrink-0 rounded-lg px-3 text-sm text-white/80">
+            <button type="button" onClick={cancelLink} className="h-11 shrink-0 rounded-lg px-3 text-sm text-ink-muted">
               Cancel
             </button>
           </div>
@@ -335,7 +337,7 @@ export default function ArticleMobileToolbar({ editorRef, formats, history, acti
           <ToolButton label="Redo" disabled={!history.canRedo} onPress={() => editor()?.redo()}>
             <Icon path={REDO_ICON} className="h-[18px] w-[18px]" />
           </ToolButton>
-          <span className="mx-0.5 h-5 w-px shrink-0 bg-white/25" aria-hidden="true" />
+          <span className="mx-0.5 h-5 w-px shrink-0 bg-divider" aria-hidden="true" />
           <ToolButton label="Bold" pressed={formats.bold} onPress={() => editor()?.toggleBold()}>
             <span className="font-bold">B</span>
           </ToolButton>

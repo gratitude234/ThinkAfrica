@@ -82,19 +82,3 @@ export const ALIGNMENT_OPTIONS: ReadonlyArray<{
   { value: "right", label: "Align right", icon: <path d="M4 6h16M10 10h10M4 14h16M10 18h10" /> },
   { value: "justify", label: "Justify", icon: <path d="M4 6h16M4 10h16M4 14h16M4 18h16" /> },
 ];
-
-/**
- * The Article mark from the mockup: a serif "A" on the brand green. It is the
- * one place the Post composer points at the long-form screen, so it reads as
- * a masthead letter rather than another stroke icon.
- */
-export function ArticleMark({ className = "h-7 w-7 text-sm" }: { className?: string }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={`flex shrink-0 items-center justify-center rounded-md bg-emerald-brand font-semibold text-white publication-article-title ${className}`}
-    >
-      A
-    </span>
-  );
-}

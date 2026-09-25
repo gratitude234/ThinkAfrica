@@ -237,9 +237,19 @@ The composer at `/write` is two screens over one saving hook.
 `UniversalComposer` owns `useContributionDraft` (the working copy, device and
 account saves, recovery, publishing, leaving and discarding) and renders
 `PostComposer` or `ArticleEditor`, chosen by `composerSurfaceFor()` and
-`?editor=article`. A Post publishes from its button, and an Article goes
-through `PublishSettingsDialog`. The Post composer is never shown over a
-title. `/edit/[slug]` uses the same root, full screen with no navigation.
+`?editor=article`. A Post publishes from its button, and an Article's Publish
+opens `PublishSettingsDialog`, whose "Publish now" is the one that publishes.
+The Post composer is never shown over a title. `/edit/[slug]` uses the same
+root, full screen with no navigation.
+
+Both screens use `WriteHeader`: Back, the save status, the ••• menu
+(`ComposerMenu`) and the main button, in one row at every size. The status is
+`writeStatus()` from the same file, a dot on a phone and a dot and a word from
+md up, and a failed save always gets a line of its own under the header.
+Article Preview is a header button from md up and a ••• menu item at every
+size. The Post composer is a full page, not a card, with its Image and "Write
+an article instead" actions in a row under the text that sits above the
+keyboard on a phone. The Article editor puts the cover under the title.
 The (write) layout draws the app navigation from md up through
 `WriteChrome`, reading the viewer with `getNavigationViewer()` from
 `lib/navigationViewer.ts`, the same lookup the (main) layout uses.

@@ -21,7 +21,7 @@ interface PublishSettingsDialogProps {
 
 /**
  * The last step for an Article, and only an Article: a Post publishes from its
- * own button. Topics, then the length, then Publish. The reader preview is one
+ * own button. Topics, then the length, then Publish now. The reader preview is one
  * tap away in the editor's header, so this does not repeat it.
  */
 export default function PublishSettingsDialog({
@@ -58,7 +58,8 @@ export default function PublishSettingsDialog({
             Cancel
           </button>
           <Button type="button" onClick={onPublish} loading={publishing} disabled={!canPublish} className={`${WRITE_PRIMARY_BUTTON} px-6`}>
-            {isUpdate ? "Update" : "Publish"}
+            {/* "now": the header's Publish opened this, and this one is final. */}
+            {isUpdate ? "Update now" : "Publish now"}
           </Button>
         </div>
       }
