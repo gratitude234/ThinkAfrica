@@ -78,12 +78,16 @@ describe("PostComposer", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("posts on Cmd+Enter", () => {
+  it("posts on Cmd+Enter, before the editor can take the keys for a line break", () => {
     const { draft } = renderComposer(text);
+    const body = screen.getByLabelText("Publication body");
+    const editorSawIt = vi.fn();
+    body.addEventListener("keydown", editorSawIt);
 
-    fireEvent.keyDown(screen.getByLabelText("Publication body"), { key: "Enter", metaKey: true });
+    fireEvent.keyDown(body, { key: "Enter", metaKey: true });
 
     expect(draft.publish).toHaveBeenCalled();
+    expect(editorSawIt).not.toHaveBeenCalled();
   });
 
   it("cancels through the root", () => {

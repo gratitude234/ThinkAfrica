@@ -1,7 +1,7 @@
 # Write redesign: Post composer and Article editor
 
 Date: 2026-09-25
-Status: draft for review
+Status: implemented (see section 13 for where the build differs)
 Source mockup: `Write Redesign (Standalone) (3).html` (Post composer, Article editor,
 Reader preview and Publish settings; desktop 1440 and mobile 390x844)
 
@@ -535,3 +535,29 @@ Each phase ends with every test passing and the app working.
    both screens, remove the old canvas and its retired tests.
 6. **Tidy up.** Update the `CLAUDE.md` notes on the composer, then run the manual check
    and the full check.
+
+## 13. As built
+
+D1 to D5 were taken as written. Where the build differs from sections 4 to 6:
+
+- **Left alignment writes nothing.** Tiptap's TextAlign writes `text-align: left`
+  on every paragraph once left is the default, which would have rewritten every
+  saved piece. `components/editor/extensions.ts` extends it so the default is
+  rendered as no style.
+- **Closer to the mockup than the plan.** The selection toolbar and the phone
+  toolbar use the mockup's text labels (B, I, Link, H2, H3, the quote mark,
+  More, +). On a phone, More and + open small white menus above the bar rather
+  than replacing a row of it. The Post composer puts the image button on its
+  own row and the Article card full width beneath it, and on a phone the image
+  button moves to the bar on the keyboard. Publish settings has Cancel on the
+  left and Publish on the right, and the missing-title message is red.
+- **The cover shows at full size** once added, instead of the compact uploader's
+  thumbnail.
+- **Editor menus hide reliably.** Tiptap's own hide-on-blur is defeated by
+  buttons that keep focus in the body, so the menus now also hide on a click
+  outside them or on focus moving elsewhere, and Escape closes the + menu and
+  the alignment choices.
+- **Cmd+Enter in the Post composer** is taken before the editor sees it, since
+  Tiptap binds the same keys to a line break.
+- **Not changed:** the remove button on a topic chip in the shared `TagInput`
+  is below 44px. It is used across the app, so it is left for its own change.

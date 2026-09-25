@@ -88,10 +88,13 @@ export default function PostComposer({
     if (canPost) withCompleteProfile(() => void draft.publish());
   };
 
-  // Cmd/Ctrl+Enter is the muscle memory for "send this".
-  const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+  // Cmd/Ctrl+Enter is the muscle memory for "send this". It is taken in the
+  // capture phase, before the editor sees it: Tiptap binds the same keys to a
+  // line break, which would otherwise land in the text as the Post goes out.
+  const onKeyDownCapture = (event: KeyboardEvent<HTMLElement>) => {
     if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
       event.preventDefault();
+      event.stopPropagation();
       postNow();
     }
   };
@@ -102,7 +105,7 @@ export default function PostComposer({
     <div className="min-h-dvh bg-surface md:min-h-[calc(100dvh-var(--app-nav-height))] md:bg-canvas md:px-4 md:pb-16 md:pt-14">
       <section
         aria-labelledby="post-composer-title"
-        onKeyDown={onKeyDown}
+        onKeyDownCapture={onKeyDownCapture}
         className="flex min-h-dvh flex-col bg-surface text-ink md:mx-auto md:min-h-0 md:max-w-[560px] md:rounded-2xl md:border md:border-card-border md:shadow-[0_10px_30px_-12px_rgba(26,26,26,0.18)]"
       >
         {/* A phone: Cancel, the title centred, the actions, and the status on
