@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { Editor } from "@tiptap/core";
 import { afterEach, describe, expect, it } from "vitest";
 import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
-import { editorExtensions } from "./extensions";
+import { caretInEmptyBlock, editorExtensions, stripPastedImages } from "./extensions";
 
 /**
  * The schema tested through @tiptap/core directly. Component tests replace the
@@ -63,5 +63,39 @@ describe("justified text on the page", () => {
     expect(css).toContain('[style*="text-align: justify"]');
     expect(css).toContain('[style*="text-align:justify"]');
     expect(css).toMatch(/hyphens:\s*auto/);
+  });
+});
+
+describe("one schema for both variants", () => {
+  it("keeps an older Post's headings, lists and image when it is opened again", () => {
+    // The Post composer hides the tools, not the formats. A Post published
+    // before the redesign must come back exactly as it was.
+    const older = '<h2>Heading</h2><ul><li><p>One</p></li></ul><img src="https://x/a.png" alt="A chart">';
+
+    expect(editorWith(older).getHTML()).toBe(older);
+  });
+});
+
+describe("the insert button", () => {
+  it("appears only in an empty top-level block", () => {
+    const editor = editorWith("<p>Text</p><p></p><blockquote><p></p></blockquote>");
+
+    editor.commands.setTextSelection(7);
+    expect(caretInEmptyBlock(editor.state)).toBe(true);
+
+    editor.commands.setTextSelection(2);
+    expect(caretInEmptyBlock(editor.state)).toBe(false);
+
+    editor.commands.setTextSelection(10);
+    expect(caretInEmptyBlock(editor.state)).toBe(false);
+  });
+});
+
+describe("pasting into a Post", () => {
+  it("takes out images and keeps the text and its formatting", () => {
+    const pasted =
+      '<p>From <strong>Word</strong></p><img src="https://x/a.png"><figure><img src="https://x/b.png"><figcaption>Chart</figcaption></figure><p>After</p>';
+
+    expect(stripPastedImages(pasted)).toBe("<p>From <strong>Word</strong></p><p>After</p>");
   });
 });

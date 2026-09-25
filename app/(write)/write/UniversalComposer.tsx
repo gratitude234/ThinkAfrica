@@ -488,8 +488,7 @@ export default function UniversalComposer({
           content={snapshot.content}
           placeholder="Start writing…"
           ariaLabel="Publication body"
-          canvasMode
-          showWordCount={false}
+          variant="article"
           // Body-first means the caret starts in the body. Adding a title is
           // the deliberate detour, and it takes focus when it opens.
           autoFocus={mode !== "published-edit" && !initialSnapshot.title}

@@ -1,5 +1,4 @@
 import { mergeAttributes, type Extensions } from "@tiptap/core";
-import CharacterCount from "@tiptap/extension-character-count";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -7,6 +6,7 @@ import TextAlign from "@tiptap/extension-text-align";
 import Typography from "@tiptap/extension-typography";
 import StarterKit from "@tiptap/starter-kit";
 import type { DOMOutputSpec } from "@tiptap/pm/model";
+import type { EditorState } from "@tiptap/pm/state";
 
 export const TEXT_ALIGNMENTS = ["left", "center", "right", "justify"] as const;
 export type TextAlignment = (typeof TEXT_ALIGNMENTS)[number];
@@ -101,7 +101,6 @@ export function editorExtensions({ placeholder }: { placeholder: string }): Exte
   return [
     StarterKit,
     Placeholder.configure({ placeholder }),
-    CharacterCount,
     // Curly quotes, real ellipses and proper dashes, applied as the writer
     // types. A publication should not ship typewriter quotes.
     Typography,
@@ -119,4 +118,31 @@ export function editorExtensions({ placeholder }: { placeholder: string }): Exte
       defaultAlignment: "left",
     }),
   ];
+}
+
+/**
+ * Whether the caret sits alone in an empty top-level paragraph or heading.
+ * That is where the Article editor's "+" insert button appears. It is the rule
+ * Tiptap's own FloatingMenu uses, without the focus check, which needs a live
+ * view and stays in Editor.tsx.
+ */
+export function caretInEmptyBlock(state: EditorState): boolean {
+  const { $anchor, empty } = state.selection;
+  return (
+    empty &&
+    $anchor.depth === 1 &&
+    $anchor.parent.isTextblock &&
+    !$anchor.parent.type.spec.code &&
+    $anchor.parent.content.size === 0
+  );
+}
+
+/**
+ * A Post has one image, attached below the text, and never one inside it.
+ * Copying from a web page or a word processor brings images along with the
+ * markup, so the Post editor takes them out before the paste lands. The text
+ * and its formatting still paste.
+ */
+export function stripPastedImages(html: string): string {
+  return html.replace(/<figure\b[\s\S]*?<\/figure>/gi, "").replace(/<img\b[^>]*>/gi, "");
 }
