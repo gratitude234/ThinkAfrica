@@ -1,6 +1,7 @@
 import PublicationIdentity from "./PublicationIdentity";
 import Link from "next/link";
 import UserAvatar from "@/components/ui/UserAvatar";
+import FollowButton from "@/components/ui/FollowButton";
 import PostImage from "@/components/post/PostImage";
 import PublishedToast from "./PublishedToast";
 import PostActionsRow from "./PostActionsRow";
@@ -138,6 +139,17 @@ export default async function PostConversationView({
             </Link>
             <span className="text-[#7A817D]"> · {formatRelativeTime(post.published_at ?? post.created_at)}</span>
           </div>
+          {isOwnPost ? null : (
+            <FollowButton
+              followingId={author.id}
+              currentUserId={userId}
+              initialFollowing={userId ? viewer.userFollowsAuthor : false}
+              authorName={authorName}
+              className="publication-follow"
+              source="post_header"
+              postId={post.id}
+            />
+          )}
           <PublicationMoreMenu
             postId={post.id}
             slug={post.slug}

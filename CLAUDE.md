@@ -95,10 +95,12 @@ Supabase clients are split by context. Always use the right one:
 
 The feed is driven by `lib/feedData.ts` (`fetchFeedPage()`). Home has two modes,
 For You and Following (`lib/homeFeedTabs.ts`); Explore reuses For You with a
-timeframe and a content-kind filter. For You ranks the newest 120 publications
-with `lib/feedRanking.ts` on relevance (followed writers, chosen topics),
-engagement (reads, likes and saves per impression) and freshness, then pages
-the rest in date order. Following is reverse-chronological. Who is reading is
+timeframe and a content-kind filter. For You is Feed v4
+(`FEED_V4_IMPLEMENTATION.md`): `lib/feedRanking.ts` ranks a candidate window
+once on relevance, satisfaction, freshness, learned writer and topic affinity,
+novelty and fatigue, and exploration, reserves up to five of every twelve
+places for recent work, and pages that snapshot with a signed cursor. Following
+is reverse-chronological. Who is reading is
 three reads in `lib/feedViewer.ts`, shared by the Home page and `/api/feed`.
 
 `lib/db` is the provider boundary for the migration off PostgREST. It holds the
