@@ -7,7 +7,8 @@ const FOCUSABLE =
 
 /**
  * Keeps keyboard focus inside an open dialog or sheet, closes it on Escape
- * unless it is busy, and stops the page behind it from scrolling.
+ * unless it is busy, stops the page behind it from scrolling, and hands focus
+ * back to whatever opened it.
  */
 export function useModalFocus(
   open: boolean,
@@ -15,6 +16,17 @@ export function useModalFocus(
   onClose: () => void,
   busy = false
 ) {
+  // Whatever had focus when the dialog opened gets it back when it closes, so
+  // a keyboard user lands where they were rather than at the top of the page.
+  // Keyed on `open` alone: `busy` changing mid-publish must not bounce focus.
+  useEffect(() => {
+    if (!open) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    return () => {
+      if (opener?.isConnected) opener.focus();
+    };
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     const previousOverflow = document.body.style.overflow;
