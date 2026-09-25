@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
 import { getTopicValuesValidationError, MAX_LONG_FORM_TOPICS, normalizeAndDedupeTopicValues } from "@/lib/tags";
-import type { ContributionSnapshot } from "@/lib/contribution";
+import { deriveContributionExcerpt, type ContributionSnapshot } from "@/lib/contribution";
 import {
   getPersistedReferenceId,
   hasReferenceContent,
@@ -79,6 +79,7 @@ export async function savePublishedEditDraft(input: {
     return { error: "Each source needs a title and a publication, URL, DOI, or note.", editDraftId: null as string | null };
   }
 
+  const content = sanitizePostHtml(input.snapshot.content);
   const { data, error } = await editable.supabase
     .from("post_edit_drafts")
     .upsert(
@@ -86,8 +87,10 @@ export async function savePublishedEditDraft(input: {
         post_id: input.postId,
         author_id: user.id,
         title: input.snapshot.title.trim() || null,
-        excerpt: input.snapshot.excerpt,
-        content: sanitizePostHtml(input.snapshot.content),
+        // The same fallback publishContribution applies: no written summary
+        // means the feed carries the opening of the body as it now reads.
+        excerpt: input.snapshot.excerpt.trim() || deriveContributionExcerpt(content),
+        content,
         tags: normalizeAndDedupeTopicValues(input.snapshot.tags, MAX_LONG_FORM_TOPICS),
         cover_image_url: input.snapshot.coverImageUrl || null,
         reference_snapshot: references,
