@@ -223,3 +223,56 @@ describe("publishing", () => {
     expect(result.current.publishing).toBe(false);
   });
 });
+
+describe("the save status", () => {
+  it("says nothing on an empty page, even after the writer clears what they typed", async () => {
+    const { result } = open();
+    expect(result.current.saveLabel).toBe("");
+
+    // An editor emptied by hand holds an empty paragraph, not nothing, so the
+    // device copy is still written.
+    act(() => result.current.setSnapshot({ ...empty, content: "<p></p>" }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(400); });
+
+    expect(result.current.saveState).toBe("device");
+    expect(result.current.saveLabel).toBe("");
+  });
+
+  it("claims no save for writing too short to make an account draft", async () => {
+    const { result } = open();
+
+    act(() => result.current.setSnapshot({ ...empty, content: "<p>Short.</p>" }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(2500); });
+
+    expect(mocks.ensure).not.toHaveBeenCalled();
+    expect(result.current.saveLabel).toBe("");
+  });
+
+  it("says Saving while the account copy is on its way, then Draft saved", async () => {
+    const { result } = open();
+
+    act(() => result.current.setSnapshot(written));
+    await act(async () => { await vi.advanceTimersByTimeAsync(400); });
+    expect(result.current.saveLabel).toBe("Saving…");
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(1700); });
+    expect(result.current.saveLabel).toBe("Draft saved");
+  });
+
+  it("says Changes saved for an edit to something published", async () => {
+    const { result } = open({ mode: "published-edit", publishedPostId: "post-1", initialSnapshot: written, editDraftId: "edit-1" });
+
+    expect(result.current.saveLabel).toBe("Changes saved");
+  });
+
+  it("mentions this device only when the account save failed", async () => {
+    mocks.ensure.mockResolvedValue({ error: "We couldn't save this draft.", draftId: null });
+    const { result } = open();
+
+    act(() => result.current.setSnapshot(written));
+    await act(async () => { await vi.advanceTimersByTimeAsync(2100); });
+
+    expect(result.current.saveState).toBe("error");
+    expect(result.current.saveLabel).toBe("We couldn't save this draft. Kept on this device.");
+  });
+});

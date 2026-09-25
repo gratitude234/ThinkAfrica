@@ -1,4 +1,4 @@
-import { mergeAttributes, type Extensions } from "@tiptap/core";
+import { mergeAttributes, type Editor as CoreEditor, type Extensions } from "@tiptap/core";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -7,6 +7,7 @@ import Typography from "@tiptap/extension-typography";
 import StarterKit from "@tiptap/starter-kit";
 import type { DOMOutputSpec } from "@tiptap/pm/model";
 import type { EditorState } from "@tiptap/pm/state";
+import { normalizeLinkUrl } from "@/lib/linkUrl";
 
 export const TEXT_ALIGNMENTS = ["left", "center", "right", "justify"] as const;
 export type TextAlignment = (typeof TEXT_ALIGNMENTS)[number];
@@ -145,4 +146,30 @@ export function caretInEmptyBlock(state: EditorState): boolean {
  */
 export function stripPastedImages(html: string): string {
   return html.replace(/<figure\b[\s\S]*?<\/figure>/gi, "").replace(/<img\b[^>]*>/gi, "");
+}
+
+/**
+ * What happened to a link request. A link is only ever made from selected
+ * text or an existing link: with neither, Tiptap stores an invisible mark and
+ * turns whatever the writer types next into a link.
+ */
+export type LinkResult = "linked" | "unlinked" | "invalid-address" | "nothing-selected";
+
+/**
+ * Links the selection, or the whole link under the caret, to the address the
+ * writer typed. An empty address removes the link. An address that is not one
+ * changes nothing, so the field can stay open and say why.
+ */
+export function linkSelection(editor: CoreEditor, url: string): LinkResult {
+  const inLink = editor.isActive("link");
+  if (editor.state.selection.empty && !inLink) return "nothing-selected";
+  if (!url.trim()) {
+    editor.chain().focus().extendMarkRange("link").unsetLink().run();
+    return "unlinked";
+  }
+  const href = normalizeLinkUrl(url);
+  if (!href) return "invalid-address";
+  // extendMarkRange: a caret inside a link edits that whole link.
+  editor.chain().focus().extendMarkRange("link").setLink({ href }).run();
+  return "linked";
 }

@@ -118,6 +118,11 @@ export function useContributionDraft({
   const editDraftIdRef = useRef(initialEditDraftId);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Whether the failure above is an account save, rather than a discard, and
+  // whether a device copy exists to fall back on. Together they decide
+  // whether the status may say "Kept on this device".
+  const [accountSaveFailed, setAccountSaveFailed] = useState(false);
+  const [hasDeviceCopy, setHasDeviceCopy] = useState(false);
   const [recovery, setRecovery] = useState<{ snapshot: ContributionSnapshot; key: string } | null>(null);
   // Where the writer was going when the account save failed, so "Leave with
   // device copy" goes there rather than always to returnTo.
@@ -180,6 +185,8 @@ export function useContributionDraft({
     setRecovery(null);
     setSaveState("idle");
     setSaveError(null);
+    setAccountSaveFailed(false);
+    setHasDeviceCopy(false);
     setDocumentKey(incoming);
     onDocumentChangeRef.current?.(initialSnapshot);
   }, [initialDraftId, initialEditDraftId, initialSnapshot, mode, publishedPostId, userId]);
@@ -235,6 +242,7 @@ export function useContributionDraft({
     (next: ContributionSnapshot, revision: number) => {
       setSaveState("saving");
       setSaveError(null);
+      setAccountSaveFailed(false);
       const operation = saveQueueRef.current
         .catch(() => undefined)
         .then(async () => {
@@ -267,12 +275,14 @@ export function useContributionDraft({
           lastPersistedRef.current = next;
           if (revision === revisionRef.current) {
             localStorage.removeItem(localKeyRef.current);
+            setHasDeviceCopy(false);
             setSaveState("cloud");
           }
         })
         .catch((error: unknown) => {
           if (!mountedRef.current) return;
           setSaveState("error");
+          setAccountSaveFailed(true);
           setSaveError(error instanceof Error ? error.message : "We couldn't save your changes.");
         });
       saveQueueRef.current = operation;
@@ -295,7 +305,10 @@ export function useContributionDraft({
           localKeyRef.current,
           JSON.stringify({ version: 1, savedAt: new Date().toISOString(), data: snapshot })
         );
-        if (mountedRef.current) setSaveState("device");
+        if (mountedRef.current) {
+          setHasDeviceCopy(true);
+          setSaveState("device");
+        }
       } catch {
         // Cloud persistence below remains available when storage is blocked.
       }
@@ -408,6 +421,7 @@ export function useContributionDraft({
     discardedRef.current = true;
     setDiscarding(true);
     setSaveError(null);
+    setAccountSaveFailed(false);
     // An autosave already in flight may be creating the draft at this moment.
     // Waiting for it means the id deleted below is the one it created.
     await saveQueueRef.current.catch(() => undefined);
@@ -436,21 +450,25 @@ export function useContributionDraft({
     return true;
   };
 
-  // "Saved" is the resting state. Only the device-only case earns more words,
-  // because it is the only one that carries a consequence for the writer. The
-  // screens put an image upload ahead of this, because only they know of it.
+  // The status describes the account copy, the one that survives a lost or
+  // replaced phone. An empty page says nothing, and writing too short to make
+  // an account draft says nothing either, rather than claim a save. The device
+  // copy is mentioned only when it is all there is: after an account save has
+  // failed. The screens put an image upload ahead of this, because only they
+  // know of it.
+  const savedLabel = mode === "published-edit" ? "Changes saved" : "Draft saved";
   const saveLabel =
-    saveState === "saving"
-      ? "Saving…"
-      : saveState === "cloud"
-        ? "Saved"
-        : saveState === "device"
-          ? "Saved on this device"
-          : saveState === "error"
-            ? saveError ?? "Save failed"
-            : mode === "published-edit" && editDraftId
-              ? "Saved"
-              : "";
+    saveState === "error"
+      ? accountSaveFailed && hasDeviceCopy
+        ? `${saveError ?? "We couldn't save to your account."} Kept on this device.`
+        : saveError ?? "Save failed"
+      : !hasMeaningfulContribution(snapshot)
+        ? ""
+        : saveState === "saving" || (saveState === "device" && deservesCloudDraft(snapshot))
+          ? "Saving…"
+          : saveState === "cloud" || (saveState === "idle" && mode === "published-edit" && editDraftId)
+            ? savedLabel
+            : "";
   const bodyText = contributionText(snapshot.content);
   const wordCount = bodyText ? bodyText.split(/\s+/).filter(Boolean).length : 0;
 

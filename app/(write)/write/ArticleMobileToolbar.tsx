@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type MouseEvent, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from "react";
 import type { EditorHandle, TextAlignment } from "@/components/editor/Editor";
+import { INVALID_LINK_MESSAGE } from "@/lib/linkUrl";
 import {
   ALIGNMENT_OPTIONS,
   BULLETS_ICON,
@@ -22,6 +23,8 @@ export interface FormatState {
   bulletList: boolean;
   orderedList: boolean;
   link: boolean;
+  /** Text is selected, so Link has something to link. */
+  hasSelection: boolean;
   align: TextAlignment;
 }
 
@@ -34,6 +37,7 @@ export const NO_FORMATS: FormatState = {
   bulletList: false,
   orderedList: false,
   link: false,
+  hasSelection: false,
   align: "left",
 };
 
@@ -107,13 +111,22 @@ function PopoverItem({
   );
 }
 
-type Drawer = "more" | "insert" | "link" | null;
+type Drawer = "more" | "insert" | "link" | "link-hint" | null;
 
 interface ArticleMobileToolbarProps {
   editorRef: RefObject<EditorHandle | null>;
   formats: FormatState;
   history: { canUndo: boolean; canRedo: boolean };
+  /**
+   * Whether the body has focus. Every tool here acts on the body, so the bar
+   * has nothing to offer while the writer is in the title and stays out of
+   * the way. Its own link field is the exception: typing an address in it is
+   * what takes focus from the body.
+   */
+  active: boolean;
 }
+
+const LINK_HINT_MS = 3000;
 
 const POPOVER =
   "absolute bottom-full right-2 mb-2 w-56 rounded-xl border border-card-border bg-surface p-1.5 text-ink shadow-lg shadow-ink/15";
@@ -125,17 +138,75 @@ const POPOVER =
  * gesture is otherwise gone for good. More and + open small white menus above
  * the bar rather than replacing it, so the writer never loses their place.
  */
-export default function ArticleMobileToolbar({ editorRef, formats, history }: ArticleMobileToolbarProps) {
+export default function ArticleMobileToolbar({ editorRef, formats, history, active }: ArticleMobileToolbarProps) {
   const [drawer, setDrawer] = useState<Drawer>(null);
   const [linkUrl, setLinkUrl] = useState("");
+  const [linkInvalid, setLinkInvalid] = useState(false);
+  const [wasActive, setWasActive] = useState(active);
+  const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editor = () => editorRef.current;
-  const toggle = (next: Exclude<Drawer, null>) =>
+
+  // Leaving the body closes the menus that act on it, so they are not waiting
+  // open the next time the writer comes back to it.
+  if (active !== wasActive) {
+    setWasActive(active);
+    if (!active && drawer !== "link") setDrawer(null);
+  }
+
+  useEffect(
+    () => () => {
+      if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
+    },
+    []
+  );
+
+  const toggle = (next: "more" | "insert") =>
     setDrawer((current) => (current === next ? null : next));
-  const applyLink = () => {
-    editor()?.insertLink(linkUrl);
+
+  const showLinkHint = () => {
+    setDrawer("link-hint");
+    if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
+    hintTimerRef.current = setTimeout(
+      () => setDrawer((current) => (current === "link-hint" ? null : current)),
+      LINK_HINT_MS
+    );
+  };
+
+  const openLink = () => {
+    if (!formats.hasSelection && !formats.link) {
+      showLinkHint();
+      return;
+    }
+    setLinkUrl(editor()?.getLinkHref() ?? "");
+    setLinkInvalid(false);
+    setDrawer("link");
+  };
+
+  const closeLink = () => {
     setLinkUrl("");
+    setLinkInvalid(false);
     setDrawer(null);
   };
+
+  const applyLink = () => {
+    const result = editor()?.insertLink(linkUrl);
+    if (result === "invalid-address") {
+      setLinkInvalid(true);
+      return;
+    }
+    closeLink();
+    if (result === "nothing-selected") {
+      editor()?.returnFocus();
+      showLinkHint();
+    }
+  };
+
+  const cancelLink = () => {
+    closeLink();
+    editor()?.returnFocus();
+  };
+
+  if (!active && drawer !== "link") return null;
 
   return (
     <div
@@ -209,30 +280,48 @@ export default function ArticleMobileToolbar({ editorRef, formats, history }: Ar
         </div>
       ) : null}
 
+      {drawer === "link-hint" ? (
+        <p role="status" className={`${POPOVER} px-3 py-2.5 text-sm`}>
+          Select the words you want to link first.
+        </p>
+      ) : null}
+
       {drawer === "link" ? (
-        <div className="flex items-center gap-2 px-2 py-1">
-          <input
-            type="url"
-            autoFocus
-            value={linkUrl}
-            onChange={(event) => setLinkUrl(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                applyLink();
-              }
-              if (event.key === "Escape") setDrawer(null);
-            }}
-            placeholder="https://…"
-            aria-label="Link address"
-            className="h-11 min-w-0 flex-1 rounded-lg border-0 bg-surface px-3 text-sm text-ink outline-none focus:ring-2 focus:ring-gold"
-          />
-          <button type="button" onClick={applyLink} className="h-11 shrink-0 rounded-lg px-3 text-sm font-semibold">
-            Apply
-          </button>
-          <button type="button" onClick={() => setDrawer(null)} className="h-11 shrink-0 rounded-lg px-3 text-sm text-white/80">
-            Cancel
-          </button>
+        <div className="px-2 py-1">
+          {linkInvalid ? (
+            <p id="toolbar-link-error" role="alert" className="px-1 pb-1 pt-0.5 text-xs text-white">
+              {INVALID_LINK_MESSAGE}
+            </p>
+          ) : null}
+          <div className="flex items-center gap-2">
+            <input
+              type="url"
+              autoFocus
+              value={linkUrl}
+              onChange={(event) => {
+                setLinkUrl(event.target.value);
+                setLinkInvalid(false);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  applyLink();
+                }
+                if (event.key === "Escape") cancelLink();
+              }}
+              placeholder="Paste or type a link"
+              aria-label="Link address"
+              aria-invalid={linkInvalid || undefined}
+              aria-describedby={linkInvalid ? "toolbar-link-error" : undefined}
+              className="h-11 min-w-0 flex-1 rounded-lg border-0 bg-surface px-3 text-sm text-ink outline-none focus:ring-2 focus:ring-gold"
+            />
+            <button type="button" onClick={applyLink} className="h-11 shrink-0 rounded-lg px-3 text-sm font-semibold">
+              Apply
+            </button>
+            <button type="button" onClick={cancelLink} className="h-11 shrink-0 rounded-lg px-3 text-sm text-white/80">
+              Cancel
+            </button>
+          </div>
         </div>
       ) : (
         <div
@@ -253,7 +342,7 @@ export default function ArticleMobileToolbar({ editorRef, formats, history }: Ar
           <ToolButton label="Italic" pressed={formats.italic} onPress={() => editor()?.toggleItalic()}>
             <span className="font-serif italic">I</span>
           </ToolButton>
-          <ToolButton label="Link" pressed={formats.link} onPress={() => setDrawer("link")}>
+          <ToolButton label="Link" pressed={formats.link} onPress={openLink}>
             Link
           </ToolButton>
           <ToolButton label="Heading" pressed={formats.heading} onPress={() => editor()?.toggleH2()}>
