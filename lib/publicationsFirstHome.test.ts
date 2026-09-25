@@ -265,9 +265,14 @@ describe("publications-first Home: what Home reads", () => {
     expect(navigationViewer).not.toMatch(/\.rpc\(/);
   });
 
-  it("ranks on relevance, engagement and freshness, with no retired signal", () => {
+  it("ranks with Feed v4's signals and none of the retired ones", () => {
+    // Phase 2F removed learned reader affinity, fatigue and the evergreen arms.
+    // Feed v4 (FEED_V4_IMPLEMENTATION.md) brought all three back on purpose, as
+    // fail-soft reads of get_reader_affinity and get_viewer_post_engagement and
+    // an evergreen lane, so those names are no longer retired here. Everything
+    // else in this list still is.
     const retired =
-      /citation_id|published_version_id|isFormallyReviewed|university|co_?authors?|coAuthor|reference_?count|referenceCount|\bfeatured\b|evergreen|well_read|requireCitation|reader_affinity|viewer_post_engagement|readerSignals|fatigue|subscription|quality_?score|surface_reason|quality_badges/i;
+      /citation_id|published_version_id|isFormallyReviewed|university|co_?authors?|coAuthor|reference_?count|referenceCount|\bfeatured\b|well_read|requireCitation|readerSignals|subscription|quality_?score|surface_reason|quality_badges/i;
     for (const file of [
       "lib/feedRanking.ts",
       "lib/feedData.ts",
