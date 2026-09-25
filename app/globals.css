@@ -261,55 +261,6 @@
   border-radius: 10px;
 }
 
-/* Distraction-free writing canvas */
-.write-canvas-editor {
-  min-height: 430px;
-  padding: 0.25rem 0;
-  color: var(--ta-ink);
-  font-family: var(--font-inter), system-ui, sans-serif;
-  font-size: 1.0625rem;
-  line-height: 1.72;
-}
-
-.write-canvas-editor p,
-.write-canvas-editor li {
-  margin-bottom: 1.15em;
-  font-family: inherit;
-  font-size: inherit;
-  line-height: inherit;
-}
-
-.write-canvas-editor p.is-editor-empty:first-child::before {
-  color: #7d7986;
-}
-
-.write-canvas-editor:focus-visible {
-  outline: 2px solid rgba(7, 57, 41, 0.28);
-  outline-offset: 8px;
-  border-radius: 8px;
-}
-
-.write-canvas-compact .write-canvas-editor {
-  min-height: 280px;
-}
-
-@media (min-width: 1024px) {
-  .write-canvas-editor {
-    min-height: 560px;
-    font-size: 1.0625rem;
-    line-height: 1.75;
-  }
-
-  .write-canvas-compact .write-canvas-editor {
-    min-height: 380px;
-  }
-}
-
-.write-canvas-editor h2,
-.write-canvas-editor h3 {
-  font-weight: 600;
-}
-
 /* The two write screens. Their type comes from the live page classes they
    sit on (.publication-article-body, .publication-post-body), so these add
    only what an editable surface needs, and undo the generic .tiptap rules
