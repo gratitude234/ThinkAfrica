@@ -15,6 +15,13 @@ import { useEffect } from "react";
  * behind a passthrough layout, so its fixed formatting toolbar read the
  * fallback 0px and sat underneath the keyboard exactly while someone was
  * typing. Both layouts now call this hook.
+ *
+ * The keyboard is measured against the box a `position: fixed; bottom: 0`
+ * control actually sits in, not against innerHeight or the initial
+ * containing block. The root layout sets viewport-fit=cover, and Chrome for
+ * Android then extends that box under the gesture bar while counting the
+ * gesture bar in neither of those, so an estimate from them came up short by
+ * the gesture bar and left every toolbar partly under the keyboard.
  */
 export function useVisualViewportBottom() {
   useEffect(() => {
@@ -27,6 +34,12 @@ export function useVisualViewportBottom() {
     }
 
     let animationFrame: number | null = null;
+
+    const fixedBox = document.createElement("div");
+    fixedBox.setAttribute("aria-hidden", "true");
+    fixedBox.style.cssText =
+      "position:fixed;top:0;bottom:0;left:0;width:0;visibility:hidden;pointer-events:none";
+    document.body.appendChild(fixedBox);
 
     const isEditableFocused = () => {
       const active = document.activeElement;
@@ -52,10 +65,9 @@ export function useVisualViewportBottom() {
           return;
         }
 
-        const layoutHeight = Math.max(
-          window.innerHeight,
-          document.documentElement.clientHeight
-        );
+        const layoutHeight =
+          fixedBox.getBoundingClientRect().height ||
+          Math.max(window.innerHeight, document.documentElement.clientHeight);
         const obscuredBottom = Math.max(
           0,
           Math.round(
@@ -86,6 +98,7 @@ export function useVisualViewportBottom() {
       window.removeEventListener("orientationchange", syncVisualViewport);
       document.removeEventListener("focusin", syncVisualViewport);
       document.removeEventListener("focusout", syncVisualViewport);
+      fixedBox.remove();
       root.style.removeProperty("--mobile-visual-viewport-bottom");
     };
   }, []);
