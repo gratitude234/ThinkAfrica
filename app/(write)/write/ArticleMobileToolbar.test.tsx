@@ -52,20 +52,21 @@ describe("ArticleMobileToolbar", () => {
     );
   });
 
-  it("puts undo and redo first, since a phone has no Cmd+Z", () => {
+  it("keeps six common controls visible without hiding Insert off screen", () => {
     show();
 
     const labels = within(screen.getByRole("toolbar", { name: "Formatting" }))
       .getAllByRole("button")
       .map((button) => button.getAttribute("aria-label"));
     expect(labels).toEqual([
-      "Undo", "Redo", "Bold", "Italic", "Link", "Heading", "Quote", "More formatting", "Insert",
+      "Undo", "Bold", "Italic", "Link", "More formatting", "Insert",
     ]);
   });
 
   it("calls the editor, and disables what history cannot do", () => {
     show();
 
+    fireEvent.click(screen.getByRole("button", { name: "More formatting" }));
     expect(screen.getByRole("button", { name: "Redo" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
     expect(editor.undo).toHaveBeenCalled();

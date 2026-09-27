@@ -87,11 +87,13 @@ function ToolButton({
 function PopoverItem({
   label,
   pressed,
+  disabled,
   onPress,
   children,
 }: {
   label: string;
   pressed?: boolean;
+  disabled?: boolean;
   onPress: () => void;
   children: ReactNode;
 }) {
@@ -100,9 +102,10 @@ function PopoverItem({
       type="button"
       aria-label={label}
       aria-pressed={pressed}
+      disabled={disabled}
       onMouseDown={keepFocus}
       onClick={onPress}
-      className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm transition-colors ${
+      className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm transition-colors disabled:opacity-35 ${
         pressed ? "bg-green-tint text-emerald-ink" : "text-ink active:bg-canvas"
       }`}
     >
@@ -129,12 +132,12 @@ interface ArticleMobileToolbarProps {
 const LINK_HINT_MS = 3000;
 
 const POPOVER =
-  "absolute bottom-full right-2 mb-2 w-56 rounded-xl border border-card-border bg-surface p-1.5 text-ink shadow-lg shadow-ink/15";
+  "absolute bottom-full right-2 mb-2 max-h-[min(340px,45dvh)] overflow-y-auto overscroll-contain w-56 rounded-xl border border-card-border bg-surface p-1.5 text-ink shadow-lg shadow-ink/15";
 
 /**
  * The Article editor's toolbar on a phone. It sits on the keyboard and
- * scrolls sideways, because nine 44px buttons do not fit in 390px. Undo and
- * Redo come first: a phone has no Cmd+Z, and a paragraph lost to a stray
+ * scrolls sideways, with six primary controls that fit a narrow phone. Undo
+ * stays in reach: a phone has no Cmd+Z, and a paragraph lost to a stray
  * gesture is otherwise gone for good. More and + open small white menus above
  * the bar rather than replacing it, so the writer never loses their place.
  */
@@ -219,6 +222,15 @@ export default function ArticleMobileToolbar({ editorRef, formats, history, acti
     >
       {drawer === "more" ? (
         <div role="group" aria-label="More formatting" className={POPOVER}>
+          <PopoverItem label="Redo" disabled={!history.canRedo} onPress={() => editor()?.redo()}>
+            <Icon path={REDO_ICON} className="h-4 w-4" />Redo
+          </PopoverItem>
+          <PopoverItem label="Heading" pressed={formats.heading} onPress={() => editor()?.toggleH2()}>
+            <span className="w-4 text-xs font-semibold">H2</span>Heading
+          </PopoverItem>
+          <PopoverItem label="Quote" pressed={formats.quote} onPress={() => editor()?.toggleBlockquote()}>
+            <span className="w-4 font-serif text-lg">&ldquo;</span>Quote
+          </PopoverItem>
           <PopoverItem label="Subheading" pressed={formats.subheading} onPress={() => editor()?.toggleH3()}>
             <span className="w-4 text-center text-xs font-semibold">H3</span>
             Subheading
@@ -333,10 +345,6 @@ export default function ArticleMobileToolbar({ editorRef, formats, history, acti
           <ToolButton label="Undo" disabled={!history.canUndo} onPress={() => editor()?.undo()}>
             <Icon path={UNDO_ICON} className="h-[18px] w-[18px]" />
           </ToolButton>
-          <ToolButton label="Redo" disabled={!history.canRedo} onPress={() => editor()?.redo()}>
-            <Icon path={REDO_ICON} className="h-[18px] w-[18px]" />
-          </ToolButton>
-          <span className="mx-0.5 h-5 w-px shrink-0 bg-white/25" aria-hidden="true" />
           <ToolButton label="Bold" pressed={formats.bold} onPress={() => editor()?.toggleBold()}>
             <span className="font-bold">B</span>
           </ToolButton>
@@ -345,12 +353,6 @@ export default function ArticleMobileToolbar({ editorRef, formats, history, acti
           </ToolButton>
           <ToolButton label="Link" pressed={formats.link} onPress={openLink}>
             Link
-          </ToolButton>
-          <ToolButton label="Heading" pressed={formats.heading} onPress={() => editor()?.toggleH2()}>
-            H2
-          </ToolButton>
-          <ToolButton label="Quote" pressed={formats.quote} onPress={() => editor()?.toggleBlockquote()}>
-            <span className="font-serif text-lg leading-none">&ldquo;</span>
           </ToolButton>
           <ToolButton label="More formatting" expanded={drawer === "more"} onPress={() => toggle("more")}>
             More

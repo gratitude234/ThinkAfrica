@@ -282,6 +282,10 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     content,
     autofocus: autoFocus ? "end" : false,
     editorProps: {
+      // Leave room for the sticky header and raised phone toolbar when the
+      // editor scrolls the caret into view. ProseMirror uses visualViewport.
+      scrollThreshold: { top: 112, bottom: 80, left: 8, right: 8 },
+      scrollMargin: { top: 128, bottom: 96, left: 8, right: 8 },
       attributes: {
         class: EDITOR_CLASS[variant],
         "aria-label": ariaLabel,
@@ -321,6 +325,27 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     },
     immediatelyRender: false,
   });
+
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!editor || !viewport) return;
+    let frame: number | null = null;
+    const revealCaret = () => {
+      if (frame !== null) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        if (!editor.isDestroyed && editor.isFocused && editor.state.selection.empty) {
+          editor.view.dispatch(editor.state.tr.scrollIntoView());
+        }
+      });
+    };
+    // Resize responds to the keyboard opening; scrolling alone must never
+    // drag someone back to their caret while they read an earlier paragraph.
+    viewport.addEventListener("resize", revealCaret);
+    return () => {
+      viewport.removeEventListener("resize", revealCaret);
+      if (frame !== null) cancelAnimationFrame(frame);
+    };
+  }, [editor]);
 
   useImperativeHandle(ref, () => ({
     toggleBold: () => editor?.chain().focus().toggleBold().run(),

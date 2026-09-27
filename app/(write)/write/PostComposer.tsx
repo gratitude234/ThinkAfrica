@@ -178,9 +178,9 @@ export default function PostComposer({
           </div>
         </header>
 
-        {statusLabel ? (
+        {statusLabel && status?.tone !== "error" ? (
           <div
-            className={`px-4 py-1.5 text-[11px] md:hidden ${status?.tone === "error" ? "bg-red-50 text-red-700" : "text-ink-muted"}`}
+            className="px-4 py-1.5 text-[11px] text-ink-muted md:hidden"
             aria-hidden="true"
           >
             {status?.label}
@@ -189,8 +189,11 @@ export default function PostComposer({
         <p aria-live="polite" className="sr-only">{status?.label ?? ""}</p>
 
         {status?.tone === "error" ? (
-          <p className="hidden border-b border-red-100 bg-red-50 px-4 py-2 text-center text-sm text-red-700 md:block">
+          <p className="border-b border-red-100 bg-red-50 px-4 py-2 text-center text-sm text-red-700">
             {status.label}
+            <button type="button" onClick={() => void draft.flush({ force: true })} className="ml-2 inline-flex min-h-11 items-center rounded-md px-3 font-semibold underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-700">
+              Retry saving
+            </button>
           </p>
         ) : null}
 
@@ -251,17 +254,20 @@ export default function PostComposer({
           <button
             type="button"
             onClick={onSwitchToArticle}
-            className="mt-3 flex min-h-11 w-full items-center gap-2.5 rounded-[10px] bg-[#EFEAE1] px-3 py-2.5 text-left transition-colors hover:bg-[#E8E1D6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand"
+            aria-label={hasText ? "Switch to article" : "Article: Write something in depth"}
+            className={`mt-3 flex min-h-11 items-center gap-2.5 rounded-[10px] text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand ${hasText ? "px-2 text-emerald-ink hover:bg-green-wash" : "w-full bg-[#EFEAE1] px-3 py-2.5 hover:bg-[#E8E1D6]"}`}
           >
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-emerald-brand font-display text-xs font-bold text-[#FAF8F5]">
-              A
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[13px] font-semibold text-ink md:text-[13px]">Article</span>
-              <span className={`text-xs text-ink-muted ${hasText ? "hidden md:block" : "block"}`}>
-                Write something in depth
-              </span>
-            </span>
+            {hasText ? (
+              <span className="text-xs font-semibold">Switch to article <span aria-hidden="true">→</span></span>
+            ) : (
+              <>
+                <span aria-hidden="true" className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-emerald-brand font-display text-xs font-bold text-[#FAF8F5]">A</span>
+                <span className="min-w-0">
+                  <span className="block text-[13px] font-semibold text-ink">Article</span>
+                  <span className="text-xs text-ink-muted">Write something in depth</span>
+                </span>
+              </>
+            )}
           </button>
         </main>
 

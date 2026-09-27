@@ -188,12 +188,18 @@ describe("PostComposer", () => {
   it("switches to the Article editor from the mockup Article card", () => {
     const { props } = renderComposer(text);
 
-    const articleCard = screen.getByRole("button", { name: /Article.*Write something in depth/ });
-    expect(articleCard).toHaveTextContent("Article");
-    expect(articleCard).toHaveTextContent("Write something in depth");
+    const articleCard = screen.getByRole("button", { name: "Switch to article" });
+    expect(articleCard).toHaveTextContent("Switch to article");
+    expect(articleCard).not.toHaveTextContent("Write something in depth");
 
     fireEvent.click(articleCard);
     expect(props.onSwitchToArticle).toHaveBeenCalled();
+  });
+
+  it("offers a direct retry when the account copy fails to save", () => {
+    const { draft } = renderComposer(text, {}, { saveState: "error", saveLabel: "Could not save. Kept on this device." });
+    fireEvent.click(screen.getByRole("button", { name: "Retry saving" }));
+    expect(draft.flush).toHaveBeenCalledWith({ force: true });
   });
 
   it("restores the centred desktop card while remaining full-screen on mobile", () => {

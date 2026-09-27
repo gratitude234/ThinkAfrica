@@ -85,6 +85,7 @@ function SaveStatus({ status }: { status: WriteStatus | null }) {
 export interface WriteHeaderProps {
   status: WriteStatus | null;
   onBack: () => void;
+  onRetrySave?: () => void;
   /** /write sits under the app navigation from md up. /edit has none. */
   hasAppNav: boolean;
   /** For screen readers, on a screen with no visible heading of its own. */
@@ -108,6 +109,7 @@ export interface WriteHeaderProps {
 export default function WriteHeader({
   status,
   onBack,
+  onRetrySave,
   hasAppNav,
   heading,
   menu,
@@ -158,7 +160,14 @@ export default function WriteHeader({
       ) : null}
 
       {status?.tone === "error" ? (
-        <p className="border-t border-red-100 bg-red-50 px-4 py-2 text-center text-sm text-red-700">{status.label}</p>
+        <p className="border-t border-red-100 bg-red-50 px-4 py-2 text-center text-sm text-red-700">
+          {status.label}
+          {onRetrySave ? (
+            <button type="button" onClick={onRetrySave} className="ml-2 inline-flex min-h-11 items-center rounded-md px-3 font-semibold underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-700">
+              Retry saving
+            </button>
+          ) : null}
+        </p>
       ) : null}
       <p aria-live="polite" className="sr-only">
         {status?.label ?? ""}

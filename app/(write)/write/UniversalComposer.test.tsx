@@ -109,7 +109,7 @@ describe("choosing the screen", () => {
     open();
     await type("<p>A thought that grew into something longer.</p>");
 
-    fireEvent.click(screen.getByRole("button", { name: /Article.*Write something in depth/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Switch to article|Article: Write something in depth/ }));
 
     expect(screen.getByLabelText("Title")).toHaveFocus();
     expect(screen.getByLabelText("Publication body")).toHaveValue("<p>A thought that grew into something longer.</p>");
@@ -119,7 +119,7 @@ describe("choosing the screen", () => {
 
   it("goes back to the Post composer while the Article is still untitled", () => {
     open();
-    fireEvent.click(screen.getByRole("button", { name: /Article.*Write something in depth/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Switch to article|Article: Write something in depth/ }));
 
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
 
@@ -130,7 +130,7 @@ describe("choosing the screen", () => {
 
   it("leaves from Back once the Article has a title", async () => {
     open();
-    fireEvent.click(screen.getByRole("button", { name: /Article.*Write something in depth/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Switch to article|Article: Write something in depth/ }));
     fireEvent.change(screen.getByLabelText("Title"), { target: { value: "A title" } });
 
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
@@ -157,7 +157,7 @@ describe("choosing the screen", () => {
     open({ ...empty, content: "<p>A photo worth a post.</p>", coverImageUrl: "https://cdn.example/photo.png" });
     expect(screen.getByRole("button", { name: "Remove image" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Article.*Write something in depth/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Switch to article|Article: Write something in depth/ }));
     expect(screen.getByText("Cover https://cdn.example/photo.png")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Back" }));

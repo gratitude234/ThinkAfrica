@@ -221,6 +221,7 @@ export default function ArticleEditor({
       <WriteHeader
         status={status}
         onBack={onBack}
+        onRetrySave={() => void draft.flush({ force: true })}
         hasAppNav={hasAppNav}
         heading={isEdit ? "Edit article" : "New article"}
         menu={
