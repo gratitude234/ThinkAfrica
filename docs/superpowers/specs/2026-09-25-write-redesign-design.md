@@ -568,3 +568,23 @@ D1 to D5 were taken as written. Where the build differs from sections 4 to 6:
   written summary, though the subtitle is still not on the writing page.
 - **Not changed:** the remove button on a topic chip in the shared `TagInput`
   is below 44px. It is used across the app, so it is left for its own change.
+
+### 13.1 Mockup parity restoration — 27 September 2026
+
+A later audit against `Write Redesign (Standalone) (3)(1).html` restored the
+visible mockup contracts that had drifted while retaining the Stage 6 product
+improvements:
+
+- Post is again a centred 560px desktop card over the warm-grey workspace,
+  with its own Cancel / New post / ••• / Post header, desktop image action +
+  character count, the full Article bridge card, and the phone image bar.
+- Article uses Continue / Update Article in the editor header; Preview remains
+  visible on mobile, save status moves to the mobile second row, and Add cover
+  is directly visible on both desktop and mobile.
+- The phone formatting bar is brand green again, with the later Undo/Redo, H3,
+  list and alignment capabilities retained.
+- Reader preview now uses a mobile Back bar and leaves the desktop app
+  navigation visible when `/write` supplies it.
+- The later Stage 6 Publish settings feed-card preview, cover, editable summary
+  and topics are deliberately retained; this is richer than the original
+  static mockup and is not treated as a parity defect.

@@ -11,11 +11,7 @@ export interface WriteStatus {
   tone: WriteStatusTone;
 }
 
-/**
- * What the save status says and how it looks. An upload the screen started
- * outranks the save state: it is the thing the writer just did, and a pasted
- * photo gives no other sign until it lands.
- */
+/** What the save status says and how it looks. */
 export function writeStatus(
   draft: Pick<ContributionDraft, "saveLabel" | "saveState">,
   uploading: boolean
@@ -23,7 +19,6 @@ export function writeStatus(
   if (uploading) return { label: "Adding image…", tone: "saving" };
   if (!draft.saveLabel) return null;
   if (draft.saveState === "error") return { label: draft.saveLabel, tone: "error" };
-  // "idle" with a label is a published edit whose changes the account holds.
   if (draft.saveState === "cloud" || draft.saveState === "idle") return { label: draft.saveLabel, tone: "saved" };
   return { label: draft.saveLabel, tone: "saving" };
 }
@@ -36,12 +31,6 @@ const DOT: Record<WriteStatusTone, string> = {
 
 const STATUS_HINT_MS = 3000;
 
-/**
- * The save status as a dot on a phone, where the header has one row to share
- * with Back, the menu and the main button, and as a dot and a word from md
- * up. A tap on the phone's dot says what it means. A failure is never left to
- * a dot: its message has a line of its own under the header at every size.
- */
 function SaveStatus({ status }: { status: WriteStatus | null }) {
   const [hintShown, setHintShown] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -102,17 +91,20 @@ export interface WriteHeaderProps {
   heading?: string;
   /** The ••• menu. */
   menu: ReactNode;
-  /** Shown from md up only. On a phone it belongs in the ••• menu. */
+  /** Preview or another secondary action. */
   secondary?: ReactNode;
   primary: ReactNode;
+  /** Match the Article mockup, where Preview stays visible on a phone. */
+  showSecondaryOnMobile?: boolean;
+  /** Move the phone save text to a second row instead of reducing it to a dot. */
+  mobileStatusLine?: boolean;
+  /** Content placed at the right side of that second mobile row, e.g. Add cover. */
+  mobileMeta?: ReactNode;
+  /** The Article mockup spans the header across the workspace rather than the 680px body. */
+  wide?: boolean;
 }
 
-/**
- * The one header both write screens use: Back, the save status, the •••
- * menu and the main button. One row on a phone, so the writing gets the room,
- * and from md up only as wide as the writing column, so Back and the main
- * button sit at its edges rather than at the edges of the window.
- */
+/** Shared Article-style header. The Post composer has its own compact-card header. */
 export default function WriteHeader({
   status,
   onBack,
@@ -121,7 +113,13 @@ export default function WriteHeader({
   menu,
   secondary,
   primary,
+  showSecondaryOnMobile = false,
+  mobileStatusLine = false,
+  mobileMeta,
+  wide = false,
 }: WriteHeaderProps) {
+  const phoneStatus = status?.tone === "error" ? "Not saved" : status?.label;
+
   return (
     <header
       className={`sticky z-30 border-b border-divider bg-canvas/95 backdrop-blur ${
@@ -129,7 +127,11 @@ export default function WriteHeader({
       }`}
     >
       {heading ? <h1 className="sr-only">{heading}</h1> : null}
-      <div className="mx-auto flex max-w-[680px] items-center gap-1 px-2 py-1 sm:px-6 md:gap-2 md:py-2">
+      <div
+        className={`mx-auto flex items-center gap-1 px-2 py-1 sm:px-6 md:gap-2 md:py-2 ${
+          wide ? "max-w-none md:px-10" : "max-w-[680px]"
+        }`}
+      >
         <button
           type="button"
           onClick={onBack}
@@ -138,13 +140,23 @@ export default function WriteHeader({
           <Icon path={BACK_ICON} className="h-4 w-4" />
           Back
         </button>
-        <SaveStatus status={status} />
+        <div className={mobileStatusLine ? "hidden md:block" : undefined}>
+          <SaveStatus status={status} />
+        </div>
         <div className="ml-auto flex shrink-0 items-center gap-1 md:gap-2">
           {menu}
-          {secondary ? <div className="hidden md:flex">{secondary}</div> : null}
+          {secondary ? <div className={showSecondaryOnMobile ? "flex" : "hidden md:flex"}>{secondary}</div> : null}
           {primary}
         </div>
       </div>
+
+      {mobileStatusLine || mobileMeta ? (
+        <div className="flex min-h-8 items-center justify-between gap-3 px-4 pb-1 text-[11px] text-ink-muted md:hidden">
+          <span className={status?.tone === "error" ? "text-red-600" : undefined}>{phoneStatus ?? ""}</span>
+          {mobileMeta}
+        </div>
+      ) : null}
+
       {status?.tone === "error" ? (
         <p className="border-t border-red-100 bg-red-50 px-4 py-2 text-center text-sm text-red-700">{status.label}</p>
       ) : null}

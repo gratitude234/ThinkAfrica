@@ -9,7 +9,7 @@ import { hasMeaningfulContribution, type ComposerMode } from "@/lib/contribution
 import { uploadImage } from "@/lib/uploadImage";
 import ComposerMenu from "./ComposerMenu";
 import type { ContributionDraft } from "./useContributionDraft";
-import WriteHeader, { writeStatus } from "./WriteHeader";
+import { writeStatus } from "./WriteHeader";
 import { WRITE_PRIMARY_BUTTON } from "./writeStyles";
 
 const Editor = dynamic(() => import("@/components/editor/Editor"), {
@@ -36,9 +36,9 @@ export interface PostComposerProps {
 }
 
 /**
- * The quick path: no title, one optional image, and a Post button that
- * publishes straight away. Topics and the reader preview belong to Articles.
- * The root never shows this screen over a title, so a Post never carries one.
+ * The quick path from the write-system mockup: a compact desktop card and a
+ * full-screen phone composer. It has no title, one optional image, and posts
+ * directly. The Article card is the explicit bridge into long-form writing.
  */
 export default function PostComposer({
   draft,
@@ -64,8 +64,6 @@ export default function PostComposer({
   const canSaveDraft = hasMeaningfulContribution(snapshot);
   const canDiscard = isEdit ? Boolean(draft.editDraftId) : Boolean(draft.draftId) || canSaveDraft;
 
-  // A Post's one image is its cover_image_url, which the feed card and the
-  // Post page already show. Switching to the Article editor makes it the cover.
   const attachImage = useCallback(
     async (file: File) => {
       if (!file.type.startsWith("image/")) {
@@ -90,9 +88,6 @@ export default function PostComposer({
     if (canPost) withCompleteProfile(() => void draft.publish());
   };
 
-  // Cmd/Ctrl+Enter is the muscle memory for "send this". It is taken in the
-  // capture phase, before the editor sees it: Tiptap binds the same keys to a
-  // line break, which would otherwise land in the text as the Post goes out.
   const onKeyDownCapture = (event: KeyboardEvent<HTMLElement>) => {
     if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
       event.preventDefault();
@@ -102,19 +97,66 @@ export default function PostComposer({
   };
 
   const heading = isEdit ? "Edit post" : "New post";
+  const action = isEdit ? "Update" : "Post";
   const status = writeStatus(draft, imageUploading);
+  const statusLabel = status?.tone === "error" ? "Not saved" : status?.label;
+  const characterCount = draft.bodyText.length;
+
+  const imagePicker = (
+    <button
+      type="button"
+      onClick={() => fileInputRef.current?.click()}
+      disabled={imageUploading}
+      aria-label={snapshot.coverImageUrl ? "Replace image" : "Add image"}
+      className="flex min-h-11 shrink-0 items-center gap-2 rounded-md px-2 text-sm font-semibold text-emerald-ink transition-colors hover:bg-green-wash disabled:opacity-40"
+    >
+      <Icon path={IMAGE_ICON} className="h-5 w-5" />
+      <span className="hidden md:inline">Image</span>
+    </button>
+  );
 
   return (
-    // Full page at every size, like the Article editor: /write has nothing
-    // behind it that a floating card could sit over.
-    <div className="min-h-dvh bg-canvas text-ink md:min-h-[calc(100dvh-var(--app-nav-height))]">
-      <section aria-label={heading} onKeyDownCapture={onKeyDownCapture}>
-        <WriteHeader
-          status={status}
-          onBack={onBack}
-          hasAppNav={hasAppNav}
-          heading={heading}
-          menu={
+    <div
+      className={`min-h-dvh bg-canvas text-ink md:bg-[#F1EEE7] md:py-14 ${
+        hasAppNav ? "md:min-h-[calc(100dvh-var(--app-nav-height))]" : ""
+      }`}
+    >
+      <section
+        aria-label={heading}
+        onKeyDownCapture={onKeyDownCapture}
+        className="mx-auto min-h-dvh w-full bg-canvas md:min-h-0 md:w-[560px] md:overflow-visible md:rounded-[14px] md:border md:border-card-border md:shadow-[0_8px_30px_rgba(0,0,0,0.07)]"
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={IMAGE_TYPES}
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            if (file) void attachImage(file);
+          }}
+        />
+        <header className="relative flex min-h-14 items-center justify-between border-b border-card-border px-3 sm:px-5">
+          <button
+            type="button"
+            onClick={onBack}
+            className="flex min-h-11 shrink-0 items-center rounded-md px-2 text-sm text-ink-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand"
+          >
+            Cancel
+          </button>
+          <h1 className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-ink sm:text-[15px]">
+            {heading}
+          </h1>
+          <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
+            {statusLabel ? (
+              <span
+                className={`hidden text-xs md:inline ${status?.tone === "error" ? "text-red-600" : "text-ink-muted"}`}
+                aria-hidden="true"
+              >
+                {statusLabel}
+              </span>
+            ) : null}
             <ComposerMenu
               onOpenDrafts={username ? () => void draft.requestClose(`/${username}?tab=drafts`) : undefined}
               canSaveDraft={canSaveDraft}
@@ -123,26 +165,42 @@ export default function PostComposer({
               canDiscard={canDiscard}
               onDiscard={onDiscard}
             />
-          }
-          primary={
             <Button
               type="button"
               onClick={postNow}
               disabled={!canPost}
               loading={draft.publishing}
-              className={WRITE_PRIMARY_BUTTON}
+              className={`${WRITE_PRIMARY_BUTTON} min-h-9 px-3.5 text-[13px] md:min-h-10 md:px-[18px] md:text-[13.5px]`}
             >
-              {isEdit ? "Update" : "Post"}
+              {action}
             </Button>
-          }
-        />
+          </div>
+        </header>
 
-        <main className="mx-auto w-full max-w-[680px] px-5 pb-28 pt-5 sm:px-8 md:pb-16 md:pt-10">
+        {statusLabel ? (
+          <div
+            className={`px-4 py-1.5 text-[11px] md:hidden ${status?.tone === "error" ? "bg-red-50 text-red-700" : "text-ink-muted"}`}
+            aria-live="polite"
+          >
+            {status?.label}
+          </div>
+        ) : (
+          <p aria-live="polite" className="sr-only" />
+        )}
+
+        {status?.tone === "error" ? (
+          <p className="hidden border-b border-red-100 bg-red-50 px-4 py-2 text-center text-sm text-red-700 md:block">
+            {status.label}
+          </p>
+        ) : null}
+
+        <main className="px-4 pb-24 pt-3.5 sm:px-5 md:pb-5 md:pt-5">
           {notice}
           <div className="flex items-center gap-2.5">
             <UserAvatar name={authorName} src={avatarUrl} size={32} className="shrink-0" />
             <p className="text-sm font-semibold text-ink">{authorName}</p>
           </div>
+
           <div className="mt-3">
             <Editor
               variant="post"
@@ -158,9 +216,7 @@ export default function PostComposer({
           </div>
 
           {snapshot.coverImageUrl ? (
-            <figure className="relative mt-4 overflow-hidden rounded-xl bg-surface">
-              {/* At its natural shape, not cropped: a Post's image is often a
-                  screenshot or a chart, and cropping loses the point of it. */}
+            <figure className="relative mt-4 overflow-hidden rounded-[10px] bg-surface">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={snapshot.coverImageUrl} alt="" className="mx-auto max-h-[420px] w-full object-contain" />
               <button
@@ -175,6 +231,7 @@ export default function PostComposer({
               </button>
             </figure>
           ) : null}
+
           {imageError ? (
             <p role="alert" className="mt-3 text-sm text-red-600">
               {imageError}
@@ -186,43 +243,34 @@ export default function PostComposer({
             </p>
           ) : null}
 
-          {/* One row under the writing, the same at every size: the image on
-              the left, the way to an Article on the right. From md up it
-              follows the text, and on a phone it rides the keyboard. */}
-          <div
-            className="fixed inset-x-0 z-20 flex items-center justify-between gap-2 border-t border-divider bg-canvas px-3 py-0.5 md:static md:mt-4 md:border-0 md:bg-transparent md:p-0"
-            style={{ bottom: "calc(env(safe-area-inset-bottom) + var(--mobile-visual-viewport-bottom, 0px))" }}
-          >
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={imageUploading}
-              aria-label={snapshot.coverImageUrl ? "Replace image" : "Add image"}
-              className="-ml-2 flex min-h-11 shrink-0 items-center gap-2 rounded-md px-2 text-sm font-semibold text-emerald-ink transition-colors hover:bg-green-wash disabled:opacity-40"
-            >
-              <Icon path={IMAGE_ICON} className="h-5 w-5" />
-              Image
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={IMAGE_TYPES}
-              className="hidden"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                event.target.value = "";
-                if (file) void attachImage(file);
-              }}
-            />
-            <button
-              type="button"
-              onClick={onSwitchToArticle}
-              className="-mr-2 flex min-h-11 shrink-0 items-center rounded-md px-2 text-sm text-ink-muted underline-offset-4 transition-colors hover:text-ink hover:underline"
-            >
-              Write an article instead
-            </button>
+          <div className="mt-3 hidden items-center justify-between md:flex">
+            <div className="-ml-2">{imagePicker}</div>
+            <p className="text-xs text-ink-muted">{characterCount.toLocaleString()} characters, no hard limit</p>
           </div>
+
+          <button
+            type="button"
+            onClick={onSwitchToArticle}
+            className="mt-3 flex min-h-11 w-full items-center gap-2.5 rounded-[10px] bg-[#EFEAE1] px-3 py-2.5 text-left transition-colors hover:bg-[#E8E1D6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand"
+          >
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-emerald-brand font-display text-xs font-bold text-[#FAF8F5]">
+              A
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[13px] font-semibold text-ink md:text-[13px]">Article</span>
+              <span className={`text-xs text-ink-muted ${hasText ? "hidden md:block" : "block"}`}>
+                Write something in depth
+              </span>
+            </span>
+          </button>
         </main>
+
+        <div
+          className="fixed inset-x-0 z-20 flex min-h-14 items-center border-t border-divider bg-surface px-3 md:hidden"
+          style={{ bottom: "calc(env(safe-area-inset-bottom) + var(--mobile-visual-viewport-bottom, 0px))" }}
+        >
+          {imagePicker}
+        </div>
       </section>
     </div>
   );

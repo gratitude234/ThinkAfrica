@@ -91,10 +91,10 @@ describe("PostComposer", () => {
     expect(editorSawIt).not.toHaveBeenCalled();
   });
 
-  it("goes Back through the root", () => {
+  it("cancels through the root", () => {
     const { props } = renderComposer(text);
 
-    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(props.onBack).toHaveBeenCalled();
   });
@@ -185,26 +185,24 @@ describe("PostComposer", () => {
     expect(draft.requestClose).toHaveBeenCalledWith("/ada?tab=drafts");
   });
 
-  it("switches to the Article editor from a quiet link beside the image button", () => {
+  it("switches to the Article editor from the mockup Article card", () => {
     const { props } = renderComposer(text);
 
-    const imageButton = screen.getByRole("button", { name: "Add image" });
-    const articleLink = screen.getByRole("button", { name: "Write an article instead" });
-    // One row, the same order at every size: the image first, then the Article.
-    expect(imageButton.parentElement).toBe(articleLink.parentElement);
-    expect(imageButton.compareDocumentPosition(articleLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(imageButton).toHaveTextContent("Image");
+    const articleCard = screen.getByRole("button", { name: /Article.*Write something in depth/ });
+    expect(articleCard).toHaveTextContent("Article");
+    expect(articleCard).toHaveTextContent("Write something in depth");
 
-    fireEvent.click(articleLink);
+    fireEvent.click(articleCard);
     expect(props.onSwitchToArticle).toHaveBeenCalled();
   });
 
-  it("is a full page under the shared header, not a floating card", () => {
+  it("restores the centred desktop card while remaining full-screen on mobile", () => {
     renderComposer();
 
     const section = screen.getByRole("region", { name: "New post" });
-    expect(section.className).not.toContain("rounded-2xl");
-    expect(within(section).getByRole("button", { name: "Back" })).toBeInTheDocument();
+    expect(section).toHaveClass("md:w-[560px]", "md:rounded-[14px]");
+    expect(within(section).getByRole("button", { name: "Cancel" })).toBeInTheDocument();
     expect(within(section).getByRole("button", { name: "More options" })).toBeInTheDocument();
+    expect(screen.getByText("0 characters, no hard limit")).toBeInTheDocument();
   });
 });

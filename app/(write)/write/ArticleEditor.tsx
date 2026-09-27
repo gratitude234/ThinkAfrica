@@ -6,7 +6,7 @@ import Button from "@/components/ui/Button";
 import CoverImageUploader, { type CoverImageUploaderHandle } from "@/components/ui/CoverImageUploader";
 import ReferencesPanel from "@/components/post/ReferencesPanel";
 import type { EditorHandle, SelectedImage } from "@/components/editor/Editor";
-import { CLOSE_ICON, Icon } from "@/components/editor/editorIcons";
+import { BACK_ICON, CLOSE_ICON, IMAGE_ICON, Icon } from "@/components/editor/editorIcons";
 import { deriveContributionExcerpt, hasMeaningfulContribution, type ComposerMode } from "@/lib/contribution";
 import ArticleMobileToolbar, { NO_FORMATS, type FormatState } from "./ArticleMobileToolbar";
 import ArticlePreview from "./ArticlePreview";
@@ -18,7 +18,7 @@ import type { ContributionDraft } from "./useContributionDraft";
 import { useModalFocus } from "./useModalFocus";
 import WriteSheet from "./WriteSheet";
 import WriteHeader, { writeStatus } from "./WriteHeader";
-import { WRITE_OUTLINE_BUTTON, WRITE_PRIMARY_BUTTON } from "./writeStyles";
+import { WRITE_PRIMARY_BUTTON } from "./writeStyles";
 
 const Editor = dynamic(() => import("@/components/editor/Editor"), {
   ssr: false,
@@ -53,9 +53,10 @@ function sameFormats(left: FormatState, right: FormatState) {
 
 /**
  * The long-form screen: a required title and a rich body, set in the live
- * article page's type. A blank page is those two and nothing else. A cover is
- * added from Publish settings or the ••• menu, and once there is one it shows
- * under the title, where the published page shows it. Formatting is a
+ * article page's type. The mockup keeps Add cover visible so writers do not
+ * have to discover it inside a menu; Publish settings remains another route
+ * to the same cover. Once there is one it shows under the title, where the
+ * published page shows it. Formatting is a
  * selection toolbar and a "+" menu on a desktop, and a toolbar on the keyboard
  * on a phone. Publish opens Publish settings, which shows the feed card.
  */
@@ -237,13 +238,26 @@ export default function ArticleEditor({
             onDiscard={onDiscard}
           />
         }
+        showSecondaryOnMobile
+        mobileStatusLine
+        wide
+        mobileMeta={
+          <button
+            type="button"
+            onClick={addCover}
+            className="flex min-h-8 items-center gap-1.5 rounded-md border border-card-border px-2.5 font-semibold text-emerald-ink transition-colors active:bg-surface"
+          >
+            <Icon path={IMAGE_ICON} className="h-3.5 w-3.5" />
+            {hasCover ? "Change cover" : "Add cover"}
+          </button>
+        }
         secondary={
           <button
             type="button"
             onClick={openPreview}
             aria-disabled={!hasBody || undefined}
             aria-describedby={missingBody ? "article-body-required" : undefined}
-            className={`${WRITE_OUTLINE_BUTTON} aria-disabled:border-divider aria-disabled:text-ink-muted/60 aria-disabled:hover:bg-transparent`}
+            className="flex min-h-11 items-center justify-center rounded-md px-2 text-sm font-semibold text-emerald-ink transition-colors hover:bg-green-wash aria-disabled:text-ink-muted/60 aria-disabled:hover:bg-transparent md:border md:border-emerald-brand md:px-4"
           >
             Preview
           </button>
@@ -261,13 +275,23 @@ export default function ArticleEditor({
             }
             className={WRITE_PRIMARY_BUTTON}
           >
-            {isEdit ? "Update" : "Publish"}
+            {isEdit ? "Update Article" : "Continue"}
           </Button>
         }
       />
 
       <main className="mx-auto w-full max-w-[680px] px-5 pb-40 pt-5 sm:px-8 md:pb-28 md:pt-10">
         {notice}
+        {!hasCover ? (
+          <button
+            type="button"
+            onClick={addCover}
+            className="mb-6 hidden min-h-11 items-center gap-2 rounded-md border border-card-border px-3 text-sm font-semibold text-emerald-ink transition-colors hover:bg-surface md:inline-flex"
+          >
+            <Icon path={IMAGE_ICON} className="h-4 w-4" />
+            Add cover
+          </button>
+        ) : null}
         <textarea
           ref={titleRef}
           autoFocus={autoFocusTitle}
@@ -292,7 +316,7 @@ export default function ArticleEditor({
         />
         {missingTitle ? (
           <p id="article-title-required" aria-live="polite" className="mt-2 text-sm text-red-600">
-            Add a title to publish. An Article needs one, a Post never does.
+            Add a title to continue. An Article needs one, a Post never does.
           </p>
         ) : null}
         {/* Below the title, where the published page shows it, and only once
@@ -389,19 +413,28 @@ export default function ArticleEditor({
           role="dialog"
           aria-modal="true"
           aria-label="Reader preview"
-          className="fixed inset-0 z-[75] overflow-y-auto overscroll-contain bg-canvas"
+          className={`fixed inset-x-0 bottom-0 z-[75] overflow-y-auto overscroll-contain bg-canvas ${
+            hasAppNav ? "top-0 md:top-[var(--app-nav-height)] md:z-40" : "top-0"
+          }`}
         >
-          <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-divider bg-canvas/95 px-4 py-2 backdrop-blur sm:px-6">
-            <p className="text-kicker font-semibold uppercase text-ink-muted">How this reads</p>
+          <div className="sticky top-0 z-10 flex min-h-14 items-center border-b border-divider bg-canvas/95 px-3 backdrop-blur md:hidden">
             <button
               type="button"
               onClick={closePreview}
-              aria-label="Close preview"
-              className="flex h-11 w-11 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-surface hover:text-ink"
+              className="flex min-h-11 items-center gap-1.5 rounded-md px-2 text-sm text-ink-muted transition-colors hover:text-ink"
             >
-              <Icon path={CLOSE_ICON} />
+              <Icon path={BACK_ICON} className="h-4 w-4" />
+              Back
             </button>
           </div>
+          <button
+            type="button"
+            onClick={closePreview}
+            aria-label="Close preview"
+            className="fixed right-5 top-[calc(var(--app-nav-height)+1rem)] z-20 hidden h-11 w-11 items-center justify-center rounded-full border border-card-border bg-canvas/95 text-ink-muted shadow-sm transition-colors hover:bg-surface hover:text-ink md:flex"
+          >
+            <Icon path={CLOSE_ICON} />
+          </button>
           <ArticlePreview snapshot={snapshot} authorName={authorName} avatarUrl={avatarUrl} wordCount={draft.wordCount} />
         </div>
       ) : null}

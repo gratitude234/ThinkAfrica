@@ -53,7 +53,7 @@ describe("ArticleEditor", () => {
   it("is a title and a body on a blank page, and nothing else", () => {
     renderEditor();
 
-    expect(screen.queryByRole("button", { name: "Add cover" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Add cover" }).length).toBeGreaterThan(0);
     expect(screen.getByLabelText("Title")).toHaveAttribute("placeholder", "Title");
     expect(screen.getByLabelText("Publication body")).toHaveAttribute("placeholder", "Tell your story.");
     expect(screen.getByLabelText("Publication body")).toHaveAttribute("data-variant", "article");
@@ -82,13 +82,13 @@ describe("ArticleEditor", () => {
     fireEvent.click(screen.getByRole("button", { name: "More options" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Add cover" }));
 
-    expect(screen.getByRole("button", { name: "Add cover" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Add cover" }).length).toBeGreaterThan(0);
   });
 
   it("shows the feed card in Publish settings, summarised from the opening lines", () => {
     const { draft } = renderEditor(titled);
 
-    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     const card = within(screen.getByRole("dialog", { name: "Publish settings" })).getByRole("group", { name: "In the feed" });
     expect(within(card).getByText("Power to the people")).toBeInTheDocument();
     expect(within(card).getByText("Solar microgrids are changing Jos.")).toBeInTheDocument();
@@ -101,9 +101,9 @@ describe("ArticleEditor", () => {
   it("asks for a title once there is a body, and holds Publish until there is one", () => {
     const { props } = renderEditor({ content: "<p>A body with no title yet.</p>" });
 
-    const message = screen.getByText("Add a title to publish. An Article needs one, a Post never does.");
+    const message = screen.getByText("Add a title to continue. An Article needs one, a Post never does.");
     expect(screen.getByLabelText("Title")).toHaveAttribute("aria-describedby", message.id);
-    const continueButton = screen.getByRole("button", { name: "Publish" });
+    const continueButton = screen.getByRole("button", { name: "Continue" });
     expect(continueButton).toHaveAttribute("aria-disabled", "true");
 
     fireEvent.click(continueButton);
@@ -114,10 +114,10 @@ describe("ArticleEditor", () => {
   it("holds Publish until there is a body, and says so when pressed", () => {
     const { props } = renderEditor({ title: "A title" });
 
-    const continueButton = screen.getByRole("button", { name: "Publish" });
+    const continueButton = screen.getByRole("button", { name: "Continue" });
     expect(continueButton).toHaveAttribute("aria-disabled", "true");
     expect(continueButton).toBeEnabled();
-    expect(screen.queryByText(/Add a title to publish/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Add a title to continue/)).not.toBeInTheDocument();
 
     fireEvent.click(continueButton);
 
@@ -129,9 +129,9 @@ describe("ArticleEditor", () => {
   it("names everything missing when Publish is pressed on an empty page", () => {
     renderEditor();
 
-    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
-    expect(screen.getByText("Add a title to publish. An Article needs one, a Post never does.")).toBeInTheDocument();
+    expect(screen.getByText("Add a title to continue. An Article needs one, a Post never does.")).toBeInTheDocument();
     expect(screen.getByText("Write something here to publish.")).toBeInTheDocument();
     expect(screen.getByLabelText("Title")).toHaveFocus();
   });
@@ -148,7 +148,7 @@ describe("ArticleEditor", () => {
   it("goes on to Publish settings, then publishes", () => {
     const { draft, props } = renderEditor(titled);
 
-    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(props.withCompleteProfile).toHaveBeenCalled();
     fireEvent.click(within(screen.getByRole("dialog", { name: "Publish settings" })).getByRole("button", { name: "Publish now" }));
 
@@ -158,7 +158,7 @@ describe("ArticleEditor", () => {
   it("says Update when editing something published", () => {
     renderEditor(titled, { mode: "published-edit" }, { editDraftId: "edit-1" });
 
-    expect(screen.getByRole("button", { name: "Update" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Update Article" })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "More options" }));
     expect(screen.getByRole("menuitem", { name: "Discard changes" })).toBeInTheDocument();
   });
@@ -214,7 +214,7 @@ describe("ArticleEditor", () => {
     });
 
     expect(screen.getByText("Adding image…", { selector: "[aria-live]" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Publish" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
   });
 
   it("previews the piece as it reads", () => {
@@ -241,7 +241,7 @@ describe("ArticleEditor", () => {
 
     expect(screen.queryByRole("dialog", { name: "Reader preview" })).not.toBeInTheDocument();
     expect(screen.getByText("Write something here to preview it.")).toBeInTheDocument();
-    expect(screen.queryByText(/Add a title to publish/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Add a title to continue/)).not.toBeInTheDocument();
     expect(editorMock.handle.focus).toHaveBeenCalled();
   });
 

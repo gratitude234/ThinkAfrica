@@ -237,25 +237,26 @@ The composer at `/write` is two screens over one saving hook.
 `UniversalComposer` owns `useContributionDraft` (the working copy, device and
 account saves, recovery, publishing, leaving and discarding) and renders
 `PostComposer` or `ArticleEditor`, chosen by `composerSurfaceFor()` and
-`?editor=article`. A Post publishes from its button, and an Article's Publish
-opens `PublishSettingsDialog`, whose "Publish now" is the one that publishes.
-The Post composer is never shown over a title. `/edit/[slug]` uses the same
-root, full screen with no navigation.
+`?editor=article`. A Post publishes from its button, and an Article's **Continue** opens
+`PublishSettingsDialog`, whose "Publish now" is the one that publishes. The
+Post composer is never shown over a title. `/edit/[slug]` uses the same root,
+full screen with no navigation.
 
-Both screens use `WriteHeader`: Back, the save status, the ••• menu
-(`ComposerMenu`) and the main button, in one row at every size. The status is
-`writeStatus()` from the same file, a dot on a phone and a dot and a word from
-md up, and a failed save always gets a line of its own under the header.
-Article Preview is a header button from md up and a ••• menu item at every
-size. The Post composer is a full page, not a card, with its Image and "Write
-an article instead" actions in a row under the text that sits above the
-keyboard on a phone.
+The Article screen uses `WriteHeader`: Back, the save status, the ••• menu
+(`ComposerMenu`), Preview and Continue/Update Article. Preview stays visible on
+a phone, where the save text moves to a second row beside Add cover. The status
+is `writeStatus()` from the same file, and a failed save always gets a line of
+its own under the header. The Post screen intentionally has its own mockup
+header: Cancel, centred New/Edit post, save status, ••• and Post/Update. On
+desktop the Post composer is the centred 560px card over the warm grey
+workspace; on a phone it remains full-screen, with the image action in the bar
+above the keyboard and the Article bridge in the body.
 
-A blank Article is a title and a body, and nothing else. There is no cover
-button on the page: a cover is added from Publish settings or from "Add cover"
-in the ••• menu, and once there is one it shows under the title. The faint
-"Title" placeholder stays, because it is the one sign that the first line is
-the headline. Publish settings works like Medium's preview screen: the card as
+A blank Article keeps the faint `Title` placeholder and the body, with **Add
+cover** visible above the title on desktop and in the second header row on a
+phone. A cover can still also be added from Publish settings or the ••• menu,
+and once there is one it shows under the title. Publish settings keeps the
+later Medium-style feed preview: the card as
 the feed will show it (`FeedCardPreview`, which follows `ArticleFeedCard` in
 `components/post/HomeFeedCard.tsx`), then the cover, the summary and the
 topics, side by side from md up. The summary starts as the opening lines

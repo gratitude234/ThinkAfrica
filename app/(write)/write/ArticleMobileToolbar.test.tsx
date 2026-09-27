@@ -43,6 +43,15 @@ describe("ArticleMobileToolbar", () => {
     editor.insertLink.mockImplementation(() => "linked");
   });
 
+  it("uses the mockup's dark-green phone toolbar", () => {
+    show();
+
+    expect(screen.getByRole("toolbar", { name: "Formatting" }).parentElement).toHaveClass(
+      "bg-emerald-brand",
+      "text-[#F1EEE7]"
+    );
+  });
+
   it("puts undo and redo first, since a phone has no Cmd+Z", () => {
     show();
 

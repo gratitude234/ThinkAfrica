@@ -1,3 +1,18 @@
+## 2026-09-27 — Write redesign mockup parity restoration
+
+- Audited the live `/write` Post and Article screens against the supplied Write
+  Redesign standalone mockup and the original design spec.
+- Restored the Post desktop 560px card/workspace treatment, compact mockup
+  header, character count, Article bridge card, and phone image toolbar.
+- Restored Article Continue/Update Article wording, mobile Preview, mobile save
+  row, visible Add cover affordance, title-validation copy, and the dark-green
+  mobile formatting bar.
+- Made reader preview use the mockup-style mobile Back bar while preserving the
+  desktop app navigation.
+- Preserved later product improvements: autosave/recovery, sources/history,
+  richer formatting, and the Stage 6 feed-card Publish settings workflow.
+- Updated focused tests for the restored contracts.
+
 # 24 September 2026 — Feed viewer-context resilience
 
 - Added a first-class feed viewer-context repository with Supabase RPC and direct PostgreSQL implementations.
