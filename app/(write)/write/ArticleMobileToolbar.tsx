@@ -214,8 +214,7 @@ export default function ArticleMobileToolbar({ editorRef, formats, history, acti
       // of the writing system: deep brand green with high-contrast controls.
       className="fixed inset-x-0 z-40 border-t border-emerald-brand bg-emerald-brand text-[#F1EEE7] shadow-[0_-4px_16px_rgba(0,0,0,0.10)] md:hidden"
       style={{
-        bottom: "var(--mobile-visual-viewport-bottom, 0px)",
-        paddingBottom: "env(safe-area-inset-bottom)",
+        bottom: "calc(var(--mobile-visual-viewport-bottom, 0px) + max(12px, env(safe-area-inset-bottom)))",
       }}
     >
       {drawer === "more" ? (

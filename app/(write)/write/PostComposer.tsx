@@ -171,7 +171,7 @@ export default function PostComposer({
               onClick={postNow}
               disabled={!canPost}
               loading={draft.publishing}
-              className={`${WRITE_PRIMARY_BUTTON} !px-2 !text-xs sm:!px-3.5 sm:!text-[13px]`}
+              className={`${WRITE_PRIMARY_BUTTON} write-header-action !px-2 !text-xs sm:!px-3.5 sm:!text-[13px]`}
             >
               {action}
             </Button>
@@ -267,7 +267,7 @@ export default function PostComposer({
 
         <div
           className="fixed inset-x-0 z-20 flex min-h-14 items-center border-t border-divider bg-surface px-3 md:hidden"
-          style={{ bottom: "var(--mobile-visual-viewport-bottom, 0px)", paddingBottom: "env(safe-area-inset-bottom)" }}
+          style={{ bottom: "calc(var(--mobile-visual-viewport-bottom, 0px) + max(12px, env(safe-area-inset-bottom)))" }}
         >
           {imagePicker}
         </div>

@@ -273,7 +273,7 @@ export default function ArticleEditor({
             aria-describedby={
               missingTitle ? "article-title-required" : missingBody ? "article-body-required" : undefined
             }
-            className={`${WRITE_PRIMARY_BUTTON} !px-2 !text-xs sm:!px-4 sm:!text-sm`}
+            className={`${WRITE_PRIMARY_BUTTON} write-header-action !px-2 !text-xs sm:!px-4 sm:!text-sm`}
           >
             {isEdit ? "Update Article" : "Continue"}
           </Button>

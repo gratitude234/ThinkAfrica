@@ -916,3 +916,32 @@ font-family: var(--font-inter), system-ui, sans-serif;
   color: #6B6B6B;
   background: repeating-linear-gradient(135deg, #F5F3EE 0 8px, #EEEBE3 8px 16px);
 }
+
+/* Slim writing-header actions: a 32px visible surface inside a 44px tap
+   target. Width and focus ring remain on the real button. */
+.write-header-action {
+  position: relative;
+  isolation: isolate;
+  height: 44px;
+  min-height: 44px;
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+  background: transparent !important;
+}
+.write-header-action::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 6px 0;
+  border-radius: 8px;
+  background: rgb(var(--ta-emerald-brand-rgb));
+  transition: background-color 150ms;
+  pointer-events: none;
+}
+.write-header-action:hover::before {
+  background: #0E4B37;
+}
+.write-header-action:disabled::before,
+.write-header-action[aria-disabled="true"]::before {
+  background: rgb(var(--ta-divider-rgb));
+}
