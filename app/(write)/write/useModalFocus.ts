@@ -5,6 +5,14 @@ import { useEffect, type RefObject } from "react";
 const FOCUSABLE =
   'button:not([disabled]), [href], input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+// Responsive dialogs can contain both desktop and phone controls. Hidden
+// controls cannot receive focus and must not become the trap's endpoints.
+function visibleControls(dialog: HTMLDivElement) {
+  return Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+    (element) => element.getClientRects().length > 0 && getComputedStyle(element).visibility !== "hidden"
+  );
+}
+
 /**
  * Keeps keyboard focus inside an open dialog or sheet, closes it on Escape
  * unless it is busy, stops the page behind it from scrolling, and hands focus
@@ -32,7 +40,8 @@ export function useModalFocus(
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const frame = requestAnimationFrame(() => {
-      dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
+      const dialog = dialogRef.current;
+      if (dialog) visibleControls(dialog)[0]?.focus();
     });
     const onKeyDown = (event: KeyboardEvent) => {
       const dialog = dialogRef.current;
@@ -43,7 +52,7 @@ export function useModalFocus(
         return;
       }
       if (event.key !== "Tab") return;
-      const controls = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE));
+      const controls = visibleControls(dialog);
       if (!controls.length) return;
       const first = controls[0];
       const last = controls[controls.length - 1];

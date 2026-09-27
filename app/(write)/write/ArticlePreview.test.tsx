@@ -30,6 +30,13 @@ describe("ArticlePreview", () => {
     expect(container.querySelector(".publication-article-body")?.innerHTML).toBe(body);
   });
 
+  it("places the cover after the title and byline, before the body", () => {
+    const { container } = render(<ArticlePreview snapshot={{ ...piece, coverImageUrl: "https://cdn.example/cover.png" }} authorName="Ada" wordCount={9} />);
+    const cover = screen.getByRole("img");
+    expect(screen.getByText("Ada").compareDocumentPosition(cover) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(cover.compareDocumentPosition(container.querySelector(".publication-article-body")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("prints a summary under the title only when someone wrote it", () => {
     const { rerender } = render(
       <ArticlePreview snapshot={{ ...piece, excerpt: "Solar microgrids are changing Jos." }} authorName="Ada" wordCount={9} />

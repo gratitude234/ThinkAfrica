@@ -137,22 +137,23 @@ export default function PostComposer({
             if (file) void attachImage(file);
           }}
         />
-        <header className="relative flex min-h-14 items-center justify-between border-b border-card-border px-3 sm:px-5">
+        <header className="relative grid min-h-14 grid-cols-[auto_minmax(0,1fr)_auto] md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 border-b border-card-border px-3 sm:px-5">
           <button
             type="button"
             onClick={onBack}
-            className="flex min-h-11 shrink-0 items-center rounded-md px-2 text-sm text-ink-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand"
+            className="flex min-h-11 w-fit items-center rounded-md px-2 text-sm text-ink-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand"
           >
             Cancel
           </button>
-          <h1 className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-ink sm:text-[15px]">
+          <h1 className="truncate text-center text-sm font-semibold text-ink sm:text-[15px]">
             {heading}
           </h1>
-          <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
+          <div className="ml-auto flex min-w-0 items-center gap-1 sm:gap-2">
             {statusLabel ? (
               <span
-                className={`hidden text-xs md:inline ${status?.tone === "error" ? "text-red-600" : "text-ink-muted"}`}
+                className={`hidden max-w-[64px] truncate text-xs md:inline ${status?.tone === "error" ? "text-red-600" : "text-ink-muted"}`}
                 aria-hidden="true"
+                title={status?.label}
               >
                 {statusLabel}
               </span>
@@ -170,7 +171,7 @@ export default function PostComposer({
               onClick={postNow}
               disabled={!canPost}
               loading={draft.publishing}
-              className={`${WRITE_PRIMARY_BUTTON} min-h-9 px-3.5 text-[13px] md:min-h-10 md:px-[18px] md:text-[13.5px]`}
+              className={`${WRITE_PRIMARY_BUTTON} !px-2 !text-xs sm:!px-3.5 sm:!text-[13px]`}
             >
               {action}
             </Button>
@@ -180,13 +181,12 @@ export default function PostComposer({
         {statusLabel ? (
           <div
             className={`px-4 py-1.5 text-[11px] md:hidden ${status?.tone === "error" ? "bg-red-50 text-red-700" : "text-ink-muted"}`}
-            aria-live="polite"
+            aria-hidden="true"
           >
             {status?.label}
           </div>
-        ) : (
-          <p aria-live="polite" className="sr-only" />
-        )}
+        ) : null}
+        <p aria-live="polite" className="sr-only">{status?.label ?? ""}</p>
 
         {status?.tone === "error" ? (
           <p className="hidden border-b border-red-100 bg-red-50 px-4 py-2 text-center text-sm text-red-700 md:block">
@@ -267,7 +267,7 @@ export default function PostComposer({
 
         <div
           className="fixed inset-x-0 z-20 flex min-h-14 items-center border-t border-divider bg-surface px-3 md:hidden"
-          style={{ bottom: "calc(env(safe-area-inset-bottom) + var(--mobile-visual-viewport-bottom, 0px))" }}
+          style={{ bottom: "var(--mobile-visual-viewport-bottom, 0px)", paddingBottom: "env(safe-area-inset-bottom)" }}
         >
           {imagePicker}
         </div>

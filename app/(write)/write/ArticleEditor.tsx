@@ -273,7 +273,7 @@ export default function ArticleEditor({
             aria-describedby={
               missingTitle ? "article-title-required" : missingBody ? "article-body-required" : undefined
             }
-            className={WRITE_PRIMARY_BUTTON}
+            className={`${WRITE_PRIMARY_BUTTON} !px-2 !text-xs sm:!px-4 sm:!text-sm`}
           >
             {isEdit ? "Update Article" : "Continue"}
           </Button>
@@ -311,6 +311,7 @@ export default function ArticleEditor({
           }}
           placeholder="Title"
           aria-label="Title"
+          aria-invalid={missingTitle || undefined}
           aria-describedby={missingTitle ? "article-title-required" : undefined}
           className="publication-article-title block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-[32px] font-semibold leading-[1.16] tracking-[-0.01em] text-ink outline-none placeholder:text-ink-muted/60 sm:text-[44px]"
         />
@@ -431,7 +432,7 @@ export default function ArticleEditor({
             type="button"
             onClick={closePreview}
             aria-label="Close preview"
-            className="fixed right-5 top-[calc(var(--app-nav-height)+1rem)] z-20 hidden h-11 w-11 items-center justify-center rounded-full border border-card-border bg-canvas/95 text-ink-muted shadow-sm transition-colors hover:bg-surface hover:text-ink md:flex"
+            className={`fixed right-5 z-20 hidden h-11 w-11 items-center justify-center rounded-full border border-card-border bg-canvas/95 text-ink-muted shadow-sm transition-colors hover:bg-surface hover:text-ink md:flex ${hasAppNav ? "top-[calc(var(--app-nav-height)+1rem)]" : "top-4"}`}
           >
             <Icon path={CLOSE_ICON} />
           </button>

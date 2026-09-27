@@ -46,18 +46,6 @@ export default function ArticlePreview({
 
   return (
     <article className="mx-auto max-w-[680px] px-5 py-8 sm:px-8 sm:py-10">
-      {snapshot.coverImageUrl ? (
-        <div className="relative mb-7 aspect-[16/9] w-full overflow-hidden rounded-2xl bg-canvas">
-          <Image
-            src={snapshot.coverImageUrl}
-            alt=""
-            fill
-            sizes="(max-width: 680px) 100vw, 680px"
-            className="object-cover"
-          />
-        </div>
-      ) : null}
-
       {title ? (
         <h1 className="publication-article-title text-[36px] font-semibold leading-[1.16] tracking-[-0.01em] text-ink sm:text-[44px]">
           {title}
@@ -76,6 +64,18 @@ export default function ArticlePreview({
         <span aria-hidden="true">·</span>
         <span>{lengthLabel(wordCount)}</span>
       </div>
+
+      {snapshot.coverImageUrl ? (
+        <div className="relative mt-7 aspect-[16/9] w-full overflow-hidden rounded-[8px] bg-canvas">
+          <Image
+            src={snapshot.coverImageUrl}
+            alt=""
+            fill
+            sizes="(max-width: 680px) 100vw, 680px"
+            className="object-cover"
+          />
+        </div>
+      ) : null}
 
       {/* The body is this writer's own editor output, constrained by the
           Tiptap schema, and the server sanitizes it again on save. */}

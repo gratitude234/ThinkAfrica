@@ -109,7 +109,7 @@ describe("choosing the screen", () => {
     open();
     await type("<p>A thought that grew into something longer.</p>");
 
-    fireEvent.click(screen.getByRole("button", { name: "Write an article instead" }));
+    fireEvent.click(screen.getByRole("button", { name: /Article.*Write something in depth/ }));
 
     expect(screen.getByLabelText("Title")).toHaveFocus();
     expect(screen.getByLabelText("Publication body")).toHaveValue("<p>A thought that grew into something longer.</p>");
@@ -119,7 +119,7 @@ describe("choosing the screen", () => {
 
   it("goes back to the Post composer while the Article is still untitled", () => {
     open();
-    fireEvent.click(screen.getByRole("button", { name: "Write an article instead" }));
+    fireEvent.click(screen.getByRole("button", { name: /Article.*Write something in depth/ }));
 
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
 
@@ -130,7 +130,7 @@ describe("choosing the screen", () => {
 
   it("leaves from Back once the Article has a title", async () => {
     open();
-    fireEvent.click(screen.getByRole("button", { name: "Write an article instead" }));
+    fireEvent.click(screen.getByRole("button", { name: /Article.*Write something in depth/ }));
     fireEvent.change(screen.getByLabelText("Title"), { target: { value: "A title" } });
 
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
@@ -157,7 +157,7 @@ describe("choosing the screen", () => {
     open({ ...empty, content: "<p>A photo worth a post.</p>", coverImageUrl: "https://cdn.example/photo.png" });
     expect(screen.getByRole("button", { name: "Remove image" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Write an article instead" }));
+    fireEvent.click(screen.getByRole("button", { name: /Article.*Write something in depth/ }));
     expect(screen.getByText("Cover https://cdn.example/photo.png")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
@@ -195,7 +195,7 @@ describe("publishing", () => {
     fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Power to the people" } });
     await type("<p>Solar microgrids are changing Jos.</p>");
 
-    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     const dialog = screen.getByRole("dialog", { name: "Publish settings" });
     await act(async () => { fireEvent.click(within(dialog).getByRole("button", { name: "Publish now" })); });
 
@@ -375,7 +375,7 @@ describe("draft hygiene", () => {
     open();
     await type("<p>Gh</p>");
 
-    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await act(async () => { await vi.advanceTimersByTimeAsync(0); });
 
     expect(screen.queryByText(/didn’t save/)).not.toBeInTheDocument();
