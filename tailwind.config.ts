@@ -76,6 +76,21 @@ const config: Config = {
         title: ["clamp(19px, 16.17px + 0.76vw, 21px)", { lineHeight: "1.3" }],
         headline: ["clamp(22px, 13.51px + 2.26vw, 28px)", { lineHeight: "1.12" }],
         display: ["clamp(25px, 15.09px + 2.64vw, 32px)", { lineHeight: "1.08" }],
+
+        /**
+         * Feed-only typography roles. These deliberately do not reuse the
+         * broader app scale: the feed is a mixed reading surface where Posts,
+         * Articles, metadata and actions need to stay visibly distinct without
+         * drifting into one-off arbitrary sizes.
+         */
+        "feed-kicker": ["11px", { lineHeight: "1.45", letterSpacing: "0.12em" }],
+        "feed-meta": ["12px", { lineHeight: "1.45" }],
+        "feed-byline": ["14px", { lineHeight: "1.35" }],
+        "feed-action": ["13px", { lineHeight: "1.35" }],
+        "feed-excerpt": ["15px", { lineHeight: "1.55" }],
+        "feed-post": ["16px", { lineHeight: "1.58" }],
+        "feed-post-title": ["20px", { lineHeight: "1.3" }],
+        "feed-article-title": ["clamp(19px, 17.7px + 0.36vw, 22px)", { lineHeight: "1.22" }],
         /**
          * The post detail headline, the largest type in the app. `display` tops
          * out at 32px and the article h1 wants 40px, so the page was carrying
@@ -96,8 +111,12 @@ const config: Config = {
         measure: "68ch",
       },
       fontFamily: {
+        // Legacy families remain available outside the feed.
         sans: ["var(--font-inter)", "system-ui", "sans-serif"],
         display: ["var(--font-bodoni)", "Georgia", "serif"],
+        // Feed system: one conversational UI face + one editorial headline face.
+        ui: ["var(--font-public-sans)", "system-ui", "sans-serif"],
+        editorial: ["var(--font-newsreader)", "Georgia", "serif"],
       },
       keyframes: {
         "slide-up": {

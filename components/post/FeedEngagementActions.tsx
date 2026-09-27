@@ -157,7 +157,7 @@ export default function FeedEngagementActions({
   };
 
   const actionClass =
-    "inline-flex min-h-9 min-w-0 items-center justify-center gap-1 rounded-lg px-1 text-[12.5px] font-semibold text-ink-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-wait disabled:opacity-60 motion-reduce:transition-none sm:min-h-10 sm:gap-1.5 sm:px-1.5 sm:text-[13px]";
+    "inline-flex min-h-9 min-w-0 items-center justify-center gap-1 rounded-lg px-1 text-feed-action font-medium text-ink-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-wait disabled:opacity-60 motion-reduce:transition-none sm:min-h-10 sm:gap-1.5 sm:px-1.5";
 
   const actionHoverBg = "hover:bg-card";
   // The mockup intentionally drops action words on phone while keeping counts.

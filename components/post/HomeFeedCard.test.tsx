@@ -115,6 +115,33 @@ describe("HomeFeedCard", () => {
     );
   });
 
+  it("uses the feed typography system to separate Posts from Articles", () => {
+    const { unmount } = render(
+      <HomeFeedCard
+        post={post({ title: "A short post title", content_kind: "post" })}
+        currentUserId="user-1"
+      />
+    );
+
+    const postHeading = screen.getByRole("heading", { name: "A short post title" });
+    expect(postHeading.closest("article")).toHaveClass("font-ui");
+    expect(postHeading).toHaveClass("font-ui", "text-feed-post-title");
+    expect(postHeading).not.toHaveClass("font-editorial");
+    unmount();
+
+    render(
+      <HomeFeedCard
+        post={post({ title: "A considered article headline", content_kind: "article" })}
+        currentUserId="user-1"
+      />
+    );
+
+    const articleHeading = screen.getByRole("heading", { name: "A considered article headline" });
+    expect(articleHeading.closest("article")).toHaveClass("font-ui");
+    expect(articleHeading).toHaveClass("font-editorial", "text-feed-article-title", "line-clamp-3");
+    expect(articleHeading).not.toHaveClass("font-display", "line-clamp-4");
+  });
+
   it("renders Article identity and reading time, with no genre between them", () => {
     render(
       <HomeFeedCard

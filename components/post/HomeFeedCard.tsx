@@ -103,7 +103,7 @@ function AuthorLine({
       ) : (
         <span className="shrink-0">{avatar}</span>
       )}
-      <div className="flex min-w-0 flex-1 items-center gap-1.5 text-[13.5px] leading-[1.35] sm:text-byline">
+      <div className="flex min-w-0 flex-1 items-center gap-1.5 text-feed-byline">
         {profile?.username ? (
           <Link
             href={`/${profile.username}`}
@@ -119,7 +119,7 @@ function AuthorLine({
             dateTime={publishedAt}
             title={new Date(publishedAt).toLocaleString("en-GB", { timeZone: "UTC" }) + " UTC"}
             aria-label={formatRelativeTime(publishedAt)}
-            className="shrink-0 whitespace-nowrap text-[12px] leading-[1.45] text-ink-muted sm:text-meta"
+            className="shrink-0 whitespace-nowrap text-feed-meta text-ink-muted"
           >
             <span aria-hidden="true">· </span>
             {compactRelativeTime(publishedAt)}
@@ -182,7 +182,7 @@ function TopicLinks({ tags }: { tags: string[] | null }) {
         <Link
           key={topic}
           href={`/topics/${encodeURIComponent(topic)}`}
-          className={`inline-flex h-7 items-center rounded-full border border-card-border bg-card px-2.5 text-[12.5px] font-semibold text-ink-soft transition-colors hover:border-emerald-ink hover:text-emerald-ink ${FOCUS_RING}`}
+          className={`inline-flex h-7 items-center rounded-full border border-card-border bg-card px-2.5 text-feed-meta font-semibold text-ink-soft transition-colors hover:border-emerald-ink hover:text-emerald-ink ${FOCUS_RING}`}
         >
           #{topic}
         </Link>
@@ -225,12 +225,12 @@ function PostFeedCard({
   const excerpt = sanitizePostExcerpt(post.excerpt) || "View post";
 
   return (
-    <article className={CARD_SHELL} data-content-kind="post">
+    <article className={`${CARD_SHELL} font-ui`} data-content-kind="post">
       <AuthorLine post={post} avatarSize={34} showTimestamp={showTimestamp ?? true} />
       <div className="mt-2.5 sm:mt-3">
         {title ? (
           <Link href={`/post/${post.slug}`} className={`group block ${FOCUS_RING}`}>
-            <h2 className="font-sans text-title font-semibold text-ink transition-colors group-hover:text-emerald-ink motion-reduce:transition-none">
+            <h2 className="font-ui text-feed-post-title font-semibold text-ink transition-colors group-hover:text-emerald-ink motion-reduce:transition-none">
               {title}
             </h2>
           </Link>
@@ -242,8 +242,8 @@ function PostFeedCard({
           <p
             className={`${
               title
-                ? "line-clamp-3 text-excerpt text-ink-soft"
-                : "line-clamp-6 text-[15.5px] leading-[1.58] text-ink sm:text-lede"
+                ? "line-clamp-3 text-feed-excerpt text-ink-soft"
+                : "line-clamp-6 text-feed-post text-ink"
             } max-w-measure whitespace-pre-line`}
           >
             {excerpt}
@@ -266,7 +266,7 @@ function PostFeedCard({
 function ArticleMeta({ readingTime }: { readingTime: number | null }) {
   return (
     <p
-      className="font-sans text-[10.5px] font-bold uppercase leading-[1.45] tracking-[0.13em] text-gold-ink sm:text-kicker"
+      className="font-ui text-feed-kicker font-semibold uppercase text-gold-ink"
       aria-label={`Article${readingTime ? `, ${readingTime} minute read` : ""}`}
     >
       <span>Article</span>
@@ -308,18 +308,18 @@ function ArticleFeedCard({
   // So: text below for every article, and the cover becomes what it always
   // was, an illustration.
   return (
-    <article className={CARD_SHELL} data-content-kind="article">
+    <article className={`${CARD_SHELL} font-ui`} data-content-kind="article">
       <AuthorLine post={post} avatarSize={34} showTimestamp={showTimestamp ?? true} />
 
       <div className="mt-2.5 sm:mt-3">
         <ArticleMeta readingTime={readingTime} />
         <Link href={`/post/${post.slug}`} className={`group block ${FOCUS_RING}`}>
-          <h2 className="mt-1.5 max-w-[640px] font-display line-clamp-4 text-[21px] font-semibold leading-[1.22] text-ink transition-colors group-hover:text-emerald-ink motion-reduce:transition-none sm:mt-2 sm:text-[26px] sm:leading-[1.2]">
+          <h2 className="mt-1.5 max-w-[640px] font-editorial line-clamp-3 text-feed-article-title font-semibold text-ink transition-colors group-hover:text-emerald-ink motion-reduce:transition-none sm:mt-2">
             {title}
           </h2>
         </Link>
         {excerpt ? (
-          <p className="mt-2 line-clamp-3 max-w-measure text-[14.5px] leading-[1.55] text-ink-soft sm:mt-2.5 sm:text-excerpt">
+          <p className="mt-2 line-clamp-3 max-w-measure text-feed-excerpt text-ink-soft sm:mt-2.5">
             {excerpt}
           </p>
         ) : null}

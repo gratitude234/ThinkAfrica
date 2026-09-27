@@ -12,8 +12,8 @@
  * previously ran three (cream for posts, amber for articles, purple-on-tinted
  * for research) plus a solid emerald hero and bordered interludes, so a scroll
  * read as five unrelated systems competing for the same column. Content kind
- * is now carried by typography -- Bodoni display headlines and a coloured
- * kicker for Article, plain sans for Post -- which leaves colour
+ * is now carried by typography -- Newsreader editorial headlines and a coloured
+ * kicker for Article, Public Sans for Post/UI -- which leaves colour
  * free to mean exactly one thing.
  *
  * It is a row, not a card. The card form ran four separators at once, each
