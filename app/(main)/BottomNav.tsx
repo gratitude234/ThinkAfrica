@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import PendingWriteIcon from "./PendingWriteIcon";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { useGuestAuthGate } from "@/components/ui/GuestAuthGateProvider";
@@ -13,7 +14,6 @@ import {
   NAV_MATCH_PREFIXES,
   NotificationsIcon,
   ProfileIcon,
-  WriteIcon,
   getProfileNavHref,
   guestAwareHref,
   isAccountNavActive,
@@ -40,7 +40,7 @@ const WRITE_CLASS =
 function WriteMark() {
   return (
     <span className="flex flex-col items-center justify-center gap-0.5 text-emerald-brand">
-      <WriteIcon className="h-[22px] w-[22px]" />
+      <PendingWriteIcon className="h-[22px] w-[22px]" />
       <span className="whitespace-nowrap text-[10.5px] font-semibold">Write</span>
     </span>
   );

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useGuestAuthGate } from "@/components/ui/GuestAuthGateProvider";
-import { WriteIcon } from "./navItems";
+import PendingWriteIcon from "./PendingWriteIcon";
 
 interface CreateLauncherProps {
   userId: string | null;
@@ -18,7 +18,7 @@ export default function CreateLauncher({ userId, isActive = false }: CreateLaunc
   const className = `hidden min-h-11 items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-semibold text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 md:inline-flex ${isActive ? "bg-ink" : "bg-emerald-brand hover:bg-[#0E4B37]"}`;
   const children = (
     <>
-      <WriteIcon className="h-4 w-4" />
+      <PendingWriteIcon className="h-4 w-4" />
       Write
     </>
   );

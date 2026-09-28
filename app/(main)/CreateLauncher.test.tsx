@@ -6,7 +6,7 @@ const requestAuth = vi.fn();
 vi.mock("@/components/ui/GuestAuthGateProvider", () => ({
   useGuestAuthGate: () => ({ requestAuth }),
 }));
-vi.mock("next/link", () => ({ default: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) => <a href={href} {...props}>{children}</a> }));
+vi.mock("next/link", () => ({ useLinkStatus: () => ({ pending: false }), default: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) => <a href={href} {...props}>{children}</a> }));
 
 describe("CreateLauncher", () => {
   beforeEach(() => requestAuth.mockReset());
