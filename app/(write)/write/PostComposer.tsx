@@ -122,6 +122,7 @@ export default function PostComposer({
       }`}
     >
       <section
+        data-write-canvas
         aria-label={heading}
         onKeyDownCapture={onKeyDownCapture}
         className="mx-auto min-h-dvh w-full bg-canvas md:min-h-0 md:w-[560px] md:overflow-visible md:rounded-[14px] md:border md:border-card-border md:shadow-[0_8px_30px_rgba(0,0,0,0.07)]"
@@ -197,7 +198,7 @@ export default function PostComposer({
           </p>
         ) : null}
 
-        <main className="px-4 pb-24 pt-3.5 sm:px-5 md:pb-5 md:pt-5">
+        <main className="px-4 pb-[calc(var(--mobile-visual-viewport-bottom,0px)+6rem)] pt-3.5 sm:px-5 md:pb-5 md:pt-5">
           {notice}
           <div className="flex items-center gap-2.5">
             <UserAvatar name={authorName} src={avatarUrl} size={32} className="shrink-0" />
@@ -272,8 +273,9 @@ export default function PostComposer({
         </main>
 
         <div
+          data-write-toolbar
           className="fixed inset-x-0 z-20 flex min-h-14 items-center border-t border-divider bg-surface px-3 md:hidden"
-          style={{ bottom: "calc(var(--mobile-visual-viewport-bottom, 0px) + max(12px, env(safe-area-inset-bottom)))" }}
+          style={{ bottom: "var(--mobile-visual-viewport-bottom, 0px)", paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}
         >
           {imagePicker}
         </div>

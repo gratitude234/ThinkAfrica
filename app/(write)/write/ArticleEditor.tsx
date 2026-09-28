@@ -217,7 +217,7 @@ export default function ArticleEditor({
   };
 
   return (
-    <div className="min-h-dvh bg-canvas text-ink md:min-h-[calc(100dvh-var(--app-nav-height))]">
+    <div data-write-canvas className="min-h-dvh bg-canvas text-ink md:min-h-[calc(100dvh-var(--app-nav-height))]">
       <WriteHeader
         status={status}
         onBack={onBack}
@@ -281,7 +281,7 @@ export default function ArticleEditor({
         }
       />
 
-      <main className="mx-auto w-full max-w-[680px] px-5 pb-40 pt-5 sm:px-8 md:pb-28 md:pt-10">
+      <main className="mx-auto w-full max-w-[680px] px-5 pb-[calc(var(--mobile-visual-viewport-bottom,0px)+10rem)] pt-5 sm:px-8 md:pb-28 md:pt-10">
         {notice}
         {!hasCover ? (
           <button

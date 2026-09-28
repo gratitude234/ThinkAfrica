@@ -11,6 +11,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { revealMobileCaret } from "./mobileCaret";
 import { INVALID_LINK_MESSAGE } from "@/lib/linkUrl";
 import { uploadImage } from "@/lib/uploadImage";
 import {
@@ -283,7 +284,8 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     autofocus: autoFocus ? "end" : false,
     editorProps: {
       // Leave room for the sticky header and raised phone toolbar when the
-      // editor scrolls the caret into view. ProseMirror uses visualViewport.
+      // editor scrolls the caret into view on desktop. Mobile measures its chrome.
+      handleScrollToSelection: revealMobileCaret,
       scrollThreshold: { top: 112, bottom: 80, left: 8, right: 8 },
       scrollMargin: { top: 128, bottom: 96, left: 8, right: 8 },
       attributes: {
@@ -334,15 +336,21 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       if (frame !== null) cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         if (!editor.isDestroyed && editor.isFocused && editor.state.selection.empty) {
-          editor.view.dispatch(editor.state.tr.scrollIntoView());
+          revealMobileCaret(editor.view);
         }
       });
     };
     // Resize responds to the keyboard opening; scrolling alone must never
     // drag someone back to their caret while they read an earlier paragraph.
     viewport.addEventListener("resize", revealCaret);
+    editor.on("focus", revealCaret);
+    editor.on("selectionUpdate", revealCaret);
+    editor.on("update", revealCaret);
     return () => {
       viewport.removeEventListener("resize", revealCaret);
+      editor.off("focus", revealCaret);
+      editor.off("selectionUpdate", revealCaret);
+      editor.off("update", revealCaret);
       if (frame !== null) cancelAnimationFrame(frame);
     };
   }, [editor]);

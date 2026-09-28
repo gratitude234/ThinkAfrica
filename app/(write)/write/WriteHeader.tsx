@@ -124,6 +124,7 @@ export default function WriteHeader({
 
   return (
     <header
+      data-write-header
       className={`sticky z-30 border-b border-divider bg-canvas/95 backdrop-blur ${
         hasAppNav ? "top-0 md:top-[var(--app-nav-height)]" : "top-0"
       }`}
