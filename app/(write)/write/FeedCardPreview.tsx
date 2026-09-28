@@ -1,10 +1,10 @@
+import PostCover from "@/components/post/PostCover";
 import UserAvatar from "@/components/ui/UserAvatar";
 import { formatTagLabel } from "@/lib/tags";
 import { readingMinutes } from "./ArticlePreview";
 
 interface FeedCardPreviewProps {
   title: string;
-  /** What the card prints under the headline: the summary, or the opening lines. */
   summary: string;
   coverImageUrl: string;
   tags: string[];
@@ -13,15 +13,7 @@ interface FeedCardPreviewProps {
   avatarUrl: string | null;
 }
 
-/**
- * An Article's card as the feed will show it, for Publish settings. It follows
- * ArticleFeedCard in components/post/HomeFeedCard.tsx: the byline, the ARTICLE
- * kicker with the reading time, the headline, three lines of summary, two
- * topics, then the cover at 16:9. Change one and change the other.
- *
- * Nothing in it is a link or a button. It is a picture of the card, and the
- * fields under it are what change it.
- */
+/** Non-interactive preview matching the headline-led Article feed card. */
 export default function FeedCardPreview({
   title,
   summary,
@@ -45,11 +37,29 @@ export default function FeedCardPreview({
         </span>
         <span className="truncate text-feed-byline font-semibold text-ink">{authorName}</span>
       </div>
-      <p className="mt-2.5 text-feed-kicker font-semibold uppercase text-gold-ink">
-        Article{minutes ? ` · ${minutes} min` : ""}
-      </p>
-      <p className="mt-1.5 font-editorial line-clamp-3 text-feed-article-title font-semibold text-ink">{title}</p>
-      {summary ? <p className="mt-2 line-clamp-3 text-feed-excerpt text-ink-soft">{summary}</p> : null}
+      <div className="mt-3 flex items-start gap-3 sm:gap-5">
+        <div className="min-w-0 flex-1">
+          <p className="text-feed-kicker font-semibold uppercase text-gold-ink">
+            Article{minutes ? ` · ${minutes} min` : ""}
+          </p>
+          <p className="mt-1.5 font-editorial line-clamp-3 text-feed-article-title font-semibold text-ink">{title}</p>
+          {summary ? <p className="mt-2 line-clamp-2 text-feed-excerpt text-ink-soft sm:line-clamp-3">{summary}</p> : null}
+        </div>
+        {coverImageUrl.trim() ? (
+          <div className="mt-1 w-24 shrink-0 overflow-hidden rounded-xl border border-card-border/60 bg-surface sm:w-40">
+            <PostCover
+              src={coverImageUrl}
+              alt="Cover"
+              content_kind="article"
+              fit="cover"
+              sizes="(max-width: 639px) 96px, 160px"
+              className="aspect-square w-full sm:aspect-[4/3]"
+              fallbackClassName="bg-surface text-ink-muted"
+              fallbackLabel="Image unavailable"
+            />
+          </div>
+        ) : null}
+      </div>
       {topics.length ? (
         <div className="mt-2.5 flex flex-wrap gap-1.5">
           {topics.map((topic) => (
@@ -61,14 +71,6 @@ export default function FeedCardPreview({
             </span>
           ))}
         </div>
-      ) : null}
-      {coverImageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={coverImageUrl}
-          alt="Cover"
-          className="mt-2.5 aspect-[16/9] w-full rounded-xl bg-green-tint object-cover"
-        />
       ) : null}
     </div>
   );

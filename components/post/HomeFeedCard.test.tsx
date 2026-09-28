@@ -202,7 +202,7 @@ describe("HomeFeedCard", () => {
     expect(screen.queryByText(/\bmin\b/)).not.toBeInTheDocument();
   });
 
-  // Both layouts render the same way, and the cover is an illustration below
+  // Both layouts render the same way, and the cover is an illustration beside
   // the text rather than a scrim the headline sits on.
   it("renders an Article the same way with a cover as without one", () => {
     const withCover = render(
@@ -225,7 +225,7 @@ describe("HomeFeedCard", () => {
     expect(heading).toHaveClass("text-ink");
 
     const cover = withCover.container.querySelector("img");
-    expect(cover?.parentElement).toHaveClass("aspect-[16/9]");
+    expect(cover?.parentElement).toHaveClass("aspect-square", "sm:aspect-[4/3]");
     // Decorative: the headline link directly above already carries the
     // destination, so the cover is not a second tab stop to the same place.
     const coverLink = cover?.closest("a");

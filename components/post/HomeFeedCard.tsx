@@ -206,10 +206,12 @@ function PostMedia({
       src={post.cover_image_url}
       alt={title}
       content_kind={post.content_kind}
-      sizes="(max-width: 640px) 220px, 300px"
+      sizes="(max-width: 640px) calc(100vw - 40px), 520px"
       priority={priority}
+      fallbackClassName="bg-surface text-ink-muted"
+      fallbackLabel="Image unavailable"
       variant="feed"
-      wrapperClassName="mt-2.5 max-w-[220px] overflow-hidden rounded-xl sm:mt-3 sm:max-w-[300px] sm:rounded-[14px]"
+      wrapperClassName="mt-3 max-w-[520px] overflow-hidden rounded-xl border border-card-border/60 sm:mt-4 sm:rounded-[14px]"
       className="w-full rounded-xl bg-card sm:rounded-[14px]"
     />
   );
@@ -291,69 +293,49 @@ function ArticleFeedCard({
   const hasCover = Boolean(post.cover_image_url?.trim());
   const readingTime = readTime(post.word_count);
 
-  // One layout, cover or no cover.
-  //
-  // An article with a cover used to print its kicker, headline and excerpt
-  // *over* the image under a dark gradient, while a cover-less one printed the
-  // same three things as ordinary text below the byline. Two grammars
-  // alternating down a single column, so a reader re-learned where the
-  // headline was on every card and never settled into a scan.
-  //
-  // The overlay was also the half that read worse. The scrim is one fixed
-  // gradient over photographs it knows nothing about, so a pale sky or a lit
-  // subject at the crop's bottom edge took white text at whatever contrast
-  // happened to fall out; and `line-clamp-3` on a display-size face inside a
-  // fixed-height crop truncated real headlines mid-phrase.
-  //
-  // So: text below for every article, and the cover becomes what it always
-  // was, an illustration.
+  // Articles are headline-led: a compact thumbnail supports scanning while
+  // Post attachments remain large enough to inspect as content in their own right.
   return (
     <article className={`${CARD_SHELL} font-ui`} data-content-kind="article">
       <AuthorLine post={post} avatarSize={34} showTimestamp={showTimestamp ?? true} />
 
-      <div className="mt-2.5 sm:mt-3">
-        <ArticleMeta readingTime={readingTime} />
-        <Link href={`/post/${post.slug}`} className={`group block ${FOCUS_RING}`}>
-          <h2 className="mt-1.5 max-w-[640px] font-editorial line-clamp-3 text-feed-article-title font-semibold text-ink transition-colors group-hover:text-emerald-ink motion-reduce:transition-none sm:mt-2">
-            {title}
-          </h2>
-        </Link>
-        {excerpt ? (
-          <p className="mt-2 line-clamp-3 max-w-measure text-feed-excerpt text-ink-soft sm:mt-2.5">
-            {excerpt}
-          </p>
+      <div className="mt-3 flex items-start gap-3 sm:gap-5">
+        <div className="min-w-0 flex-1">
+          <ArticleMeta readingTime={readingTime} />
+          <Link href={`/post/${post.slug}`} className={`group block ${FOCUS_RING}`}>
+            <h2 className="mt-1.5 max-w-[640px] font-editorial line-clamp-3 text-feed-article-title font-semibold text-ink transition-colors group-hover:text-emerald-ink motion-reduce:transition-none sm:mt-2">
+              {title}
+            </h2>
+          </Link>
+          {excerpt ? (
+            <p className="mt-2 line-clamp-2 max-w-measure text-feed-excerpt text-ink-soft sm:mt-2.5 sm:line-clamp-3">
+              {excerpt}
+            </p>
+          ) : null}
+        </div>
+        {hasCover ? (
+          <Link
+            href={`/post/${post.slug}`}
+            tabIndex={-1}
+            aria-hidden="true"
+            className="mt-1 block w-24 shrink-0 overflow-hidden rounded-xl border border-card-border/60 bg-surface sm:w-40"
+          >
+            <PostCover
+              src={post.cover_image_url}
+              alt={title}
+              content_kind={post.content_kind}
+              sizes="(max-width: 639px) 96px, 160px"
+              priority={priority}
+              fit="cover"
+              className="aspect-square w-full sm:aspect-[4/3]"
+              imageClassName="object-cover"
+              fallbackClassName="bg-surface text-ink-muted"
+              fallbackLabel="Image unavailable"
+            />
+          </Link>
         ) : null}
       </div>
-
       <TopicLinks tags={post.tags} />
-
-      {hasCover ? (
-        // 16:9 rather than the overlay's 4:3. A near-square crop on a phone
-        // meant one article filled the screen, and a feed that shows a reader
-        // one post at a time reads as empty however much is in it. The wider
-        // crop gives back about a quarter of each card's height.
-        //
-        // Links to the post rather than opening the zoom viewer a Post's image
-        // gets: on an article the cover is a lede illustration, so the whole
-        // card should behave as one target.
-        <Link
-          href={`/post/${post.slug}`}
-          tabIndex={-1}
-          aria-hidden="true"
-          className="group mt-2.5 block overflow-hidden rounded-xl bg-green-tint sm:mt-3 sm:rounded-[14px]"
-        >
-          <PostCover
-            src={post.cover_image_url}
-            alt={title}
-            content_kind={post.content_kind}
-            sizes="(max-width: 640px) calc(100vw - 32px), 704px"
-            priority={priority}
-            fit="cover"
-            className="aspect-[16/9] w-full"
-            imageClassName="object-cover transition-transform duration-500 group-hover:scale-[1.015] motion-reduce:transition-none"
-          />
-        </Link>
-      ) : null}
 
       <Actions post={post} currentUserId={currentUserId} />
     </article>

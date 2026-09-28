@@ -48,7 +48,7 @@ export default function PostImage({
 
   const isEditorialCrop = variant === "feed-thumbnail";
   const aspectClass = isEditorialCrop ? "aspect-[4/3] sm:aspect-[16/10]" : "";
-  const heightGuard = variant === "feed" ? "max-h-[72svh] sm:max-h-[720px]" : "";
+  const heightGuard = variant === "feed" ? "max-h-[min(60svh,480px)]" : "";
   const fit = isEditorialCrop ? "cover" : "natural";
 
   return (

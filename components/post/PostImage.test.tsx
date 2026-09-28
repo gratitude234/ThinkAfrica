@@ -54,7 +54,7 @@ describe("PostImage", () => {
 
     const image = screen.getByRole("img", { name: "A portrait" });
     expect(ratioOf(image.parentElement as HTMLElement)).toBeCloseTo(4 / 5);
-    expect(image.parentElement).toHaveClass("max-h-[72svh]", "sm:max-h-[720px]");
+    expect(image.parentElement).toHaveClass("max-h-[min(60svh,480px)]");
     expect(image).toHaveClass("object-contain");
     expect(
       screen.getByRole("button", { name: "View image full screen: A portrait" })

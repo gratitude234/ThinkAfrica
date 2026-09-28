@@ -67,7 +67,7 @@ describe("PublishSettingsDialog", () => {
     const props = open({ coverImageUrl: "https://cdn.example/cover.png" });
 
     const card = screen.getByRole("group", { name: "In the feed" });
-    expect(within(card).getByRole("img", { name: "Cover" })).toHaveAttribute("src", "https://cdn.example/cover.png");
+    expect(decodeURIComponent(within(card).getByRole("img", { name: "Cover" }).getAttribute("src") ?? "")).toContain("https://cdn.example/cover.png");
 
     fireEvent.click(screen.getByRole("button", { name: "Remove cover" }));
     expect(props.onCoverChange).toHaveBeenCalledWith("");
