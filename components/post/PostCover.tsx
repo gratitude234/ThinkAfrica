@@ -25,7 +25,7 @@ interface PostCoverProps {
   // proportions drive the box height: the container's aspect ratio is taken
   // from the loaded image and clamped to NATURAL_*_RATIO, so a portrait photo
   // stays portrait instead of being sliced into a 16/9 letterbox.
-  fit?: "cover" | "contain" | "natural";
+  fit?: "cover" | "contain" | "natural" | "proportional";
   sizes?: string;
   priority?: boolean;
   unoptimized?: boolean;
@@ -100,8 +100,9 @@ export default function PostCover({
   }, []);
 
   const naturalFit = useMemo(
-    () => (naturalRatio === null ? null : clampNaturalFit(naturalRatio)),
-    [naturalRatio]
+    () => (naturalRatio === null ? null : fit === "proportional"
+      ? { ratio: naturalRatio, constrained: false } : clampNaturalFit(naturalRatio)),
+    [naturalRatio, fit]
   );
 
   useEffect(() => {
@@ -123,7 +124,7 @@ export default function PostCover({
   // In natural mode the height comes from the ratio, not from a caller aspect
   // utility, so the same style also backs the no-image fallback box.
   const naturalStyle =
-    fit === "natural"
+    (fit === "natural" || fit === "proportional")
       ? { aspectRatio: String(naturalFit?.ratio ?? NATURAL_DEFAULT_RATIO) }
       : undefined;
 
@@ -149,7 +150,7 @@ export default function PostCover({
       data-lite-placeholder={`${kindLabel} cover image`}
     >
       <Image
-        ref={fit === "natural" ? measureRef : undefined}
+        ref={fit === "natural" || fit === "proportional" ? measureRef : undefined}
         src={src}
         alt={resolvedAlt}
         fill

@@ -54,11 +54,20 @@ describe("PostImage", () => {
 
     const image = screen.getByRole("img", { name: "A portrait" });
     expect(ratioOf(image.parentElement as HTMLElement)).toBeCloseTo(4 / 5);
-    expect(image.parentElement).toHaveClass("max-h-[min(60svh,480px)]");
+    expect(image.closest("button")?.style.getPropertyValue("--post-media-width")).toBe("min(100%, 48svh, 384px)");
     expect(image).toHaveClass("object-contain");
     expect(
       screen.getByRole("button", { name: "View image full screen: A portrait" })
     ).toBeInTheDocument();
+  });
+
+  it("keeps a tall feed screenshot in an equally narrow frame", () => {
+    render(<PostImage src={SRC} alt="Tall feed screenshot" variant="feed" />);
+    loadFeedImage(1000, 4000);
+    const image = screen.getByRole("img", { name: "Tall feed screenshot" });
+    expect(ratioOf(image.parentElement as HTMLElement)).toBe(0.25);
+    expect(image.closest("button")?.style.getPropertyValue("--post-media-width")).toBe("min(100%, 15svh, 120px)");
+    expect(image).toHaveClass("object-contain");
   });
 
   it("uses a compact crop for article thumbnails", () => {

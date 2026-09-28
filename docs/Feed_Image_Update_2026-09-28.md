@@ -2,7 +2,7 @@
 
 ## Design decisions
 
-Short Posts treat the attachment as content: show it beneath the text at the available width, up to 520px. Preserve the entire image with object-contain and natural proportions, bounded to 60% of the small viewport height or 480px. Portraits and tall screenshots may have neutral space around them rather than lose information. Tapping still opens the full-screen viewer, and closing restores focus.
+Short Posts treat the attachment as content: show it beneath the text at the available width, up to 520px. Preserve the entire image with its true aspect ratio. The frame width is limited to the available space, 60svh multiplied by the image ratio, or 480px multiplied by the image ratio, whichever is smallest; the existing 520px width cap also applies. Height and width therefore scale together, removing the artificial side strips around portraits and tall screenshots. The clickable frame and rounded corners follow the image. Tap to expand very tall screenshots for reading. Tapping still opens the full-screen viewer, and closing restores focus.
 
 Articles remain headline-led: show a 96px square thumbnail beside the headline and summary on phones, increasing to a 160px-wide 4:3 thumbnail from the small breakpoint. Covers are centre-cropped; the headline remains outside the image. Tapping the cover opens the article. The headline remains the accessible keyboard link to avoid duplicate tab stops. Without a cover, text uses the full width.
 
@@ -15,3 +15,7 @@ Responsive image sizes now match these display widths. Failed feed images use a 
 ## Scope
 
 This archive continues from the corrected ZIP in this conversation and includes the preceding keyboard and Write loading changes. It has not been deployed. No database or dependency changes are required.
+
+## Proportional frame correction
+
+Added a proportional fit mode used only by short-post feed images. Existing natural and article crop modes are retained. Source changes reset the measured image geometry. Checked portrait and tall-image sizing, image containment and viewer behaviour. 26 targeted tests, TypeScript and changed-component ESLint passed. Browser visual verification remains outstanding. No rollback was performed.

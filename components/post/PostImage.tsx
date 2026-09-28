@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, type CSSProperties } from "react";
 import ImageLightbox from "@/components/ui/ImageLightbox";
-import PostCover from "./PostCover";
+import PostCover, { type NaturalFit } from "./PostCover";
 
 interface PostImageProps {
   src: string;
@@ -39,6 +39,12 @@ export default function PostImage({
   variant = "natural",
 }: PostImageProps) {
   const [open, setOpen] = useState(false);
+  const [measured, setMeasured] = useState<{ src: string; ratio: number } | null>(null);
+  const measureFeedImage = useCallback((fit: NaturalFit) => {
+    setMeasured((current) => current?.src === src && current.ratio === fit.ratio
+      ? current : { src, ratio: fit.ratio });
+  }, [src]);
+  const ratio = measured?.src === src ? measured.ratio : 4 / 3;
   const triggerRef = useRef<HTMLButtonElement | null>(null);
 
   const handleClose = useCallback(() => {
@@ -48,19 +54,26 @@ export default function PostImage({
 
   const isEditorialCrop = variant === "feed-thumbnail";
   const aspectClass = isEditorialCrop ? "aspect-[4/3] sm:aspect-[16/10]" : "";
-  const heightGuard = variant === "feed" ? "max-h-[min(60svh,480px)]" : "";
-  const fit = isEditorialCrop ? "cover" : "natural";
+  const fit = isEditorialCrop ? "cover" : variant === "feed" ? "proportional" : "natural";
+  // Constrain BOTH dimensions. A height cap on a full-width box creates
+  // empty sidebars around portraits; proportional width keeps the frame snug.
+  const feedStyle = variant === "feed"
+    ? { "--post-media-width": `min(100%, ${60 * ratio}svh, ${480 * ratio}px)`, width: "var(--post-media-width)" } as CSSProperties
+    : undefined;
 
   return (
     <>
       <button
         ref={triggerRef}
+        style={feedStyle}
         type="button"
         onClick={() => setOpen(true)}
         aria-label={alt ? `View image full screen: ${alt}` : "View image full screen"}
         className={`relative block w-full cursor-zoom-in rounded-[10px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 ${wrapperClassName}`}
       >
         <PostCover
+          key={src}
+          onNaturalFit={variant === "feed" ? measureFeedImage : undefined}
           fallbackClassName={fallbackClassName}
           fallbackLabel={fallbackLabel}
           src={src}
@@ -69,7 +82,7 @@ export default function PostImage({
           sizes={sizes}
           priority={priority}
           fit={fit}
-          className={`${aspectClass} ${heightGuard} ${className}`}
+          className={`${aspectClass} ${className}`}
           imageClassName={isEditorialCrop ? "object-cover" : "object-contain"}
         />
       </button>
