@@ -54,21 +54,37 @@ describe("PostImage", () => {
 
     const image = screen.getByRole("img", { name: "A portrait" });
     expect(ratioOf(image.parentElement as HTMLElement)).toBeCloseTo(4 / 5);
-    expect(image.closest("button")?.style.getPropertyValue("--post-media-width")).toBe("min(100%, 48svh, 384px)");
-    expect(image).toHaveClass("object-contain");
+    expect(image.closest("button")).toHaveClass("w-full");
+    expect(screen.queryByText("View full image")).toBeNull();
+    expect(image).toHaveClass("object-cover");
     expect(
       screen.getByRole("button", { name: "View image full screen: A portrait" })
     ).toBeInTheDocument();
   });
 
-  it("keeps a tall feed screenshot in an equally narrow frame", () => {
+  it("caps tall feed previews at 4:5 and exposes the original", () => {
     render(<PostImage src={SRC} alt="Tall feed screenshot" variant="feed" />);
     loadFeedImage(1000, 4000);
     const image = screen.getByRole("img", { name: "Tall feed screenshot" });
-    expect(ratioOf(image.parentElement as HTMLElement)).toBe(0.25);
-    expect(image.closest("button")?.style.getPropertyValue("--post-media-width")).toBe("min(100%, 15svh, 120px)");
-    expect(image).toHaveClass("object-contain");
+    expect(ratioOf(image.parentElement as HTMLElement)).toBe(0.8);
+    expect(image.closest("button")).toHaveClass("w-full");
+    expect(screen.getByText("View full image")).toBeInTheDocument();
+    fireEvent.click(image.closest("button")!);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(image).toHaveClass("object-cover");
   });
+
+  it.each([[1200, 1200], [1600, 900], [2400, 600]])(
+    "preserves square and landscape proportions (%i x %i)", (width, height) => {
+      render(<PostImage src={SRC} alt="Feed photo" variant="feed" />);
+      loadFeedImage(width, height);
+      const image = screen.getByRole("img", { name: "Feed photo" });
+      expect(ratioOf(image.parentElement as HTMLElement)).toBeCloseTo(width / height);
+      expect(image.closest("button")).toHaveClass("w-full");
+      expect(image.closest("button")?.style.width).toBe("");
+      expect(screen.queryByText("View full image")).toBeNull();
+    }
+  );
 
   it("uses a compact crop for article thumbnails", () => {
     render(<PostImage src={SRC} alt="An article cover" variant="feed-thumbnail" />);

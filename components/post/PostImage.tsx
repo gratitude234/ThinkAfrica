@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useRef, useState } from "react";
 import ImageLightbox from "@/components/ui/ImageLightbox";
 import PostCover, { type NaturalFit } from "./PostCover";
 
@@ -39,12 +39,12 @@ export default function PostImage({
   variant = "natural",
 }: PostImageProps) {
   const [open, setOpen] = useState(false);
-  const [measured, setMeasured] = useState<{ src: string; ratio: number } | null>(null);
+  const [measured, setMeasured] = useState<{ src: string; cropped: boolean } | null>(null);
   const measureFeedImage = useCallback((fit: NaturalFit) => {
-    setMeasured((current) => current?.src === src && current.ratio === fit.ratio
-      ? current : { src, ratio: fit.ratio });
+    setMeasured((current) => current?.src === src && current.cropped === fit.constrained
+      ? current : { src, cropped: fit.constrained });
   }, [src]);
-  const ratio = measured?.src === src ? measured.ratio : 4 / 3;
+  const cropped = variant === "feed" && measured?.src === src && measured.cropped;
   const triggerRef = useRef<HTMLButtonElement | null>(null);
 
   const handleClose = useCallback(() => {
@@ -54,18 +54,13 @@ export default function PostImage({
 
   const isEditorialCrop = variant === "feed-thumbnail";
   const aspectClass = isEditorialCrop ? "aspect-[4/3] sm:aspect-[16/10]" : "";
-  const fit = isEditorialCrop ? "cover" : variant === "feed" ? "proportional" : "natural";
-  // Constrain BOTH dimensions. A height cap on a full-width box creates
-  // empty sidebars around portraits; proportional width keeps the frame snug.
-  const feedStyle = variant === "feed"
-    ? { "--post-media-width": `min(100%, ${60 * ratio}svh, ${480 * ratio}px)`, width: "var(--post-media-width)" } as CSSProperties
-    : undefined;
+  const fit = isEditorialCrop ? "cover" : variant === "feed" ? "feed-preview" : "natural";
+  // Feed width is consistent; only portraits taller than 4:5 are cropped.
 
   return (
     <>
       <button
         ref={triggerRef}
-        style={feedStyle}
         type="button"
         onClick={() => setOpen(true)}
         aria-label={alt ? `View image full screen: ${alt}` : "View image full screen"}
@@ -83,8 +78,13 @@ export default function PostImage({
           priority={priority}
           fit={fit}
           className={`${aspectClass} ${className}`}
-          imageClassName={isEditorialCrop ? "object-cover" : "object-contain"}
+          imageClassName={isEditorialCrop || variant === "feed" ? "object-cover" : "object-contain"}
         />
+        {cropped ? (
+          <span aria-hidden="true" className="pointer-events-none absolute bottom-3 right-3 rounded-full bg-black/75 px-3 py-1.5 text-xs font-medium text-white">
+            View full image
+          </span>
+        ) : null}
       </button>
       <ImageLightbox src={src} alt={alt} open={open} onClose={handleClose} />
     </>

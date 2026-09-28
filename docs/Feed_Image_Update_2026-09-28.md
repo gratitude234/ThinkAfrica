@@ -1,21 +1,17 @@
-# Feed image display update
+# Feed image display — consistent width
 
-## Design decisions
+This revision supersedes the earlier proportional-width treatment for short Posts.
 
-Short Posts treat the attachment as content: show it beneath the text at the available width, up to 520px. Preserve the entire image with its true aspect ratio. The frame width is limited to the available space, 60svh multiplied by the image ratio, or 480px multiplied by the image ratio, whichever is smallest; the existing 520px width cap also applies. Height and width therefore scale together, removing the artificial side strips around portraits and tall screenshots. The clickable frame and rounded corners follow the image. Tap to expand very tall screenshots for reading. Tapping still opens the full-screen viewer, and closing restores focus.
+## Short Posts
 
-Articles remain headline-led: show a 96px square thumbnail beside the headline and summary on phones, increasing to a 160px-wide 4:3 thumbnail from the small breakpoint. Covers are centre-cropped; the headline remains outside the image. Tapping the cover opens the article. The headline remains the accessible keyboard link to avoid duplicate tab stops. Without a cover, text uses the full width.
+All attachments use the available content width, capped at 520px. Width no longer depends on viewport height or the image ratio. Landscape, square and portraits up to 4:5 keep their original proportions. Taller portraits and screenshots use a centre-cropped 4:5 preview. Object-cover fills the frame without stretching or artificial side strips. Cropped previews show “View full image”. Tapping opens the complete original through the existing lightbox; closing restores focus to the trigger. Uploaded files are not modified. Very wide panoramas retain their full proportions.
 
-Responsive image sizes now match these display widths. Failed feed images use a quiet “Image unavailable” fallback. The Article publishing preview and feed loading skeleton match the new layout. Existing image optimisation, lazy loading, priority behaviour, engagement controls, and full-screen viewer are retained.
+## Articles
+
+Retain the compact side-thumbnail layout: 96px square on phones and 160px wide at 4:3 on larger screens. Publishing previews and feed placeholders retain the matching layout from the preceding update.
 
 ## Validation
 
-41 targeted tests passed across HomeFeedCard, PostImage, PostCover and PublishSettingsDialog. TypeScript, changed-component ESLint and Tailwind compilation passed. Existing tests cover full-image containment, viewer focus restoration, article links, and adding/removing the cover in the publishing preview. Browser and physical-device visual verification remain outstanding.
+29 targeted tests passed across PostImage, PostCover and HomeFeedCard, covering portrait cropping, square/landscape/panoramic ratios, crop labels and opening the viewer. TypeScript, changed-component ESLint, whitespace checks and Tailwind compilation passed. Browser visual verification and deployment remain outstanding.
 
-## Scope
-
-This archive continues from the corrected ZIP in this conversation and includes the preceding keyboard and Write loading changes. It has not been deployed. No database or dependency changes are required.
-
-## Proportional frame correction
-
-Added a proportional fit mode used only by short-post feed images. Existing natural and article crop modes are retained. Source changes reset the measured image geometry. Checked portrait and tall-image sizing, image containment and viewer behaviour. 26 targeted tests, TypeScript and changed-component ESLint passed. Browser visual verification remains outstanding. No rollback was performed.
+This archive retains the earlier keyboard and Write loading improvements. No database or dependency changes are required.
