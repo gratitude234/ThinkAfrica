@@ -51,7 +51,7 @@ export function useVisualViewportBottom() {
       );
     };
 
-    const syncVisualViewport = () => {
+    const syncVisualViewport = (event?: Event) => {
       if (animationFrame !== null) cancelAnimationFrame(animationFrame);
 
       animationFrame = requestAnimationFrame(() => {
@@ -62,6 +62,7 @@ export function useVisualViewportBottom() {
         // of view until that chrome settles.
         if (!isEditableFocused()) {
           root.style.setProperty("--mobile-visual-viewport-bottom", "0px");
+          root.removeAttribute("data-mobile-keyboard");
           return;
         }
 
@@ -79,6 +80,23 @@ export function useVisualViewportBottom() {
           "--mobile-visual-viewport-bottom",
           `${obscuredBottom}px`
         );
+        // Ignore browser chrome changes and pinch zoom. OffsetTop is deliberately
+        // excluded here: Safari may pan the viewport to keep the input visible.
+        const keyboardOpen = layoutHeight - visualViewport.height > 120 &&
+          Math.abs((visualViewport.scale ?? 1) - 1) < 0.05;
+        root.toggleAttribute("data-mobile-keyboard", keyboardOpen);
+        // Reveal the whole composer, including its actions, once on focus/resize.
+        // Never fight the reader's manual scrolling.
+        if (keyboardOpen && event?.type !== "scroll") {
+          const composer = document.activeElement?.closest<HTMLElement>("[data-keyboard-composer]");
+          if (composer) {
+            const rect = composer.getBoundingClientRect();
+            const bottom = visualViewport.offsetTop + visualViewport.height - 16;
+            const delta = Math.min(rect.bottom - bottom, rect.top - visualViewport.offsetTop - 16);
+            if (delta > 0) window.scrollBy({ top: delta, behavior: "instant" });
+          }
+        }
+
       });
     };
 
@@ -99,6 +117,7 @@ export function useVisualViewportBottom() {
       document.removeEventListener("focusin", syncVisualViewport);
       document.removeEventListener("focusout", syncVisualViewport);
       fixedBox.remove();
+      root.removeAttribute("data-mobile-keyboard");
       root.style.removeProperty("--mobile-visual-viewport-bottom");
     };
   }, []);

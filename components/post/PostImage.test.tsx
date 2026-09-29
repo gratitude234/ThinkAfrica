@@ -48,25 +48,25 @@ describe("PostImage", () => {
     expect(container.querySelector("[title='Tap to see the whole image']")).toBeNull();
   });
 
-  it("uses the uploaded image's natural ratio for feed media", () => {
+  it("crops portrait feed media to a square", () => {
     render(<PostImage src={SRC} alt="A portrait" variant="feed" />);
     loadFeedImage(1080, 1350);
 
     const image = screen.getByRole("img", { name: "A portrait" });
-    expect(ratioOf(image.parentElement as HTMLElement)).toBeCloseTo(4 / 5);
+    expect(ratioOf(image.parentElement as HTMLElement)).toBeCloseTo(1);
     expect(image.closest("button")).toHaveClass("w-full");
-    expect(screen.queryByText("View full image")).toBeNull();
+    expect(screen.getByText("View full image")).toBeInTheDocument();
     expect(image).toHaveClass("object-cover");
     expect(
       screen.getByRole("button", { name: "View image full screen: A portrait" })
     ).toBeInTheDocument();
   });
 
-  it("caps tall feed previews at 4:5 and exposes the original", () => {
+  it("caps tall feed previews at 1:1 and exposes the original", () => {
     render(<PostImage src={SRC} alt="Tall feed screenshot" variant="feed" />);
     loadFeedImage(1000, 4000);
     const image = screen.getByRole("img", { name: "Tall feed screenshot" });
-    expect(ratioOf(image.parentElement as HTMLElement)).toBe(0.8);
+    expect(ratioOf(image.parentElement as HTMLElement)).toBe(1);
     expect(image.closest("button")).toHaveClass("w-full");
     expect(screen.getByText("View full image")).toBeInTheDocument();
     fireEvent.click(image.closest("button")!);

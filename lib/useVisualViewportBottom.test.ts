@@ -104,6 +104,43 @@ describe("useVisualViewportBottom", () => {
     expect(offset()).toBe("0px");
   });
 
+  it("hides navigation during keyboard use and restores it on dismissal", () => {
+    fixedBoxHeight(800);
+    const vv = viewport(400);
+    focusTextField();
+    const { unmount } = renderHook(() => useVisualViewportBottom());
+    flushFrames();
+    expect(document.documentElement.hasAttribute("data-mobile-keyboard")).toBe(true);
+    vv.height = 800;
+    document.dispatchEvent(new Event("focusin"));
+    flushFrames();
+    expect(document.documentElement.hasAttribute("data-mobile-keyboard")).toBe(false);
+    unmount();
+  });
+
+  it("reveals composer actions without fighting viewport scrolling", () => {
+    fixedBoxHeight(800);
+    const vv = viewport(400);
+    const composer = document.createElement("div");
+    composer.setAttribute("data-keyboard-composer", "");
+    const field = document.createElement("textarea");
+    composer.appendChild(field);
+    document.body.appendChild(composer);
+    field.focus();
+    Object.defineProperty(composer, "getBoundingClientRect", { value: () => ({
+      top: 200, bottom: 470, height: 270,
+    }) });
+    const scroll = vi.spyOn(window, "scrollBy").mockImplementation(() => {});
+    renderHook(() => useVisualViewportBottom());
+    flushFrames();
+    expect(scroll).toHaveBeenCalledWith({ top: 86, behavior: "instant" });
+    scroll.mockClear();
+    const onScroll = vv.addEventListener.mock.calls.find(([name]) => name === "scroll")![1];
+    onScroll(new Event("scroll"));
+    flushFrames();
+    expect(scroll).not.toHaveBeenCalled();
+  });
+
   it("removes what it added when unmounted", () => {
     layoutHeights({ inner: 700, client: 700 });
     viewport(400);

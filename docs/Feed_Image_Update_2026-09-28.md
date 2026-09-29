@@ -4,7 +4,7 @@ This revision supersedes the earlier proportional-width treatment for short Post
 
 ## Short Posts
 
-All attachments use the available content width, capped at 520px. Width no longer depends on viewport height or the image ratio. Landscape, square and portraits up to 4:5 keep their original proportions. Taller portraits and screenshots use a centre-cropped 4:5 preview. Object-cover fills the frame without stretching or artificial side strips. Cropped previews show “View full image”. Tapping opens the complete original through the existing lightbox; closing restores focus to the trigger. Uploaded files are not modified. Very wide panoramas retain their full proportions.
+All attachments use the available content width, capped at 520px. Width no longer depends on viewport height or the image ratio. Landscape and square images keep their original proportions. Portraits and tall screenshots use a centre-cropped square preview. Object-cover fills the frame without stretching or artificial side strips. Cropped previews show “View full image”. Tapping opens the complete original through the existing lightbox; closing restores focus to the trigger. Uploaded files are not modified. Very wide panoramas retain their full proportions.
 
 ## Articles
 

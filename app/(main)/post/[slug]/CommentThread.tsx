@@ -362,7 +362,7 @@ export default function CommentThread({
           </div>
 
           {isEditing ? (
-            <div className="mt-1.5">
+            <div data-keyboard-composer="" className="mt-1.5">
               <label htmlFor={`edit-${comment.id}`} className="sr-only">
                 Edit your comment
               </label>
@@ -372,7 +372,7 @@ export default function CommentThread({
                 onChange={(event) => setDraft(event.target.value)}
                 rows={2}
                 maxLength={COMMENT_MAX_CHARACTERS}
-                className="w-full resize-none rounded-lg border border-card-border bg-surface px-3 py-2 text-byline text-ink focus:border-emerald-brand focus:outline-none"
+                className="w-full resize-none rounded-lg border border-card-border bg-surface px-3 py-2 text-[16px] sm:text-byline text-ink focus:border-emerald-brand focus:outline-none"
               />
               <div className="mt-1.5 flex justify-end gap-2">
                 <button type="button" onClick={() => setEditingId(null)} className={ACTION_CLASS}>
@@ -538,7 +538,7 @@ export default function CommentThread({
               {renderRow(comment, false)}
 
               {replyingToId === comment.id ? (
-                <div className="ml-[42px] mt-2">
+                <div data-keyboard-composer="" className="ml-[42px] mt-2">
                   <label htmlFor={`reply-${comment.id}`} className="sr-only">
                     Write a reply
                   </label>
@@ -552,7 +552,7 @@ export default function CommentThread({
                     placeholder={`Reply to ${
                       comment.profiles?.full_name ?? comment.profiles?.username ?? "this comment"
                     }…`}
-                    className="w-full resize-none rounded-lg border border-card-border bg-surface px-3 py-2 text-byline text-ink placeholder:text-ink-muted focus:border-emerald-brand focus:outline-none"
+                    className="w-full resize-none rounded-lg border border-card-border bg-surface px-3 py-2 text-[16px] sm:text-byline text-ink placeholder:text-ink-muted focus:border-emerald-brand focus:outline-none"
                   />
                   <div className="mt-1.5 flex items-center justify-end gap-2">
                     {countCommentCharacters(draft) > COMMENT_MAX_CHARACTERS - 200 ? (

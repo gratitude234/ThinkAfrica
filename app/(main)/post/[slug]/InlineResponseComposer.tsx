@@ -76,7 +76,7 @@ export default function InlineResponseComposer({
   return (
     <div className="mt-4 flex items-start gap-3 font-public-sans sm:mt-[18px]">
       <UserAvatar name="You" src={null} size={36} className="mt-0.5 shrink-0 overflow-hidden rounded-full" />
-      <div className="min-w-0 flex-1">
+      <div data-keyboard-composer="" className="min-w-0 flex-1">
         <label htmlFor={composerId} className="sr-only">{label}</label>
         <textarea
           id={composerId}
@@ -98,7 +98,7 @@ export default function InlineResponseComposer({
           disabled={busy}
           placeholder="Add to the discussion…"
           aria-describedby={error ? `${composerId}-error` : undefined}
-          className="min-h-11 w-full resize-none rounded-[10px] border border-card-border bg-transparent px-3.5 py-2.5 text-[14px] leading-5 text-ink outline-none transition-colors placeholder:text-ink-faint focus:border-emerald-brand/50 disabled:opacity-60"
+          className="min-h-11 w-full resize-none rounded-[10px] border border-card-border bg-transparent px-3.5 py-2.5 text-[16px] sm:text-[14px] leading-5 text-ink outline-none transition-colors placeholder:text-ink-faint focus:border-emerald-brand/50 disabled:opacity-60"
         />
 
         {error ? <p id={`${composerId}-error`} role="alert" className="mt-1 text-[12px] text-red-600">{error}</p> : null}

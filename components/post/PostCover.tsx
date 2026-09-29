@@ -25,7 +25,7 @@ interface PostCoverProps {
   // proportions drive the box height: the container's aspect ratio is taken
   // from the loaded image and clamped to NATURAL_*_RATIO, so a portrait photo
   // stays portrait instead of being sliced into a 16/9 letterbox.
-  // Feed previews preserve wide/square media, but cap tall portraits at 4:5.
+  // Feed previews preserve wide/square media, but cap portraits at a square.
   fit?: "cover" | "contain" | "natural" | "feed-preview";
   sizes?: string;
   priority?: boolean;
@@ -102,7 +102,7 @@ export default function PostCover({
 
   const naturalFit = useMemo(
     () => (naturalRatio === null ? null : fit === "feed-preview"
-      ? { ratio: Math.max(4 / 5, naturalRatio), constrained: naturalRatio < 4 / 5 } : clampNaturalFit(naturalRatio)),
+      ? { ratio: Math.max(1, naturalRatio), constrained: naturalRatio < 1 } : clampNaturalFit(naturalRatio)),
     [naturalRatio, fit]
   );
 
