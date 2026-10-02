@@ -1,3 +1,14 @@
+## 2026-10-02 — Profile V3 Phase 6 final production hardening
+
+- Hardened Related Thinkers with fail-closed, either-direction block exclusions for both the profile owner and current viewer.
+- Removed per-candidate block RPC fan-out; the public profile now uses the shared bounded server-side block-exclusion boundary and filters a six-person reserve down to at most three recommendations.
+- Added stale Selected Work recovery in Edit Profile so owners can clear a selection whose publication is no longer published.
+- Added graceful cover-image failure handling so deleted or invalid media never leaves a broken profile banner.
+- Added `npm run profile:qa`, a dependency-free final Profile V3 architecture audit; 22/22 checks pass in this environment.
+- Ran a full source syntax/transpile sweep across 674 TypeScript/TSX files with 0 errors.
+- Added the final production-readiness report and deployment checklist.
+- Phase 6 adds no database migration; the Phase 2 `set_my_selected_work` migration remains the only Profile V3 schema prerequisite to verify on the real Indegenius Supabase project.
+
 ## 2026-10-02 — Profile V3 Phase 4 published-topic intelligence and full record
 
 - Added **Writes about** as a derived signal from normalized topic keys on real published Posts and Articles; reading interests remain a separate feed preference.

@@ -132,6 +132,11 @@ export default function ProfileHeader({
   const displayName = getProfileDisplayName(profile);
   const headline = getProfileHeadline(profile);
   const bio = profile.bio?.trim() || null;
+  const [coverFailed, setCoverFailed] = useState(false);
+
+  useEffect(() => {
+    setCoverFailed(false);
+  }, [profile.cover_image_url]);
   const viewerState = getProfileViewerState({
     viewerId: currentUserId,
     profileId: profile.id,
@@ -183,11 +188,16 @@ export default function ProfileHeader({
     <>
       <ProfileViewTracker profileId={profile.id} viewerState={viewerState} />
       <section id="profile-identity" aria-labelledby="profile-name" className="profile-identity">
-        {profile.cover_image_url ? (
+        {profile.cover_image_url && !coverFailed ? (
           <div className="profile-cover" aria-label="Profile cover">
             {/* The URL is constrained server-side to this project's Supabase Storage host. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={profile.cover_image_url} alt="" className="profile-cover-image" />
+            <img
+              src={profile.cover_image_url}
+              alt=""
+              className="profile-cover-image"
+              onError={() => setCoverFailed(true)}
+            />
           </div>
         ) : null}
         <div className="profile-identity-top">

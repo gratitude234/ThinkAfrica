@@ -80,6 +80,7 @@ export async function loadProfileSettings(
 
   const workRows = [...(worksResult.data ?? [])];
   const selectedWorkId = selectedResult.data?.post_id ?? null;
+  let selectedWorkUnavailable = false;
   if (selectedWorkId && !workRows.some((work) => work.id === selectedWorkId)) {
     const current = await supabase
       .from("posts")
@@ -91,6 +92,7 @@ export async function loadProfileSettings(
       .maybeSingle();
     if (current.error) throw new Error(`selected work publication settings failed: ${current.error.message}`);
     if (current.data) workRows.unshift(current.data);
+    else selectedWorkUnavailable = true;
   }
 
   const selectedWorkOptions: ProfileSettingsWorkOption[] = workRows.map((work) => {
@@ -121,6 +123,7 @@ export async function loadProfileSettings(
     graduationYear: profile.graduation_year ? String(profile.graduation_year) : "",
     interests: profile.interests ?? [],
     selectedWorkId,
+    selectedWorkUnavailable,
     selectedWorkOptions,
     visibility: {
       profileVisibility:

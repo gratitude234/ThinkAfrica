@@ -2,6 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getFeedExcludedUserIds } from "@/lib/blocking";
 import { getDatabase } from "@/lib/db";
 import type {
   ProfilePublicationActivityPoint,
@@ -369,17 +370,37 @@ export async function loadProfileOverview({
   let relatedThinkers: ProfileRelatedThinker[] = [];
   if (writingTopics.length > 0) {
     try {
-      relatedThinkers = await repository.relatedThinkers({
+      const [candidates, ownerExcludedIds, viewerExcludedIds] = await Promise.all([
+        repository.relatedThinkers({
+          profileId,
+          topicKeys: writingTopics.map((topic) => topic.key),
+          viewerId,
+          // Fetch a small reserve so block exclusions do not leave an otherwise
+          // healthy profile with an artificially short recommendation list.
+          limit: 6,
+        }),
+        getFeedExcludedUserIds(profileId, { strict: true }),
+        viewerId && viewerId !== profileId
+          ? getFeedExcludedUserIds(viewerId, { strict: true })
+          : Promise.resolve([]),
+      ]);
+
+      const excludedIds = new Set<string>([
         profileId,
-        topicKeys: writingTopics.map((topic) => topic.key),
-        viewerId,
-        limit: 3,
-      });
+        ...(viewerId ? [viewerId] : []),
+        ...ownerExcludedIds,
+        ...viewerExcludedIds,
+      ]);
+      relatedThinkers = candidates
+        .filter((candidate) => !excludedIds.has(candidate.id))
+        .slice(0, 3);
     } catch (error) {
       // Related Thinkers is a discovery aid, not a stated profile fact. A
-      // recommendation timeout must not turn a healthy public profile into an
-      // error page; the core record above remains strict and non-degradable.
+      // recommendation or block-exclusion failure must not turn a healthy
+      // public profile into an error page. Failing closed here is also a
+      // privacy requirement: uncertain block state means no recommendations.
       console.warn("[profile] related thinkers unavailable", error);
+      relatedThinkers = [];
     }
   }
 

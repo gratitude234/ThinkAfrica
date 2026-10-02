@@ -12,6 +12,11 @@ vi.mock("@/lib/serverAuth", () => ({
   getCurrentUser: async () => currentUser.value,
 }));
 
+const getFeedExcludedUserIds = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/blocking", () => ({
+  getFeedExcludedUserIds,
+}));
+
 /**
  * The identity read is behind lib/db, so it does not travel through the
  * Supabase client stubbed below. The row it returns is set per test here; the
@@ -135,6 +140,8 @@ beforeEach(() => {
   currentUser.value = null;
   findIdentityByUsername.mockReset();
   findIdentityByUsername.mockResolvedValue(null);
+  getFeedExcludedUserIds.mockReset();
+  getFeedExcludedUserIds.mockResolvedValue([]);
   vi.unstubAllEnvs();
 });
 
@@ -556,6 +563,48 @@ describe("Overview bounded public reads", () => {
     expect(topicReads[0]?.kinds).toEqual([["article", "post"]]);
     expect(data?.overview?.activity).toHaveLength(12);
   });
+
+
+  it("fails closed and excludes block-related writers for both the profile owner and viewer", async () => {
+    currentUser.value = { id: "reader-1" };
+    findIdentityByUsername.mockResolvedValue(PROFILE_ROW);
+    getFeedExcludedUserIds.mockImplementation(async (userId: string) => {
+      if (userId === "author-1") return ["candidate-b"];
+      if (userId === "reader-1") return ["candidate-c"];
+      return [];
+    });
+
+    const { client } = makeClient({
+      routes: {
+        follows: { count: 2, data: [], error: null },
+        posts: {
+          count: 4,
+          data: [
+            row({ id: "owner-work", author_id: "author-1", topic_keys: ["governance"] }),
+            row({ id: "candidate-a-work", author_id: "candidate-a", topic_keys: ["governance"] }),
+            row({ id: "candidate-b-work", author_id: "candidate-b", topic_keys: ["governance"] }),
+            row({ id: "candidate-c-work", author_id: "candidate-c", topic_keys: ["governance"] }),
+          ],
+          error: null,
+        },
+        profile_directory: {
+          data: [
+            { id: "candidate-a", username: "amina", full_name: "Amina", avatar_url: null, professional_title: null },
+            { id: "candidate-b", username: "bayo", full_name: "Bayo", avatar_url: null, professional_title: null },
+            { id: "candidate-c", username: "chika", full_name: "Chika", avatar_url: null, professional_title: null },
+          ],
+          error: null,
+        },
+      },
+    });
+
+    const data = await loadProfileView({ supabase: client, username: "student1" });
+
+    expect(getFeedExcludedUserIds).toHaveBeenCalledWith("author-1", { strict: true });
+    expect(getFeedExcludedUserIds).toHaveBeenCalledWith("reader-1", { strict: true });
+    expect(data?.overview?.relatedThinkers.map((person) => person.id)).toEqual(["candidate-a"]);
+  });
+
 });
 
 describe("Full Intellectual Record", () => {

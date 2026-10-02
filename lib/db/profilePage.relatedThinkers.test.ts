@@ -151,6 +151,7 @@ describe("relatedThinkers, PostgreSQL", () => {
     expect(calls[0]?.text).toContain("public.follows");
     expect(calls[0]?.text).toContain("show_in_directory");
     expect(calls[0]?.text).toContain("profile_visibility");
+    expect(calls[0]?.text).not.toContain("public.user_blocks");
   });
 
   it("does not query when the profile has no demonstrated writing topics", async () => {
@@ -198,4 +199,6 @@ describe("relatedThinkers, Supabase", () => {
       { table: "posts", column: "topic_keys", values: ["governance", "education policy"] },
     ]);
   });
+
+
 });

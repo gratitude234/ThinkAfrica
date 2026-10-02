@@ -65,6 +65,8 @@ export interface ProfileSettingsModel {
   graduationYear: string;
   interests: string[];
   selectedWorkId: string | null;
+  /** True when the stored pointer no longer resolves to a published Post/Article. */
+  selectedWorkUnavailable: boolean;
   selectedWorkOptions: ProfileSettingsWorkOption[];
   visibility: {
     profileVisibility: "public" | "members_only";

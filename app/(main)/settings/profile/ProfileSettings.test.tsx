@@ -49,6 +49,7 @@ const model: ProfileSettingsModel = {
   graduationYear: "",
   interests: ["Education"],
   selectedWorkId: null,
+  selectedWorkUnavailable: false,
   selectedWorkOptions: [
     { id: "article-1", title: "A public argument", kind: "article", publishedAt: "2026-09-01T00:00:00Z" },
     { id: "post-1", title: "A short post", kind: "post", publishedAt: "2026-08-28T00:00:00Z" },
@@ -71,6 +72,29 @@ beforeEach(() => {
 });
 
 describe("Edit profile", () => {
+  it("lets an owner clear a selected work pointer when that work is no longer published", async () => {
+    const user = setup();
+    render(
+      <ProfileSettings
+        model={{
+          ...model,
+          selectedWorkId: "old-work",
+          selectedWorkUnavailable: true,
+          selectedWorkOptions: [],
+        }}
+      />
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent(/no longer published/i);
+    await user.click(screen.getByRole("radio", { name: /No selected work/i }));
+    const selected = section("Selected Work");
+    await user.click(within(selected).getByRole("button", { name: /save/i }));
+
+    await waitFor(() =>
+      expect(saveSelectedWorkSection).toHaveBeenCalledWith({ postId: null })
+    );
+  });
+
   it("is Profile, Selected Work, Topics and Visibility", () => {
     render(<ProfileSettings model={model} />);
 

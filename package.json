@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.check.json",
+    "profile:qa": "node scripts/profile-v3-final-audit.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

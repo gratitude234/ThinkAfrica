@@ -43,6 +43,9 @@ Onboarding is Profile Stage 1, not a separate identity system.
 - Derived writing topics use the existing normalized `posts.topic_keys` field. No expertise table, AI classifier or new profile topic store is introduced.
 - Related Thinkers also reuses `posts.topic_keys`, the safe `profile_directory` discovery projection and public follow edges. It introduces no recommendation table and does not read bookmarks or private preferences. The Supabase and direct-Postgres implementations use the same bounded recent-match window and ranking rules.
 - Related Thinkers is supplemental discovery context. If that recommendation read fails, the profile remains available and simply omits the section; stated profile facts and publication lists remain strict.
+- Related Thinkers must never surface a writer who is in an either-direction block relationship with either the profile owner or the current viewer. Block exclusions are resolved server-side through the shared blocking boundary and fail closed: uncertain block state means the supplemental recommendation section is omitted.
+- A Selected Work pointer may outlive publication status. Public reads hide stale/unpublished selections; Edit Profile must surface the stale state and let the owner clear or replace it.
+- Optional cover media must disappear cleanly if the stored object can no longer be loaded; a broken image must not leave a broken profile banner.
 - Selected Work reuses the existing `profile_featured_posts` table but reads/writes only position 1 through the new `set_my_selected_work(uuid)` RPC. The old multi-item replacement RPCs are not used by Profile V3.
 
 ## Visual language

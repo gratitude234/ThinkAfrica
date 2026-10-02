@@ -822,8 +822,12 @@ export function createSupabaseProfilePageRepository(
 
       if (candidateIds.length === 0) return [];
 
-      const [profilesResult, ownerFollowingResult, followersResult, viewerFollowingResult] =
-        await Promise.all([
+      const [
+        profilesResult,
+        ownerFollowingResult,
+        followersResult,
+        viewerFollowingResult,
+      ] = await Promise.all([
           supabase
             .from("profile_directory")
             .select("id, username, full_name, avatar_url, professional_title")

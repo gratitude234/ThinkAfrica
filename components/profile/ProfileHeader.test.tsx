@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ProfileHeader from "./ProfileHeader";
 
@@ -108,6 +108,15 @@ describe("ProfileHeader identity", () => {
       "https://example.supabase.co/storage/v1/object/public/post-images/covers/user-1/profile-cover"
     );
     expect(screen.queryByRole("button", { name: /cover image/i })).toBeNull();
+  });
+  it("removes a cover banner cleanly when the stored object can no longer load", () => {
+    const { container } = renderHeader({
+      profileOverrides: { cover_image_url: "https://example.supabase.co/storage/v1/object/public/post-images/covers/user-1/missing-cover" },
+    });
+    const image = container.querySelector(".profile-cover img") as HTMLImageElement;
+    expect(image).toBeTruthy();
+    fireEvent.error(image);
+    expect(container.querySelector(".profile-cover")).toBeNull();
   });
 });
 
