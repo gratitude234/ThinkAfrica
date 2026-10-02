@@ -25,6 +25,7 @@ function baseProfile(
     full_name: "A Student",
     bio: "Writes about governance and institutions.",
     avatar_url: null,
+    cover_image_url: null,
     professional_title: null,
     ...overrides,
   };
@@ -98,10 +99,20 @@ describe("ProfileHeader identity", () => {
       "•••"
     );
   });
+  it("renders an optional cover without adding cover controls to the public header", () => {
+    const { container } = renderHeader({
+      profileOverrides: { cover_image_url: "https://example.supabase.co/storage/v1/object/public/post-images/covers/user-1/profile-cover" },
+    });
+    expect(container.querySelector(".profile-cover img")).toHaveAttribute(
+      "src",
+      "https://example.supabase.co/storage/v1/object/public/post-images/covers/user-1/profile-cover"
+    );
+    expect(screen.queryByRole("button", { name: /cover image/i })).toBeNull();
+  });
 });
 
-describe("ProfileHeader carries no record and no credibility", () => {
-  it("renders no Intellectual Record, metrics, topics, focus statement or cover", () => {
+describe("ProfileHeader keeps identity separate from the record", () => {
+  it("renders no Intellectual Record, metrics, topics or focus statement", () => {
     const { container } = renderHeader({
       profileOverrides: { professional_title: "Policy researcher" },
     });

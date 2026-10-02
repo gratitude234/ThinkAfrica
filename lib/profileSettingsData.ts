@@ -2,21 +2,24 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeMyPrivateProfile } from "@/lib/profilePrivate";
-import type { ProfileSettingsModel } from "@/lib/profileSettings";
+import type { ProfileSettingsModel, ProfileSettingsWorkOption } from "@/lib/profileSettings";
+import { sanitizePostExcerpt } from "@/lib/utils";
 
 /**
  * Exactly the columns Edit profile edits. The Command Center this replaced
- * read six domains to fill a preview, featured work and a topic index; this is
- * the profile row and the private visibility settings, two reads.
+ * read six domains to fill a preview and a topic index. Profile V3 adds one
+ * deliberately narrow Selected Work read plus a bounded list of the owner
+ * published Posts/Articles.
  */
 const PROFILE_SETTINGS_SELECT =
-  "id, username, full_name, avatar_url, professional_title, bio, country, university, field_of_study, graduation_year, interests";
+  "id, username, full_name, avatar_url, cover_image_url, professional_title, bio, country, university, field_of_study, graduation_year, interests";
 
 interface ProfileSettingsRow {
   id: string;
   username: string;
   full_name: string | null;
   avatar_url: string | null;
+  cover_image_url: string | null;
   professional_title: string | null;
   bio: string | null;
   country: string | null;
@@ -39,9 +42,19 @@ export async function loadProfileSettings(
   supabase: SupabaseClient,
   userId: string
 ): Promise<ProfileSettingsModel | null> {
-  const [profileResult, privateResult] = await Promise.all([
+  const [profileResult, privateResult, selectedResult, worksResult] = await Promise.all([
     supabase.from("profiles").select(PROFILE_SETTINGS_SELECT).eq("id", userId).maybeSingle(),
     supabase.rpc("get_my_profile_private"),
+    supabase.from("profile_featured_posts").select("post_id").eq("user_id", userId).eq("position", 1).maybeSingle(),
+    supabase
+      .from("posts")
+      .select("id, title, excerpt, content_kind, published_at, created_at")
+      .eq("author_id", userId)
+      .eq("status", "published")
+      .in("content_kind", ["post", "article"])
+      .order("published_at", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
+      .limit(50),
   ]);
 
   if (profileResult.error) {
@@ -53,17 +66,53 @@ export async function loadProfileSettings(
   if (privateResult.error) {
     throw new Error(`profile visibility failed: ${privateResult.error.message}`);
   }
+  if (selectedResult.error) {
+    throw new Error(`selected work settings failed: ${selectedResult.error.message}`);
+  }
+  if (worksResult.error) {
+    throw new Error(`published work settings failed: ${worksResult.error.message}`);
+  }
   const privacy = (normalizeMyPrivateProfile(privateResult.data)?.privacy_settings ??
     {}) as Partial<{
     profile_visibility: "public" | "members_only";
     show_in_directory: boolean;
   }>;
 
+  const workRows = [...(worksResult.data ?? [])];
+  const selectedWorkId = selectedResult.data?.post_id ?? null;
+  if (selectedWorkId && !workRows.some((work) => work.id === selectedWorkId)) {
+    const current = await supabase
+      .from("posts")
+      .select("id, title, excerpt, content_kind, published_at, created_at")
+      .eq("id", selectedWorkId)
+      .eq("author_id", userId)
+      .eq("status", "published")
+      .in("content_kind", ["post", "article"])
+      .maybeSingle();
+    if (current.error) throw new Error(`selected work publication settings failed: ${current.error.message}`);
+    if (current.data) workRows.unshift(current.data);
+  }
+
+  const selectedWorkOptions: ProfileSettingsWorkOption[] = workRows.map((work) => {
+    const kind = work.content_kind === "article" ? "article" : "post";
+    const fallback = kind === "article" ? "Untitled Article" : "Post";
+    const title = kind === "article"
+      ? work.title?.trim() || fallback
+      : sanitizePostExcerpt(work.excerpt ?? "") || fallback;
+    return {
+      id: String(work.id),
+      title,
+      kind,
+      publishedAt: work.published_at ?? null,
+    };
+  });
+
   return {
     id: profile.id,
     username: profile.username,
     fullName: text(profile.full_name),
     avatarUrl: profile.avatar_url,
+    coverImageUrl: profile.cover_image_url,
     headline: text(profile.professional_title),
     bio: text(profile.bio),
     country: text(profile.country),
@@ -71,6 +120,8 @@ export async function loadProfileSettings(
     fieldOfStudy: text(profile.field_of_study),
     graduationYear: profile.graduation_year ? String(profile.graduation_year) : "",
     interests: profile.interests ?? [],
+    selectedWorkId,
+    selectedWorkOptions,
     visibility: {
       profileVisibility:
         privacy.profile_visibility === "members_only" ? "members_only" : "public",

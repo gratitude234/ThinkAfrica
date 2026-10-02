@@ -72,8 +72,11 @@ describe("the profile step's rule", () => {
     expect(getOnboardingProfileError({ fullName: "Ada", username: "Ada Obi", bio: "" })).toBeNull();
   });
 
-  it("keeps the bio optional and bounded", () => {
-    expect(getOnboardingProfileError({ fullName: "Ada", username: "ada", bio: "x".repeat(300) })).toBeNull();
-    expect(getOnboardingProfileError({ fullName: "Ada", username: "ada", bio: "x".repeat(301) })).toMatch(/300/);
+  it("keeps the headline and bio optional and bounded", () => {
+    expect(getOnboardingProfileError({ fullName: "Ada", username: "ada", headline: "", bio: "" })).toBeNull();
+    expect(getOnboardingProfileError({ fullName: "Ada", username: "ada", headline: "x".repeat(120), bio: "" })).toBeNull();
+    expect(getOnboardingProfileError({ fullName: "Ada", username: "ada", headline: "x".repeat(121), bio: "" })).toMatch(/120/);
+    expect(getOnboardingProfileError({ fullName: "Ada", username: "ada", headline: "", bio: "x".repeat(300) })).toBeNull();
+    expect(getOnboardingProfileError({ fullName: "Ada", username: "ada", headline: "", bio: "x".repeat(301) })).toMatch(/300/);
   });
 });

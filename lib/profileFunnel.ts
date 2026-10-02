@@ -28,6 +28,8 @@ export type ProfileFunnelEvent = (typeof PROFILE_FUNNEL_EVENTS)[number];
 /** Where on the profile the action happened. */
 export const PROFILE_FUNNEL_SURFACES = [
   "profile_header",
+  "profile_selected_work",
+  "profile_record",
   "profile_posts",
   "profile_articles",
 ] as const;

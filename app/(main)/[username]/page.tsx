@@ -103,6 +103,7 @@ export default async function UserProfilePage({ params, searchParams }: PageProp
           full_name: profile.full_name,
           bio: profile.bio,
           avatar_url: profile.avatar_url,
+          cover_image_url: profile.cover_image_url,
           professional_title: profile.professional_title,
           verified: profile.verified,
         }}
@@ -124,7 +125,7 @@ export default async function UserProfilePage({ params, searchParams }: PageProp
         isOwnProfile={viewer.isOwnProfile}
       />
 
-      <div id="profile-panel" role="tabpanel" aria-labelledby={`main-tab-${tab}`} tabIndex={0} className="profile-panel focus-ring">
+      <div id="profile-panel" role="tabpanel" aria-labelledby={`main-tab-${tab}`} tabIndex={0} className={`profile-panel focus-ring ${tab === "overview" ? "profile-panel-overview" : "profile-panel-reading"}`}>
         {tab === "drafts" && drafts ? (
           <ProfileDraftList initialDrafts={drafts} />
         ) : tab === "overview" ? (

@@ -1,11 +1,12 @@
 import Link from "next/link";
 import type { ProfileSettingsModel } from "@/lib/profileSettings";
 import ProfileSection from "./sections/ProfileSection";
+import SelectedWorkSection from "./sections/SelectedWorkSection";
 import TopicsSection from "./sections/TopicsSection";
 import VisibilitySection from "./sections/VisibilitySection";
 
 /**
- * Edit profile: Profile, Topics and Visibility, each saving on its own.
+ * Edit profile: Profile, Selected Work, Topics and Visibility, each saving on its own.
  * Account, notification and privacy settings stay on `/settings`.
  */
 export default function ProfileSettings({ model }: { model: ProfileSettingsModel }) {
@@ -35,6 +36,7 @@ export default function ProfileSettings({ model }: { model: ProfileSettingsModel
 
       <div className="mt-6 space-y-6">
         <ProfileSection model={model} />
+        <SelectedWorkSection model={model} />
         <TopicsSection model={model} />
         <VisibilitySection model={model} />
       </div>

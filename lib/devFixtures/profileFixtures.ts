@@ -4,7 +4,7 @@ import type { ProfileIdentityRecord, ProfilePublicationPage, ProfileDraft } from
 export const PROFILE_FIXTURE: ProfileIdentityRecord = {
   id: "fixture-writer", username: "amara", full_name: "Amara Okafor",
   bio: "I write about cities, public life and the everyday decisions that shape our communities. My work explores how people experience institutions, and how thoughtful design can make them more useful. I am interested in practical ideas, careful observation and conversations across disciplines.",
-  avatar_url: null, professional_title: "Researcher · Writer", country: "Nigeria",
+  avatar_url: null, cover_image_url: "/dev-fixtures/cover-emerald.svg", professional_title: "Researcher · Writer", country: "Nigeria",
   university: "University of Lagos", field_of_study: "Urban Studies", graduation_year: 2023,
   interests: ["Governance", "Technology", "Education"], verified: true, verified_type: null,
   organization_website: "https://example.org/", created_at: "2023-09-01T00:00:00Z",

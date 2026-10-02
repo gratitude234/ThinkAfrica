@@ -9,16 +9,16 @@ import {
 } from "@/lib/profileUsername";
 
 /**
- * Edit profile, at `/settings/profile`: three sections, each with its own
+ * Edit profile, at `/settings/profile`: four sections, each with its own
  * save.
  *
  * The publishing reset, Phase 2G, replaced the profile Command Center (seven
- * sections, a live preview, Featured Work curation, a persona picker and an
+ * sections, a live preview, the old three-item Featured Work manager, a persona picker and an
  * "intellectual focus" statement) and the older settings ProfileForm with
  * this. There is no completion score and nothing on the page suggests what a
  * member should add.
  */
-export const PROFILE_SETTINGS_SECTIONS = ["profile", "topics", "visibility"] as const;
+export const PROFILE_SETTINGS_SECTIONS = ["profile", "selected-work", "topics", "visibility"] as const;
 
 export type ProfileSettingsSection = (typeof PROFILE_SETTINGS_SECTIONS)[number];
 
@@ -28,7 +28,11 @@ export const PROFILE_SETTINGS_SECTION_DEFINITIONS: Record<
 > = {
   profile: {
     label: "Profile",
-    summary: "Your photo, name, username, headline and bio, and where you are and studied.",
+    summary: "Your photo, optional cover, name, username, headline and bio, and where you are and studied.",
+  },
+  "selected-work": {
+    label: "Selected Work",
+    summary: "Choose one published Post or Article to represent your work at the top of your profile.",
   },
   topics: {
     label: "Topics",
@@ -40,11 +44,19 @@ export const PROFILE_SETTINGS_SECTION_DEFINITIONS: Record<
   },
 };
 
+export interface ProfileSettingsWorkOption {
+  id: string;
+  title: string;
+  kind: "post" | "article";
+  publishedAt: string | null;
+}
+
 export interface ProfileSettingsModel {
   id: string;
   username: string;
   fullName: string;
   avatarUrl: string | null;
+  coverImageUrl: string | null;
   headline: string;
   bio: string;
   country: string;
@@ -52,6 +64,8 @@ export interface ProfileSettingsModel {
   fieldOfStudy: string;
   graduationYear: string;
   interests: string[];
+  selectedWorkId: string | null;
+  selectedWorkOptions: ProfileSettingsWorkOption[];
   visibility: {
     profileVisibility: "public" | "members_only";
     showInDirectory: boolean;

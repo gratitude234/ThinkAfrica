@@ -163,6 +163,41 @@ describe.skipIf(!enabled)("public profile: PostgREST vs PostgreSQL, same databas
     expect(mismatches).toEqual([]);
   });
 
+  it("agrees on the topics derived from published Posts and Articles", async () => {
+    const mismatches: string[] = [];
+    for (const id of profiles) {
+      const [rest, direct] = await Promise.all([
+        pageRest.publicationTopics({ profileId: id, limit: 8 }),
+        pageSql.publicationTopics({ profileId: id, limit: 8 }),
+      ]);
+      mismatches.push(
+        ...differences(rest, direct).map((line) => `${id} writing topics: ${line}`)
+      );
+    }
+    expect(mismatches).toEqual([]);
+  });
+
+  it("agrees on topic-grounded Related Thinkers for a logged-out viewer", async () => {
+    const mismatches: string[] = [];
+    for (const id of profiles) {
+      const topics = await pageSql.publicationTopics({ profileId: id, limit: 6 });
+      const input = {
+        profileId: id,
+        topicKeys: topics.map((topic) => topic.key),
+        viewerId: null,
+        limit: 3,
+      };
+      const [rest, direct] = await Promise.all([
+        pageRest.relatedThinkers(input),
+        pageSql.relatedThinkers(input),
+      ]);
+      mismatches.push(
+        ...differences(rest, direct).map((line) => `${id} related thinkers: ${line}`)
+      );
+    }
+    expect(mismatches).toEqual([]);
+  });
+
   it("agrees on the owner's drafts, and on refusing them to anyone else", async () => {
     // The service-role client bypasses RLS, so this compares the repositories'
     // own owner check and filters, which is the whole authorization on the

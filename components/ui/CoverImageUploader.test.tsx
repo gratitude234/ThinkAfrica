@@ -71,6 +71,11 @@ describe("CoverImageUploader", () => {
     await waitFor(() =>
       expect(onUpload).toHaveBeenCalledWith("https://cdn.example/cover.png")
     );
+    expect(mockUpload).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(File),
+      expect.objectContaining({ upsert: true, contentType: "image/png" })
+    );
     expect(onUploadingChange).toHaveBeenNthCalledWith(1, true);
     expect(onUploadingChange).toHaveBeenLastCalledWith(false);
     expect(screen.getByRole("img", { name: "Cover" })).toHaveAttribute(

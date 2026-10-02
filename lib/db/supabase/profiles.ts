@@ -16,11 +16,11 @@ import type {
 
 /**
  * Exactly the columns a writer's profile renders. The publishing reset, Phase
- * 2G, dropped the persona, positioning, organisation, cover and alumni columns
- * from it, and added `created_at` for the joined date on About.
+ * 2G dropped persona, positioning, organisation and alumni columns. Profile V3
+ * Phase 3 restores the optional cover image and keeps `created_at` for About.
  */
 export const PROFILE_IDENTITY_SELECT =
-  "id, username, full_name, bio, avatar_url, professional_title, country, university, field_of_study, graduation_year, interests, organization_website, verified, verified_type, created_at";
+  "id, username, full_name, bio, avatar_url, cover_image_url, professional_title, country, university, field_of_study, graduation_year, interests, organization_website, verified, verified_type, created_at";
 
 export const supabaseProfilesRepository: ProfilesRepository = {
   // Unused, for the same reason as posts.findBySlug: RLS is applied by the

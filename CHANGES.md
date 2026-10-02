@@ -1,3 +1,37 @@
+## 2026-10-02 — Profile V3 Phase 4 published-topic intelligence and full record
+
+- Added **Writes about** as a derived signal from normalized topic keys on real published Posts and Articles; reading interests remain a separate feed preference.
+- Added provider-neutral publication-topic reads for both Supabase and direct PostgreSQL profile paths, with per-publication topic de-duplication and deterministic ranking.
+- Added the live `/:username/record` route as a flat, paginated chronological history of current Posts + Articles only.
+- Linked Intellectual Record to the full record page and added profile-funnel tracking for work opened there.
+- Consolidated zero-work Overview states: owners get one clear publishing prompt while visitors get a quiet non-actionable state.
+- Kept legacy Post titles hidden in the full record and did not restore Research, Debates, Responses, Citations, Peer Review or the old evidence-heavy record system.
+- Added responsive record-page styling, a dedicated loading state, dev-preview data and regression coverage for topic derivation, pagination and empty states.
+- No Phase 4 database migration is required; the implementation reuses the existing `posts.topic_keys` classification.
+
+## 2026-10-02 — Profile V3 Phase 2 Selected Work
+
+- Added one owner-selected published Post or Article at the top of the public Overview without restoring the retired three-item Featured Work manager.
+- Added the `set_my_selected_work(uuid)` migration/RPC with authenticated-only execution, explicit Data API grants, owner/published/content-kind validation, and atomic clear/replace behavior.
+- Added provider-neutral Selected Work reads for both Supabase and direct PostgreSQL profile paths.
+- Added a Selected Work section to Edit Profile with independent save state and a bounded latest-publications chooser.
+- Kept legacy Post titles hidden by using Post excerpts as the selection label and public selected-work text.
+- Added a dedicated profile funnel surface for Selected Work opens and prevented Selected Work from immediately repeating in Recent Work.
+- Extended Profile V3 regression, repository, migration, settings and component coverage.
+- Cover image work remains deferred to the next phase.
+
+## 2026-10-02 — Profile V3 work-first foundation
+
+- Reframed the public member page as a work-first intellectual profile while keeping the existing Indegenius application shell.
+- Reordered tabs to Overview, Posts, Articles and About, with Drafts owner-only.
+- Added a lightweight Intellectual Record based only on real published Posts + Articles and replaced split previews with one mixed Recent Work stream.
+- Added provider-neutral publication counts for both Supabase and direct PostgreSQL profile reads.
+- Moved biography/education/location/reading interests into supporting Overview context and stopped presenting reading interests as demonstrated writing topics.
+- Extended the two-step onboarding profile with an optional headline and unified composer ProfileGate validation with onboarding identity rules.
+- Updated responsive profile geometry, loading/dev-preview states and regression/architecture tests.
+- Added `docs/profile-v3-contract.md`; the earlier Intellectual Profile V2 record contract is now historical context.
+- No schema migration was added; Featured Work and cover-image reintroduction remain deferred pending deployed-schema verification.
+
 ## 2026-09-27 — Write redesign mockup parity restoration
 
 - Audited the live `/write` Post and Article screens against the supplied Write
@@ -168,3 +202,21 @@
 - Replace the remaining raw `<img>` usage in `landing/page.tsx` and `write/PublishDrawer.tsx` with a safe image strategy so the lingering build warnings are cleared without breaking remote previews.
 - Fix the existing `NotificationBell` hook dependency warning and the `UniversitySelect` `aria-expanded` issue; they predated this pass and still show up on build.
 - Add a proper `metadataBase` configuration so social metadata stops falling back to `http://localhost:3000` during build.
+
+## 2026-10-02 — Profile V3 Phase 3
+
+- Restored the optional profile cover as a restrained public banner using the existing `profiles.cover_image_url` column.
+- Reused the existing `post-images` storage bucket and `CoverImageUploader`; profile covers write to the fixed `covers/{userId}/profile-cover` path and save through the server-side profile media action.
+- Added cover support to both public profile identity adapters and Edit Profile settings without making cover part of onboarding or profile completion.
+- Added a truthful rolling 12-month Intellectual Record activity timeline from published Posts + Articles only.
+- Kept Supabase and direct-Postgres activity reads behaviorally aligned; the Supabase path pages timestamp-only rows instead of downloading full publications or issuing twelve count requests.
+- No new database migration is required for Phase 3; it uses schema/storage capabilities already present in the project.
+
+## 2026-10-02 — Profile V3 Phase 5
+
+- Added **Related Thinkers** to the public profile as a topic-grounded intellectual-network surface.
+- A recommendation now requires demonstrated overlap in normalized topics from real published Posts/Articles; follows cannot create a match by themselves.
+- Public follow relationships are used only as a secondary ranking/context signal, and the current viewer's follow state powers the existing compact Follow control.
+- Candidate identity comes from the safe directory projection on Supabase and the equivalent visibility/directory predicate on direct PostgreSQL, so hidden-from-directory profiles do not become recommendations.
+- Related Thinkers intentionally excludes the current viewer from their own recommendation list and remains supplemental: a recommendation failure is logged and omitted rather than taking the profile down.
+- No new table, RPC or migration was added in Phase 5.

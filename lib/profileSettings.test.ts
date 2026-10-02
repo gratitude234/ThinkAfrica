@@ -19,8 +19,8 @@ const draft = (overrides: Partial<ProfileDetailsDraft> = {}): ProfileDetailsDraf
 });
 
 describe("Edit profile", () => {
-  it("is Profile, Topics and Visibility", () => {
-    expect([...PROFILE_SETTINGS_SECTIONS]).toEqual(["profile", "topics", "visibility"]);
+  it("is Profile, Selected Work, Topics and Visibility", () => {
+    expect([...PROFILE_SETTINGS_SECTIONS]).toEqual(["profile", "selected-work", "topics", "visibility"]);
   });
 });
 

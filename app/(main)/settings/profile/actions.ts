@@ -123,6 +123,21 @@ export async function saveTopicsSection(input: {
   });
 }
 
+export async function saveSelectedWorkSection(input: {
+  postId: string | null;
+}): Promise<SectionSaveResult> {
+  return withViewer(async (supabase, userId) => {
+    const postId = typeof input.postId === "string" && input.postId.trim() ? input.postId.trim() : null;
+    const result = await supabase.rpc("set_my_selected_work", { p_post_id: postId });
+    if (result.error) {
+      return { ok: false, error: result.error.message || "Could not save selected work. Try again." };
+    }
+
+    revalidateProfile(await currentUsername(supabase, userId));
+    return { ok: true };
+  });
+}
+
 export async function saveVisibilitySection(input: {
   profileVisibility: string;
   showInDirectory: boolean;

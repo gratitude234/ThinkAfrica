@@ -1,5 +1,8 @@
 # Intellectual Profile V2 contract
 
+> **Superseded for current implementation by [`profile-v3-contract.md`](./profile-v3-contract.md).**
+> This document is retained as historical design context only. Profile V3 is work-first, derives its lightweight Intellectual Record from live Posts + Articles, and does not restore the retired evidence/credibility record system.
+
 > **Changed since this was written.** Responses are retired (publishing reset,
 > Phase 2C). The record no longer offers a `responses` filter; an entry the
 > database view classifies as `response` is shown and counted as a

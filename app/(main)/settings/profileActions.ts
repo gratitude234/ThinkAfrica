@@ -2,10 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import {
-  getProfileUsernameError,
-  normalizeProfileUsername,
-} from "@/lib/profileUsername";
+import { getOnboardingProfileError } from "@/lib/onboarding";
+import { normalizeProfileUsername } from "@/lib/profileUsername";
 import {
   profileUpdateMessage,
   updateOwnProfile,
@@ -54,10 +52,10 @@ async function revalidateForViewer(
 // ---------------------------------------------------------------------------
 
 /**
- * The avatar, which saves the moment an upload finishes rather than when the
- * form is submitted. It used to be written from the browser with a bare
- * update. The cover image this also accepted went with the profile cover in
- * Phase 2G.
+ * Profile media saves the moment an upload finishes rather than when the
+ * form is submitted. Profile V3 Phase 3 restores the optional cover image
+ * alongside the avatar, but both still pass through the same storage-host
+ * validation and self-editable profile mutation boundary.
  *
  * The URL is not trusted as a string: an arbitrary value here would let a
  * member point their avatar at any host, which is an image-based tracking
@@ -66,6 +64,7 @@ async function revalidateForViewer(
  */
 export async function saveProfileMedia(input: {
   avatarUrl?: string | null;
+  coverUrl?: string | null;
 }): Promise<ActionResult<null>> {
   const viewer = await requireViewer();
   if (!viewer) return fail(NOT_SIGNED_IN);
@@ -76,6 +75,12 @@ export async function saveProfileMedia(input: {
     const value = normalizeStorageUrl(input.avatarUrl);
     if (value === INVALID) return fail("That image could not be saved.");
     patch.avatar_url = value;
+  }
+
+  if (input.coverUrl !== undefined) {
+    const value = normalizeStorageUrl(input.coverUrl);
+    if (value === INVALID) return fail("That image could not be saved.");
+    patch.cover_image_url = value;
   }
 
   if (Object.keys(patch).length === 0) return fail("There was nothing to save.");
@@ -91,7 +96,7 @@ export async function saveProfileMedia(input: {
 const INVALID = Symbol("invalid-storage-url");
 
 /**
- * A profile image must live in this project's own storage.
+ * Profile media must live in this project's own storage.
  *
  * The client uploads to Supabase Storage and then reports the public URL, so
  * the only legitimate values are that host's or a relative path. Anything else
@@ -307,12 +312,14 @@ export async function completeProfileGate(input: {
   if (!viewer) return fail(NOT_SIGNED_IN);
 
   const fullName = input.fullName.trim();
-  if (!fullName) return fail("Enter your full name.");
-  if (fullName.length > 120) return fail("That name is too long.");
-
   const username = normalizeProfileUsername(input.username);
-  const usernameError = getProfileUsernameError(username);
-  if (usernameError) return fail(usernameError);
+  const problem = getOnboardingProfileError({
+    fullName,
+    username,
+    headline: "",
+    bio: "",
+  });
+  if (problem) return fail(problem);
 
   const supabase = await createClient();
   const result = await updateOwnProfile(supabase, {

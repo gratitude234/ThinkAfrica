@@ -4,14 +4,15 @@ import {
   PROFILE_TAB_KIND,
   PROFILE_TABS,
   profilePublicationKind,
+  profileRecordHref,
   profileTabHref,
   resolveProfilePage,
   resolveProfileTab,
 } from "./profileTabs";
 
 describe("the profile tabs", () => {
-  it("are Overview, About, Articles and Posts, opening on Overview", () => {
-    expect([...PROFILE_TABS]).toEqual(["overview", "about", "articles", "posts"]);
+  it("are Overview, Posts, Articles and About, opening on Overview", () => {
+    expect([...PROFILE_TABS]).toEqual(["overview", "posts", "articles", "about"]);
     expect(DEFAULT_PROFILE_TAB).toBe("overview");
   });
 
@@ -43,6 +44,13 @@ describe("the profile tabs", () => {
     expect(profileTabHref("ada", "about")).toBe("/ada?view=about");
     expect(profileTabHref("ada", "posts", 2)).toBe("/ada?view=posts&page=2");
     expect(profileTabHref("ada", "articles", 3)).toBe("/ada?view=articles&page=3");
+  });
+
+
+  it("builds canonical full-record addresses with defensive pagination", () => {
+    expect(profileRecordHref("ada")).toBe("/ada/record");
+    expect(profileRecordHref("ada", 1)).toBe("/ada/record");
+    expect(profileRecordHref("ada", 3)).toBe("/ada/record?page=3");
   });
 
   it("read a page number defensively", () => {

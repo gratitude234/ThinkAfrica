@@ -3,7 +3,12 @@ import "server-only";
 import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getDatabase } from "@/lib/db";
-import type { ProfilePublicationRow } from "@/lib/db/profilePage";
+import type {
+  ProfilePublicationActivityPoint,
+  ProfilePublicationRow,
+  ProfileRelatedThinker,
+  ProfileWritingTopic,
+} from "@/lib/db/profilePage";
 import { profilePageRepository } from "@/lib/db/readAdapter";
 import type { ProfileIdentityRecord } from "@/lib/db/types";
 import {
@@ -19,11 +24,11 @@ import { sanitizePostExcerpt } from "@/lib/utils";
 /**
  * The server-side data layer for a writer's profile.
  *
- * A profile is a header and one of its tabs (see lib/profileTabs.ts): Overview, About,
- * Articles and Posts for everyone, and Drafts for the owner. The header needs
+ * A profile is a header and one of its tabs (see lib/profileTabs.ts): Overview, Posts,
+ * Articles and About for everyone, and Drafts for the owner. The header needs
  * the identity row, the two relationship counts and, for a signed-in
  * stranger, their relationship to the profile. Posts and Articles each add one
- * page of that kind, and Drafts adds the owner's drafts. Overview reads two bounded publication previews concurrently. About adds
+ * page of that kind, and Drafts adds the owner's drafts. Overview reads one bounded mixed work stream plus exact Post/Article totals. About adds
  * nothing: everything it shows is on the identity row.
  *
  * Two rules the callers depend on.
@@ -35,14 +40,18 @@ import { sanitizePostExcerpt } from "@/lib/utils";
  * route's error boundary takes it. Collapsing the two is what once made a
  * database outage report that every member's profile did not exist.
  *
- * Nothing here is degradable. The counts are stated as facts in the header
- * and the list is what the page is, so a failure in either throws rather than
- * printing zero followers or an empty tab.
+ * Core profile facts are not degradable. The counts are stated as facts in the
+ * header and the publication lists are what the page is, so failures there
+ * throw rather than printing zero followers or an empty tab. Related Thinkers
+ * is the one deliberate exception: it is supplemental discovery context, so a
+ * recommendation failure is logged and omitted instead of taking the profile
+ * down.
  */
 
 export type { ProfileIdentityRecord } from "@/lib/db/types";
 
 export const PROFILE_PUBLICATION_PAGE_SIZE = 20;
+export const PROFILE_RECORD_PAGE_SIZE = 24;
 
 export interface ProfileViewerContext {
   viewerId: string | null;
@@ -89,12 +98,43 @@ export interface ProfileViewData {
   profile: ProfileIdentityRecord;
   viewer: ProfileViewerContext;
   tab: ProfileTab;
-  /** Present for Posts and Articles only. Overview has its own bounded previews. */
+  /** Present for Posts and Articles only. Overview has its own mixed work stream. */
   publications: ProfilePublicationPage | null;
   /** Present only on the owner's Drafts tab. */
   drafts: ProfileDraft[] | null;
-  overview: { articles: ProfilePublicationPage; posts: ProfilePublicationPage } | null;
+  overview: ProfileOverviewData | null;
 }
+
+export interface ProfileOverviewData {
+  selectedWork: ProfilePublication | null;
+  recentWork: ProfilePublication[];
+  articleCount: number;
+  postCount: number;
+  totalPublished: number;
+  activity: ProfilePublicationActivityPoint[];
+  writingTopics: ProfileWritingTopic[];
+  relatedThinkers: ProfileRelatedThinker[];
+}
+
+export interface ProfileRecordPage {
+  items: ProfilePublication[];
+  page: number;
+  pageSize: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+  articleCount: number;
+  postCount: number;
+  totalPublished: number;
+  writingTopics: ProfileWritingTopic[];
+}
+
+export interface ProfileRecordViewData {
+  profile: ProfileIdentityRecord;
+  viewerId: string | null;
+  isOwnProfile: boolean;
+  record: ProfileRecordPage;
+}
+
 
 /**
  * Wraps a failed query in something a server log can hold. A gateway in front
@@ -253,6 +293,203 @@ export async function loadProfilePublications({
   };
 }
 
+/** Mixed newest-first public work for the work-first Overview. */
+export async function loadProfileRecentWork({
+  supabase,
+  profileId,
+  limit = 6,
+}: {
+  supabase: SupabaseClient;
+  profileId: string;
+  limit?: number;
+}): Promise<ProfilePublication[]> {
+  let branches;
+  try {
+    branches = await profilePageRepository(supabase).publicationBranches({
+      profileId,
+      contentKinds: ["post", "article"],
+      start: 0,
+      limit,
+    });
+  } catch (error) {
+    throw queryFailure(
+      "recent work failed",
+      error instanceof Error ? error.message : String(error)
+    );
+  }
+
+  return branches.owned
+    .map((row) => {
+      const kind = profilePublicationKind(row);
+      return kind ? toPublication(row, kind, false) : null;
+    })
+    .filter((item): item is ProfilePublication => Boolean(item))
+    .sort((left, right) => {
+      const leftAt = left.publishedAt ?? left.createdAt;
+      const rightAt = right.publishedAt ?? right.createdAt;
+      return rightAt.localeCompare(leftAt) || right.id.localeCompare(left.id);
+    })
+    .slice(0, limit);
+}
+
+function profileActivityStartMonth(now = new Date(), months = 12) {
+  const start = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1)
+  );
+  return start.toISOString();
+}
+
+export async function loadProfileOverview({
+  supabase,
+  profileId,
+  viewerId,
+}: {
+  supabase: SupabaseClient;
+  profileId: string;
+  viewerId: string | null;
+}): Promise<ProfileOverviewData> {
+  const repository = profilePageRepository(supabase);
+  const [recentWork, counts, selectedRow, activity, writingTopics] = await Promise.all([
+    loadProfileRecentWork({ supabase, profileId, limit: 7 }),
+    repository.publicationCounts(profileId),
+    repository.selectedWork(profileId),
+    repository.publicationActivity({
+      profileId,
+      startMonth: profileActivityStartMonth(),
+      months: 12,
+    }),
+    repository.publicationTopics({ profileId, limit: 6 }),
+  ]);
+  const selectedKind = selectedRow ? profilePublicationKind(selectedRow) : null;
+
+  const selectedWork = selectedRow && selectedKind
+    ? toPublication(selectedRow, selectedKind, false)
+    : null;
+
+  let relatedThinkers: ProfileRelatedThinker[] = [];
+  if (writingTopics.length > 0) {
+    try {
+      relatedThinkers = await repository.relatedThinkers({
+        profileId,
+        topicKeys: writingTopics.map((topic) => topic.key),
+        viewerId,
+        limit: 3,
+      });
+    } catch (error) {
+      // Related Thinkers is a discovery aid, not a stated profile fact. A
+      // recommendation timeout must not turn a healthy public profile into an
+      // error page; the core record above remains strict and non-degradable.
+      console.warn("[profile] related thinkers unavailable", error);
+    }
+  }
+
+  return {
+    selectedWork,
+    recentWork: recentWork.filter((item) => item.id !== selectedWork?.id).slice(0, 6),
+    articleCount: counts.articleCount,
+    postCount: counts.postCount,
+    totalPublished: counts.articleCount + counts.postCount,
+    activity,
+    writingTopics,
+    relatedThinkers,
+  };
+}
+
+/**
+ * One chronological page of the complete public record. Unlike the Posts and
+ * Articles tabs, this mixes both current product kinds into one history.
+ */
+export async function loadProfileRecord({
+  supabase,
+  profileId,
+  page = 1,
+  pageSize = PROFILE_RECORD_PAGE_SIZE,
+}: {
+  supabase: SupabaseClient;
+  profileId: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<ProfileRecordPage> {
+  const safePage = Math.max(1, Math.trunc(page));
+  const safePageSize = Math.max(1, Math.min(50, Math.trunc(pageSize)));
+  const start = (safePage - 1) * safePageSize;
+  const repository = profilePageRepository(supabase);
+
+  let branches;
+  let counts;
+  let writingTopics;
+  try {
+    [branches, counts, writingTopics] = await Promise.all([
+      repository.publicationBranches({
+        profileId,
+        contentKinds: ["post", "article"],
+        start,
+        limit: safePageSize + 1,
+      }),
+      repository.publicationCounts(profileId),
+      repository.publicationTopics({ profileId, limit: 8 }),
+    ]);
+  } catch (error) {
+    throw queryFailure(
+      "profile record failed",
+      error instanceof Error ? error.message : String(error)
+    );
+  }
+
+  const items = branches.owned
+    .map((row) => {
+      const kind = profilePublicationKind(row);
+      return kind ? toPublication(row, kind, false) : null;
+    })
+    .filter((item): item is ProfilePublication => Boolean(item))
+    .sort((left, right) => {
+      const leftAt = left.publishedAt ?? left.createdAt;
+      const rightAt = right.publishedAt ?? right.createdAt;
+      return rightAt.localeCompare(leftAt) || right.id.localeCompare(left.id);
+    });
+
+  return {
+    items: items.slice(0, safePageSize),
+    page: safePage,
+    pageSize: safePageSize,
+    hasPreviousPage: safePage > 1,
+    hasNextPage: items.length > safePageSize,
+    articleCount: counts.articleCount,
+    postCount: counts.postCount,
+    totalPublished: counts.articleCount + counts.postCount,
+    writingTopics,
+  };
+}
+
+export async function loadProfileRecordView({
+  supabase,
+  username,
+  page = 1,
+}: {
+  supabase: SupabaseClient;
+  username: string;
+  page?: number;
+}): Promise<ProfileRecordViewData | null> {
+  const [profile, viewer] = await Promise.all([
+    loadProfileIdentity(supabase, username),
+    getCurrentUser(),
+  ]);
+  if (!profile) return null;
+
+  const record = await loadProfileRecord({
+    supabase,
+    profileId: profile.id,
+    page,
+  });
+
+  return {
+    profile,
+    viewerId: viewer?.id ?? null,
+    isOwnProfile: viewer?.id === profile.id,
+    record,
+  };
+}
+
 /**
  * The owner's Drafts tab. Owner-only on two levels: the route asks only when
  * the signed-in viewer is the profile, and the repository answers empty for
@@ -292,7 +529,8 @@ export async function loadProfileDrafts({
 /**
  * The one entry point the route needs. Wave 1 is the identity row and the
  * session; wave 2 is the viewer context and, on a list tab, one page of it,
- * or on the owner's Drafts tab, their drafts. Drafts requested by anyone but
+ * or on the owner's Drafts tab, their drafts. Overview additionally reads the
+ * one Selected Work pointer when present. Drafts requested by anyone but
  * the owner fall back to the default tab before anything is loaded.
  */
 export async function loadProfileView({
@@ -338,10 +576,11 @@ export async function loadProfileView({
         })
       : Promise.resolve(null),
     effectiveTab === "overview"
-      ? Promise.all([
-          loadProfilePublications({ supabase, profileId: profile.id, kind: "article", pageSize: 2 }),
-          loadProfilePublications({ supabase, profileId: profile.id, kind: "post", pageSize: 2 }),
-        ]).then(([articles, posts]) => ({ articles, posts }))
+      ? loadProfileOverview({
+          supabase,
+          profileId: profile.id,
+          viewerId: viewer?.id ?? null,
+        })
       : Promise.resolve(null),
   ]);
 

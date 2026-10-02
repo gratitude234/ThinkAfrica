@@ -7,15 +7,15 @@ import { PROFILE_SETTINGS_SECTIONS } from "@/lib/profileSettings";
 import { OWNER_PROFILE_TABS, PROFILE_TABS, PUBLIC_PROFILE_TABS } from "@/lib/profileTabs";
 
 /**
- * A public writer profile, not an Intellectual Record product. Minimal
+ * A public writer profile with a lightweight Intellectual Record derived from real published work. Minimal
  * onboarding, not an identity questionnaire.
  *
- * The publishing reset, Phase 2G, replaced the record overview, the full
- * record page, Featured Work, evidence labels, record metrics, the Background
+ * The publishing reset, Phase 2G, replaced the old evidence-heavy record
+ * system, Featured Work, evidence labels, record metrics, the Background
  * rail, the persona taxonomy, the profile Command Center, the four-step
  * onboarding questionnaire, AI topic suggestions and the admin Profile
- * Credibility section with a header and three tabs, a two-step onboarding and
- * a three-section Edit profile.
+ * Credibility section. Profile V3 restores only a lightweight chronological
+ * /:username/record page built from current Posts and Articles.
  *
  * This guards the application only. It reads no SQL migration: the database
  * objects those features used are deferred, not gone. Comments are stripped
@@ -80,7 +80,6 @@ function isProfileSurface(file: string) {
 }
 
 const RETIRED_PATHS = [
-  "app/(main)/[username]/record",
   "app/(main)/[username]/actions.ts",
   "components/profile/EvidenceLabels.tsx",
   "components/profile/EvidenceLegend.tsx",
@@ -123,7 +122,7 @@ describe("simple writer profile: the retired modules are gone", () => {
   it("imports and renders none of them", () => {
     expect(
       filesMatching(
-        /\b(?:profileRecord(?:Data|Metrics)?|intellectualRecord|profileCommandCenter(?:Data)?|profileOwnerAnalytics|featuredWork|topicSuggestions|geminiTopicSuggestions|profileTypes|EvidenceLabels|EvidenceLegend|FeaturedWork(?:Manager|Section)?|ProfileBackground|ProfileIdentityPanel|ProfilePreview|ProfileRecordCard|ProfileSectionNav|ProfileStickyBar|IntellectualRecordWelcome|ProfileForm|ProfileCommandCenter|IdentitySection|FocusSection|BackgroundSection)\b/
+        /\b(?:profileRecord(?:Data|Metrics)?\b|intellectualRecord|profileCommandCenter(?:Data)?|profileOwnerAnalytics|featuredWork|topicSuggestions|geminiTopicSuggestions|profileTypes|EvidenceLabels|EvidenceLegend|FeaturedWork(?:Manager|Section)?|ProfileBackground|ProfileIdentityPanel|ProfilePreview|ProfileRecordCard|ProfileSectionNav|ProfileStickyBar|IntellectualRecordWelcome|ProfileForm|ProfileCommandCenter|IdentitySection|FocusSection|BackgroundSection)\b/
       )
     ).toEqual([]);
   });
@@ -137,12 +136,12 @@ describe("simple writer profile: the retired modules are gone", () => {
 
 describe("simple writer profile: the profile", () => {
   it("uses the approved four public tabs", () => {
-    expect([...PROFILE_TABS]).toEqual(["overview", "about", "articles", "posts"]);
+    expect([...PROFILE_TABS]).toEqual(["overview", "posts", "articles", "about"]);
   });
 
   it("adds Drafts for the owner only", () => {
-    expect([...PUBLIC_PROFILE_TABS]).toEqual(["overview", "about", "articles", "posts"]);
-    expect([...OWNER_PROFILE_TABS]).toEqual(["overview", "about", "articles", "posts", "drafts"]);
+    expect([...PUBLIC_PROFILE_TABS]).toEqual(["overview", "posts", "articles", "about"]);
+    expect([...OWNER_PROFILE_TABS]).toEqual(["overview", "posts", "articles", "about", "drafts"]);
 
     const tabs = codeOf("components/profile/ProfileTabs.tsx");
     expect(tabs).toMatch(/isOwnProfile \? OWNER_PROFILE_TABS : PUBLIC_PROFILE_TABS/);
@@ -181,24 +180,23 @@ describe("simple writer profile: the profile", () => {
     );
   });
 
-  it("sends the record address to the profile, permanently", async () => {
+  it("keeps the lightweight full record page live without restoring the old record system", async () => {
+    expect(existsSync(join(process.cwd(), "app/(main)/[username]/record/page.tsx"))).toBe(true);
     const redirects = (await nextConfig.redirects?.()) ?? [];
-    expect(redirects.find((entry) => entry.source === "/:username/record")).toMatchObject({
-      destination: "/:username",
-      permanent: true,
-    });
+    expect(redirects.find((entry) => entry.source === "/:username/record")).toBeUndefined();
+    expect(codeOf("app/(main)/[username]/record/page.tsx")).not.toMatch(/\.from\(|\.rpc\(/);
   });
 
-  it("uses no record, evidence, credibility or completion language on a profile, onboarding or settings surface", () => {
+  it("uses no retired evidence, credibility or completion language on a profile, onboarding or settings surface", () => {
     expect(
       filesMatching(
-        /Intellectual Record|intellectual identity|intellectual focus|evidence-backed|Demonstrated (?:expertise|topics)|credibility|citable|source-backed|Featured Work|Selected work|Why I featured|% complete|Complete your profile|Complete profile/i,
+        /intellectual identity|intellectual focus|evidence-backed|Demonstrated (?:expertise|topics)|credibility|citable|source-backed|Featured Work|Why I featured|% complete|Complete your profile|Complete profile/i,
         { within: isProfileSurface }
       )
     ).toEqual([]);
   });
 
-  it("reads and writes no persona, positioning, organisation, cover or alumni field where a profile is shown or edited", () => {
+  it("reads and writes no retired persona, positioning, organisation or alumni field where a profile is shown or edited", () => {
     const identitySurfaces = new Set([
       "lib/db/supabase/profiles.ts",
       "lib/db/postgres/profiles.ts",
@@ -221,7 +219,7 @@ describe("simple writer profile: the profile", () => {
     ]);
     expect(
       filesMatching(
-        /\b(?:profile_type|secondary_profile_types|positioning_statement|organization_name|organization_website|is_alumni|open_to_mentoring|cover_image_url|coverImageUrl|current_path|work_category)\b/,
+        /\b(?:profile_type|secondary_profile_types|positioning_statement|organization_name|organization_website|is_alumni|open_to_mentoring|current_path|work_category)\b/,
         {
           allowed: {
             "lib/db/supabase/profiles.ts": "Existing external link projection",
@@ -237,10 +235,10 @@ describe("simple writer profile: the profile", () => {
     ).toEqual([]);
   });
 
-  it("reads none of the record, featured work, onboarding preference or topic quota data", () => {
+  it("keeps retired record systems gone while allowing the single Selected Work path", () => {
     expect(
       filesMatching(
-        /\.from\(\s*["'](?:profile_featured_posts|profile_record_entries|user_onboarding_preferences|ai_topic_suggestion_quotas)["']|\bpublic\.(?:profile_featured_posts|profile_record_entries|user_onboarding_preferences)\b/
+        /\.from\(\s*["'](?:profile_record_entries|user_onboarding_preferences|ai_topic_suggestion_quotas)["']|\bpublic\.(?:profile_record_entries|user_onboarding_preferences)\b/
       )
     ).toEqual([]);
     expect(
@@ -248,6 +246,7 @@ describe("simple writer profile: the profile", () => {
         /\.rpc\(\s*["'](?:complete_onboarding|save_onboarding_[a-z]+|get_my_onboarding_state|get_public_profile_record_summary(?:_v2)?|replace_my_featured_posts(?:_v2)?|claim_ai_topic_suggestion_quota)["']/
       )
     ).toEqual([]);
+    expect(codeOf("app/(main)/settings/profile/actions.ts")).toContain('rpc("set_my_selected_work"');
   });
 });
 
@@ -281,8 +280,8 @@ describe("simple writer profile: onboarding", () => {
 });
 
 describe("simple writer profile: settings", () => {
-  it("edits the profile in three sections", () => {
-    expect([...PROFILE_SETTINGS_SECTIONS]).toEqual(["profile", "topics", "visibility"]);
+  it("edits the profile in four focused sections", () => {
+    expect([...PROFILE_SETTINGS_SECTIONS]).toEqual(["profile", "selected-work", "topics", "visibility"]);
   });
 
   it("writes through the column allowlist, and reads no profile row on the account settings page", () => {

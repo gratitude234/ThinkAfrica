@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import AvatarUploader from "@/app/(main)/settings/AvatarUploader";
+import CoverImageUploader from "@/components/ui/CoverImageUploader";
 import { saveProfileMedia } from "@/app/(main)/settings/profileActions";
 import UniversitySelect from "@/components/ui/UniversitySelect";
 import { AFRICAN_COUNTRIES } from "@/lib/academicIdentity";
@@ -41,7 +42,7 @@ function draftFrom(model: ProfileSettingsModel): ProfileDetailsDraft {
 }
 
 /**
- * Photo, name, username, headline and bio, then location and education.
+ * Photo and optional cover, name, username, headline and bio, then location and education.
  *
  * The headline is free text in the member's own words, which is what replaced
  * the persona picker. Location and education are ordinary optional facts:
@@ -51,6 +52,7 @@ export default function ProfileSection({ model }: { model: ProfileSettingsModel 
   const [draft, setDraft] = useState<ProfileDetailsDraft>(() => draftFrom(model));
   const [saved, setSaved] = useState<ProfileDetailsDraft>(() => draftFrom(model));
   const [avatarUrl, setAvatarUrl] = useState(model.avatarUrl);
+  const [coverUrl, setCoverUrl] = useState(model.coverImageUrl);
 
   const isDirty = JSON.stringify(draft) !== JSON.stringify(saved);
   useUnsavedChangesWarning(isDirty);
@@ -83,7 +85,7 @@ export default function ProfileSection({ model }: { model: ProfileSettingsModel 
       status={status}
       error={error}
       canSave={!problem}
-      footnote="Your photo saves as soon as it finishes uploading. Everything else saves when you choose Save."
+      footnote="Your photo and cover save as soon as they finish uploading. Everything else saves when you choose Save."
       onSave={() =>
         void save(async () => {
           const result = await saveProfileSection(draft);
@@ -110,6 +112,32 @@ export default function ProfileSection({ model }: { model: ProfileSettingsModel 
           onUpload={(url) => {
             setAvatarUrl(url);
             void saveProfileMedia({ avatarUrl: url });
+          }}
+        />
+      </div>
+
+      <div>
+        <div className="mb-1 flex items-baseline justify-between gap-3">
+          <p className="block text-sm font-medium text-ink-soft">
+            Cover <span className="text-xs font-normal text-ink-muted">(optional)</span>
+          </p>
+          <p className="text-xs text-ink-muted">A short banner on your public profile.</p>
+        </div>
+        <CoverImageUploader
+          initialUrl={coverUrl ?? undefined}
+          bucket="post-images"
+          variant="dropzone"
+          previewHeightClass="h-36 sm:h-40"
+          emptyTitle="Add profile cover"
+          emptyHint="JPG, PNG, or WebP, up to 5MB"
+          buildPath={(userId) => `covers/${userId}/profile-cover`}
+          onUpload={(url) => {
+            setCoverUrl(url);
+            void saveProfileMedia({ coverUrl: url });
+          }}
+          onRemove={() => {
+            setCoverUrl(null);
+            void saveProfileMedia({ coverUrl: null });
           }}
         />
       </div>

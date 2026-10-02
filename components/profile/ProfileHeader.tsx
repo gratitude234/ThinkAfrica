@@ -183,6 +183,13 @@ export default function ProfileHeader({
     <>
       <ProfileViewTracker profileId={profile.id} viewerState={viewerState} />
       <section id="profile-identity" aria-labelledby="profile-name" className="profile-identity">
+        {profile.cover_image_url ? (
+          <div className="profile-cover" aria-label="Profile cover">
+            {/* The URL is constrained server-side to this project's Supabase Storage host. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={profile.cover_image_url} alt="" className="profile-cover-image" />
+          </div>
+        ) : null}
         <div className="profile-identity-top">
           <div className="flex min-w-0 items-center gap-4">
             <UserAvatar

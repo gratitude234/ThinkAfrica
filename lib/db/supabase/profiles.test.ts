@@ -68,6 +68,7 @@ const PROFILE_ROW = {
   full_name: "A Student",
   bio: null,
   avatar_url: null,
+  cover_image_url: null,
   professional_title: "Policy researcher",
   country: "Nigeria",
   university: "University of Lagos",
@@ -92,7 +93,7 @@ describe("PROFILE_IDENTITY_SELECT", () => {
     expect(columns).toEqual(Object.keys(PROFILE_ROW));
   });
 
-  it("names no private column and no retired one", () => {
+  it("names no private column and no retired identity field", () => {
     for (const column of [
       "signup_email",
       "email",
@@ -102,7 +103,6 @@ describe("PROFILE_IDENTITY_SELECT", () => {
       "profile_type",
       "secondary_profile_types",
       "organization_name",
-      "cover_image_url",
       "is_alumni",
       "open_to_mentoring",
     ]) {

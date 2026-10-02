@@ -7,7 +7,7 @@ import ProfileSettings from "./ProfileSettings";
 
 export const metadata: Metadata = {
   title: "Edit profile",
-  description: "Edit your public profile, topics and visibility.",
+  description: "Edit your public profile, selected work, topics and visibility.",
 };
 
 /**

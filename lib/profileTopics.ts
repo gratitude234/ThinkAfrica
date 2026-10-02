@@ -1,3 +1,5 @@
+import { getExactCanonicalTag } from "@/lib/tags";
+
 /**
  * Display casing for one interest.
  *
@@ -19,4 +21,14 @@ export function formatInterestLabel(interest: string) {
     /(^|[- /])([a-z])/g,
     (_match, prefix: string, letter: string) => prefix + letter.toUpperCase()
   );
+}
+
+/**
+ * Display label for a topic demonstrated by published work. `topic_keys` is
+ * normalized lowercase for matching; canonical platform topics recover their
+ * curated casing, while free-form topics use the same restrained title casing
+ * as reading interests.
+ */
+export function formatPublishedTopicLabel(topic: string) {
+  return getExactCanonicalTag(topic) ?? formatInterestLabel(topic);
 }

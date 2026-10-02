@@ -29,6 +29,7 @@ export interface OnboardingProfileSnapshot {
   full_name: string | null;
   username: string | null;
   avatar_url: string | null;
+  professional_title: string | null;
   bio: string | null;
   interests: string[] | null;
 }
@@ -44,7 +45,7 @@ export type OnboardingResult =
   | { ok: true; data: OnboardingState }
   | { ok: false; reason: "unauthorized" | "unavailable" };
 
-const PROFILE_SELECT = "full_name, username, avatar_url, bio, interests";
+const PROFILE_SELECT = "full_name, username, avatar_url, professional_title, bio, interests";
 
 export async function loadOnboardingState(): Promise<OnboardingResult> {
   const user = await getCurrentUser();

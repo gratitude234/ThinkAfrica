@@ -23,6 +23,7 @@ import {
 import { loadOnboardingState } from "@/lib/onboardingActions";
 import {
   PROFILE_BIO_MAX_LENGTH,
+  PROFILE_HEADLINE_MAX_LENGTH,
   PROFILE_NAME_MAX_LENGTH,
 } from "@/lib/profileIdentity";
 import {
@@ -53,7 +54,7 @@ const TITLES: Record<OnboardingStep, string> = {
 
 const SUBTITLES: Record<OnboardingStep, string> = {
   profile:
-    "Your name and a username are all you need. A photo and a bio are optional.",
+    "Your name and username create your public identity. A photo, headline and bio are optional.",
   topics:
     "Pick a few topics to shape your feed. You can skip this and change it later.",
 };
@@ -85,6 +86,7 @@ export default function OnboardingClient({ requestedStep }: OnboardingClientProp
   const [username, setUsername] = useState("");
   const [savedUsername, setSavedUsername] = useState("");
   const [usernameCheck, setUsernameCheck] = useState<UsernameCheck>("idle");
+  const [headline, setHeadline] = useState("");
   const [bio, setBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [interests, setInterests] = useState<string[]>([]);
@@ -148,6 +150,7 @@ export default function OnboardingClient({ requestedStep }: OnboardingClientProp
       setFullName(storedName);
       setUsername(storedUsername);
       setSavedUsername(storedUsername);
+      setHeadline(profile.professional_title ?? "");
       setBio(profile.bio ?? "");
       setAvatarUrl(profile.avatar_url);
       setInterests(storedInterests);
@@ -209,11 +212,11 @@ export default function OnboardingClient({ requestedStep }: OnboardingClientProp
         ? "Couldn't check that username. Try again."
         : null);
 
-  const profileError = getOnboardingProfileError({ fullName, username, bio });
+  const profileError = getOnboardingProfileError({ fullName, username, headline, bio });
   const canContinue = !profileError && usernameCheck === "idle";
 
   const saveProfile = async () => {
-    const problem = getOnboardingProfileError({ fullName, username, bio });
+    const problem = getOnboardingProfileError({ fullName, username, headline, bio });
     if (problem) {
       setError(problem);
       return;
@@ -221,7 +224,7 @@ export default function OnboardingClient({ requestedStep }: OnboardingClientProp
 
     setLoading(true);
     setError(null);
-    const result = await saveOnboardingProfile({ fullName, username, bio });
+    const result = await saveOnboardingProfile({ fullName, username, headline, bio });
     setLoading(false);
 
     if (!result.ok) {
@@ -236,6 +239,7 @@ export default function OnboardingClient({ requestedStep }: OnboardingClientProp
       metadata: {
         step: "profile",
         has_avatar: Boolean(avatarUrl),
+        has_headline: headline.trim().length > 0,
         has_bio: bio.trim().length > 0,
       },
     });
@@ -412,6 +416,21 @@ export default function OnboardingClient({ requestedStep }: OnboardingClientProp
                     (usernameCheck === "checking"
                       ? "Checking availability…"
                       : `Your profile will live at /${normalizedUsername || "username"}.`)}
+                </span>
+              </label>
+
+              <label className="block">
+                <FieldLabel>Headline (optional)</FieldLabel>
+                <input
+                  type="text"
+                  value={headline}
+                  onChange={(event) => setHeadline(event.target.value)}
+                  maxLength={PROFILE_HEADLINE_MAX_LENGTH}
+                  placeholder="e.g. Writing about public health in West Africa"
+                  className={INPUT_STYLES}
+                />
+                <span className="mt-1.5 block text-right text-xs text-ink-muted">
+                  {headline.length}/{PROFILE_HEADLINE_MAX_LENGTH}
                 </span>
               </label>
 

@@ -1,5 +1,6 @@
 import {
   PROFILE_BIO_MAX_LENGTH,
+  PROFILE_HEADLINE_MAX_LENGTH,
   PROFILE_NAME_MAX_LENGTH,
 } from "@/lib/profileIdentity";
 import {
@@ -10,7 +11,7 @@ import {
 /**
  * Onboarding is two steps: a profile, then topics.
  *
- * The profile step needs a display name and a username. A photo and a bio are
+ * The profile step needs a display name and a username. A photo, headline and bio are
  * optional. Topics are optional too, and "Skip for now" finishes without them.
  *
  * The publishing reset, Phase 2G, replaced the four-step identity
@@ -49,6 +50,7 @@ export function parseOnboardingStep(
 export interface OnboardingProfileDraft {
   fullName: string;
   username: string;
+  headline?: string;
   bio: string;
 }
 
@@ -68,6 +70,10 @@ export function getOnboardingProfileError(
     normalizeProfileUsername(draft.username)
   );
   if (usernameError) return usernameError;
+
+  if ((draft.headline ?? "").trim().length > PROFILE_HEADLINE_MAX_LENGTH) {
+    return `Keep your headline to ${PROFILE_HEADLINE_MAX_LENGTH} characters or fewer.`;
+  }
 
   if (draft.bio.length > PROFILE_BIO_MAX_LENGTH) {
     return `Keep your bio to ${PROFILE_BIO_MAX_LENGTH} characters or fewer.`;

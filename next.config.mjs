@@ -63,10 +63,6 @@ const nextConfig = {
       // Notifications, the nearest thing to where that activity lived.
       { source: "/messages", destination: "/notifications", permanent: true },
       { source: "/messages/:path*", destination: "/notifications", permanent: true },
-      // The full Intellectual Record page went in Phase 2G. A writer's work is
-      // on their profile's Posts and Articles tabs, and the query string
-      // carries through, so an old ?type=posts still opens Posts.
-      { source: "/:username/record", destination: "/:username", permanent: true },
       // Phase 2H removed author and topic subscriptions, the leaderboard and
       // My Stats, with points and publication delivery. Follow is the one
       // relationship left, and a writer's views and likes are on the dashboard.

@@ -13,6 +13,8 @@ export interface PublicProfileIdentity {
   full_name: string | null;
   bio: string | null;
   avatar_url: string | null;
+  /** Optional short public profile banner. */
+  cover_image_url?: string | null;
   /** The member's own headline. Stored in `profiles.professional_title`. */
   professional_title?: string | null;
   verified?: boolean;

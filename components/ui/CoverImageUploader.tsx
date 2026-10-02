@@ -107,7 +107,7 @@ export default function CoverImageUploader({
 
         const { error: uploadError } = await supabase.storage
           .from(bucket)
-          .upload(path, file, { upsert: true });
+          .upload(path, file, { upsert: true, contentType: file.type });
 
         if (uploadError) {
           failWith(`Upload failed: ${uploadError.message}`);

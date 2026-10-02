@@ -34,6 +34,7 @@ describe("profile funnel event contract", () => {
   it("names the surfaces a funnel step can start from", () => {
     expect([...PROFILE_FUNNEL_SURFACES]).toEqual([
       "profile_header",
+      "profile_selected_work",
       "profile_posts",
       "profile_articles",
     ]);

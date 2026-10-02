@@ -5,10 +5,12 @@ import type { ProfileSettingsModel } from "@/lib/profileSettings";
 import ProfileSettings from "./ProfileSettings";
 
 const saveProfileSection = vi.hoisted(() => vi.fn());
+const saveSelectedWorkSection = vi.hoisted(() => vi.fn());
 const saveTopicsSection = vi.hoisted(() => vi.fn());
 const saveVisibilitySection = vi.hoisted(() => vi.fn());
 vi.mock("./actions", () => ({
   saveProfileSection,
+  saveSelectedWorkSection,
   saveTopicsSection,
   saveVisibilitySection,
 }));
@@ -20,6 +22,7 @@ vi.mock("@/app/(main)/settings/profileActions", () => ({
 // Both upload or search against real services; neither is what these tests
 // are about.
 vi.mock("@/app/(main)/settings/AvatarUploader", () => ({ default: () => null }));
+vi.mock("@/components/ui/CoverImageUploader", () => ({ default: () => <div data-testid="cover-uploader" /> }));
 vi.mock("@/components/ui/UniversitySelect", () => ({
   default: ({ value }: { value: string }) => (
     <input aria-label="University search" readOnly value={value} />
@@ -37,6 +40,7 @@ const model: ProfileSettingsModel = {
   username: "ada",
   fullName: "Ada Nwosu",
   avatarUrl: null,
+  coverImageUrl: null,
   headline: "Policy researcher",
   bio: "A biography.",
   country: "Nigeria",
@@ -44,6 +48,11 @@ const model: ProfileSettingsModel = {
   fieldOfStudy: "",
   graduationYear: "",
   interests: ["Education"],
+  selectedWorkId: null,
+  selectedWorkOptions: [
+    { id: "article-1", title: "A public argument", kind: "article", publishedAt: "2026-09-01T00:00:00Z" },
+    { id: "post-1", title: "A short post", kind: "post", publishedAt: "2026-08-28T00:00:00Z" },
+  ],
   visibility: { profileVisibility: "public", showInDirectory: true },
 };
 
@@ -56,22 +65,23 @@ function section(name: string) {
 beforeEach(() => {
   vi.clearAllMocks();
   saveProfileSection.mockResolvedValue({ ok: true, username: "ada" });
+  saveSelectedWorkSection.mockResolvedValue({ ok: true });
   saveTopicsSection.mockResolvedValue({ ok: true });
   saveVisibilitySection.mockResolvedValue({ ok: true });
 });
 
 describe("Edit profile", () => {
-  it("is Profile, Topics and Visibility, and nothing else", () => {
+  it("is Profile, Selected Work, Topics and Visibility", () => {
     render(<ProfileSettings model={model} />);
 
     expect(screen.getByRole("heading", { name: "Edit profile", level: 1 })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "View profile" })).toHaveAttribute("href", "/ada");
     expect(
       screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent)
-    ).toEqual(["Profile", "Topics", "Visibility"]);
+    ).toEqual(["Profile", "Selected Work", "Topics", "Visibility"]);
   });
 
-  it("asks for no persona, focus statement, organisation, cover, featured work or completion", () => {
+  it("asks for no persona, focus statement, organisation, old Featured Work manager or completion", () => {
     const { container } = render(<ProfileSettings model={model} />);
     const text = container.textContent ?? "";
 
@@ -79,7 +89,6 @@ describe("Edit profile", () => {
       /Profile type/i,
       /Intellectual focus/i,
       /Organi[sz]ation/i,
-      /Cover photo/i,
       /Featured Work/i,
       /Intellectual Record/i,
       /Demonstrated topics/i,
@@ -98,6 +107,7 @@ describe("Edit profile", () => {
     for (const label of ["Name", "Username", "Headline", "Bio", "Location", "Field of study", "Graduation year"]) {
       expect(within(profile).getByLabelText(new RegExp(`^${label}`))).toBeInTheDocument();
     }
+    expect(within(profile).getByTestId("cover-uploader")).toBeInTheDocument();
   });
 });
 
@@ -171,6 +181,20 @@ describe("section save states", () => {
 
     expect(within(profile).getByRole("button", { name: "Save" })).toBeDisabled();
     expect(within(profile).getAllByRole("alert").length).toBeGreaterThan(0);
+  });
+
+  it("saves one Selected Work independently", async () => {
+    const user = setup();
+    render(<ProfileSettings model={model} />);
+    const selected = section("Selected Work");
+
+    await user.click(within(selected).getByRole("radio", { name: /A public argument/i }));
+    await user.click(within(selected).getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(saveSelectedWorkSection).toHaveBeenCalledWith({ postId: "article-1" })
+    );
+    expect(saveProfileSection).not.toHaveBeenCalled();
   });
 
   it("saves topics on their own", async () => {

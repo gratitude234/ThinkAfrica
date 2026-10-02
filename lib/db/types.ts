@@ -108,9 +108,10 @@ export interface Database {
  * moving a private read behind an adapter before its authorization semantics
  * are explicit is exactly what the Phase 4 brief says not to do.
  *
- * The publishing reset, Phase 2G, took the persona type, the positioning
- * statement, the organisation, the cover image and the alumni flag out of it.
- * Their columns are still in the database; nothing on a profile reads them.
+ * The publishing reset, Phase 2G, took the persona type, positioning,
+ * organisation, cover and alumni flag out of this projection. Profile V3
+ * Phase 3 deliberately restores only the optional cover image; the other
+ * retired identity fields stay absent.
  *
  * Mirrors `ProfileIdentityRecord` in lib/profileViewData.ts, which re-exports
  * this so no caller has to move.
@@ -123,6 +124,8 @@ export interface ProfileIdentityRecord {
   full_name: string | null;
   bio: string | null;
   avatar_url: string | null;
+  /** Optional short public profile banner. */
+  cover_image_url?: string | null;
   /** The member's own headline, shown under their name. */
   professional_title: string | null;
   /** Location, on About. */

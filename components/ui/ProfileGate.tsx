@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
 import { completeProfileGate } from "@/app/(main)/settings/profileActions";
 import { checkUsernameAvailable } from "@/lib/composerActions";
+import { getOnboardingProfileError } from "@/lib/onboarding";
+import { normalizeProfileUsername } from "@/lib/profileUsername";
 
 interface ProfileGateProfile {
   full_name: string | null;
@@ -53,7 +55,7 @@ export default function ProfileGate({
   useEffect(() => {
     if (!open || hasUsername) return;
 
-    const normalizedUsername = username.trim().toLowerCase();
+    const normalizedUsername = normalizeProfileUsername(username);
     if (!normalizedUsername) {
       setUsernameError("Username is required.");
       setCheckingUsername(false);
@@ -82,12 +84,27 @@ export default function ProfileGate({
   }, [hasUsername, open, userId, username]);
 
   const canSubmit = useMemo(() => {
-    if (!hasFullName && !fullName.trim()) return false;
-    if (!hasUsername && (!username.trim() || Boolean(usernameError) || checkingUsername)) {
-      return false;
-    }
+    const candidateName = hasFullName ? initialProfile?.full_name ?? "" : fullName;
+    const candidateUsername = hasUsername ? initialProfile?.username ?? "" : username;
+    const problem = getOnboardingProfileError({
+      fullName: candidateName,
+      username: candidateUsername,
+      headline: "",
+      bio: "",
+    });
+    if (problem) return false;
+    if (!hasUsername && (Boolean(usernameError) || checkingUsername)) return false;
     return true;
-  }, [checkingUsername, fullName, hasFullName, hasUsername, username, usernameError]);
+  }, [
+    checkingUsername,
+    fullName,
+    hasFullName,
+    hasUsername,
+    initialProfile?.full_name,
+    initialProfile?.username,
+    username,
+    usernameError,
+  ]);
 
   if (!open) return null;
 
@@ -100,7 +117,7 @@ export default function ProfileGate({
       full_name: hasFullName ? (initialProfile?.full_name ?? "") : fullName.trim(),
       username: hasUsername
         ? (initialProfile?.username ?? "")
-        : username.trim().toLowerCase().replace(/\s+/g, ""),
+        : normalizeProfileUsername(username),
       // Carried through untouched for the composer's own state. The gate asks
       // for a name and a username only.
       university: initialProfile?.university ?? null,

@@ -16,12 +16,67 @@ beforeEach(() => { deletion.mockReset(); });
 
 describe("approved writer profile", () => {
   it("keeps the four Overview sections in order", () => {
+    const articles = profileFixturePage("article").items;
+    const posts = profileFixturePage("post").items;
     render(<ProfileOverview data={{ profile: PROFILE_FIXTURE,
       viewer: { viewerId: null, isOwnProfile: false, isFollowing: false, isBlocked: false, followerCount: 1, followingCount: 2 },
-      tab: "overview", overview: { articles: profileFixturePage("article"), posts: profileFixturePage("post") }, publications: null, drafts: null }} />);
-    expect(screen.getAllByRole("heading", { level: 2 }).map(node => node.textContent)).toEqual(["Recent articles", "Recent posts", "Writes about", "At a glance"]);
-    expect(screen.queryByText("Current role")).not.toBeInTheDocument();
+      tab: "overview", overview: { selectedWork: null, recentWork: [...articles, ...posts], articleCount: 2, postCount: 2, totalPublished: 4, activity: [
+        { month: "2025-11", count: 1 }, { month: "2025-12", count: 0 },
+        { month: "2026-01", count: 2 }, { month: "2026-02", count: 1 },
+        { month: "2026-03", count: 3 }, { month: "2026-04", count: 2 },
+        { month: "2026-05", count: 4 }, { month: "2026-06", count: 3 },
+        { month: "2026-07", count: 5 }, { month: "2026-08", count: 4 },
+        { month: "2026-09", count: 6 }, { month: "2026-10", count: 2 },
+      ], writingTopics: [
+        { key: "politics & governance", count: 3 },
+        { key: "education policy", count: 2 },
+      ], relatedThinkers: [] }, publications: null, drafts: null }} />);
+    expect(screen.getAllByRole("heading", { level: 2 }).map(node => node.textContent)).toEqual(["Intellectual Record", "Recent Work", "About", "Writes about", "Interests"]);
+    expect(screen.getByText("Published work built on Indegenius.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Last 12 months", level: 3 })).toBeInTheDocument();
+    expect(screen.getByLabelText("Published works by month")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "View Posts" })).toHaveAttribute("href", "/amara?view=posts");
+    expect(screen.getByRole("link", { name: "View full record" })).toHaveAttribute("href", "/amara/record");
+    expect(screen.getByRole("link", { name: "Politics & Governance" })).toHaveAttribute("href", "/topics/politics%20%26%20governance");
   });
+
+  it("places an author-selected published work before the Intellectual Record", () => {
+    const selected = profileFixturePage("article").items[0];
+    render(<ProfileOverview data={{ profile: PROFILE_FIXTURE,
+      viewer: { viewerId: null, isOwnProfile: false, isFollowing: false, isBlocked: false, followerCount: 1, followingCount: 2 },
+      tab: "overview", overview: { selectedWork: selected, recentWork: [], articleCount: 2, postCount: 2, totalPublished: 4, activity: [
+        { month: "2025-11", count: 1 }, { month: "2025-12", count: 0 },
+        { month: "2026-01", count: 2 }, { month: "2026-02", count: 1 },
+        { month: "2026-03", count: 3 }, { month: "2026-04", count: 2 },
+        { month: "2026-05", count: 4 }, { month: "2026-06", count: 3 },
+        { month: "2026-07", count: 5 }, { month: "2026-08", count: 4 },
+        { month: "2026-09", count: 6 }, { month: "2026-10", count: 2 },
+      ], writingTopics: [], relatedThinkers: [] }, publications: null, drafts: null }} />);
+    const headings = screen.getAllByRole("heading", { level: 2 }).map(node => node.textContent);
+    expect(headings[0]).toBe(selected.title);
+    expect(headings[1]).toBe("Intellectual Record");
+  });
+
+  it("gives a zero-work owner one clear publishing state instead of empty modules", () => {
+    render(<ProfileOverview data={{ profile: PROFILE_FIXTURE,
+      viewer: { viewerId: PROFILE_FIXTURE.id, isOwnProfile: true, isFollowing: false, isBlocked: false, followerCount: 0, followingCount: 0 },
+      tab: "overview", overview: { selectedWork: null, recentWork: [], articleCount: 0, postCount: 0, totalPublished: 0, activity: [], writingTopics: [], relatedThinkers: [] }, publications: null, drafts: null }} />);
+    expect(screen.getByRole("heading", { name: "Build your intellectual record" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Write a Post" })).toHaveAttribute("href", "/write");
+    expect(screen.getByRole("link", { name: "Write an Article" })).toHaveAttribute("href", "/write?editor=article");
+    expect(screen.queryByRole("heading", { name: "Intellectual Record" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Recent Work" })).not.toBeInTheDocument();
+  });
+
+  it("gives a zero-work visitor a quiet state without owner actions", () => {
+    render(<ProfileOverview data={{ profile: PROFILE_FIXTURE,
+      viewer: { viewerId: null, isOwnProfile: false, isFollowing: false, isBlocked: false, followerCount: 0, followingCount: 0 },
+      tab: "overview", overview: { selectedWork: null, recentWork: [], articleCount: 0, postCount: 0, totalPublished: 0, activity: [], writingTopics: [], relatedThinkers: [] }, publications: null, drafts: null }} />);
+    expect(screen.getByRole("heading", { name: "No published work yet" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Write a Post" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Write an Article" })).not.toBeInTheDocument();
+  });
+
   it("never renders a Post title, even when a legacy row has one", () => {
     const page = profileFixturePage("post"); page.items[0].title = "Legacy title must stay hidden";
     render(<ProfilePublicationList username="amara" profileId="fixture" tab="posts" publications={page} isOwnProfile={false} viewerState="anonymous" />);
@@ -53,7 +108,7 @@ describe("approved writer profile", () => {
     render(<ProfileTabs username="amara" active="overview" isOwnProfile />);
     const overview = screen.getByRole("tab", { name: "Overview" }); overview.focus();
     fireEvent.keyDown(overview, { key: "ArrowRight" });
-    expect(screen.getByRole("tab", { name: "About" })).toHaveFocus();
+    expect(screen.getByRole("tab", { name: "Posts" })).toHaveFocus();
     expect(overview).toHaveAttribute("aria-selected", "true");
     fireEvent.keyDown(document.activeElement!, { key: "End" });
     expect(screen.getByRole("tab", { name: "Drafts" })).toHaveFocus();

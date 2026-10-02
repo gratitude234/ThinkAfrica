@@ -27,6 +27,7 @@ import {
   loadProfileDrafts,
   loadProfileIdentity,
   loadProfilePublications,
+  loadProfileRecord,
   loadProfileView,
   loadProfileViewerContext,
 } from "./profileViewData";
@@ -50,10 +51,10 @@ function makeClient({ routes = {} }: { routes?: Routes } = {}) {
   const rpcNames: string[] = [];
   /** Every table call with its equality filters, so a test can tell a drafts
    *  query from a publications query on the same table. */
-  const queries: Array<{ table: string; eq: Array<[string, unknown]>; ranges: number[][]; kinds: string[][] }> = [];
+  const queries: Array<{ table: string; eq: Array<[string, unknown]>; ranges: number[][]; kinds: string[][]; selects: string[] }> = [];
 
   const chainFor = (table: string) => {
-    const query = { table, eq: [] as Array<[string, unknown]>, ranges: [] as number[][], kinds: [] as string[][] };
+    const query = { table, eq: [] as Array<[string, unknown]>, ranges: [] as number[][], kinds: [] as string[][], selects: [] as string[] };
     queries.push(query);
     const resolve = () => {
       const route = routes[table] ?? { data: null, error: null };
@@ -65,9 +66,10 @@ function makeClient({ routes = {} }: { routes?: Routes } = {}) {
       then: (onOk: unknown, onErr: unknown) =>
         resolve().then(onOk as never, onErr as never),
     };
-    for (const method of ["select", "neq", "in", "or", "not", "order", "limit", "range"]) {
+    for (const method of ["neq", "or", "not", "order", "limit", "overlaps"]) {
       chain[method] = () => chain;
     }
+    chain.select = (columns: string) => { query.selects.push(columns); return chain; };
     chain.range = (start: number, end: number) => { query.ranges.push([start, end]); return chain; };
     chain.in = (_column: string, values: string[]) => { query.kinds.push(values); return chain; };
     chain.eq = (column: string, value: unknown) => {
@@ -100,6 +102,7 @@ const PROFILE_ROW = {
   full_name: "A Student",
   bio: null,
   avatar_url: null,
+  cover_image_url: null,
   professional_title: null,
   country: "Nigeria",
   university: "University of Lagos",
@@ -122,6 +125,8 @@ function row(overrides: Record<string, unknown>) {
     created_at: "2026-01-01T00:00:00Z",
     published_at: "2026-01-01T00:00:00Z",
     cover_image_url: null,
+    topic_keys: [],
+    word_count: 800,
     ...overrides,
   };
 }
@@ -452,7 +457,7 @@ describe("the owner's Drafts tab", () => {
 
     expect(data?.tab).toBe("overview");
     expect(data?.drafts).toBeNull();
-    expect(data?.overview?.posts.kind).toBe("post");
+    expect(data?.overview?.recentWork).toBeDefined();
     expect(draftQueries(queries)).toEqual([]);
   });
 
@@ -495,25 +500,92 @@ describe("the owner's Drafts tab", () => {
 
 
 describe("Overview bounded public reads", () => {
-  it("loads two items of each canonical kind, with one lookahead and no draft query", async () => {
+  it("loads one mixed Recent Work stream plus exact Post and Article counts", async () => {
     findIdentityByUsername.mockResolvedValue(PROFILE_ROW);
     const { client, queries } = makeClient({ routes: {
       follows: { count: 2, data: null },
-      posts: { data: [row({ id: "one" }), row({ id: "two" }), row({ id: "three" })] },
+      posts: {
+        count: 2,
+        data: [
+          row({ id: "article-one", content_kind: "article", published_at: "2026-03-02T00:00:00Z", topic_keys: ["politics & governance", "education policy"] }),
+          row({ id: "post-one", content_kind: "post", published_at: "2026-03-01T00:00:00Z", topic_keys: ["politics & governance"] }),
+        ],
+      },
     } });
     const data = await loadProfileView({ supabase: client, username: "student1" });
     expect(data?.tab).toBe("overview");
     expect(data?.drafts).toBeNull();
     expect(data?.publications).toBeNull();
-    expect(data?.overview?.articles.items).toHaveLength(2);
-    expect(data?.overview?.posts.items).toHaveLength(2);
+    expect(data?.overview?.recentWork.map(item => [item.id, item.kind])).toEqual([
+      ["article-one", "article"],
+      ["post-one", "post"],
+    ]);
+    expect(data?.overview).toMatchObject({
+      articleCount: 2, postCount: 2, totalPublished: 4,
+      writingTopics: [
+        { key: "politics & governance", count: 2 },
+        { key: "education policy", count: 1 },
+      ],
+      relatedThinkers: [],
+    });
+
     const reads = queries.filter(query => query.table === "posts");
-    expect(reads).toHaveLength(2);
-    expect(reads.map(query => query.kinds)).toEqual([[["article"]], [["post"]]]);
-    for (const read of reads) {
+    expect(reads).toHaveLength(6);
+    const recent = reads.find(query => query.ranges.some(([start, end]) => start === 0 && end === 6));
+    expect(recent?.kinds).toEqual([["post", "article"]]);
+    expect(recent?.eq).toContainEqual(["status", "published"]);
+    expect(recent?.eq).toContainEqual(["author_id", "author-1"]);
+    expect(recent?.ranges).toEqual([[0, 6]]);
+
+    const countReads = reads.filter(query => query.selects.includes("id") && query.ranges.length === 0);
+    expect(countReads).toHaveLength(2);
+    for (const read of countReads) {
       expect(read.eq).toContainEqual(["status", "published"]);
       expect(read.eq).toContainEqual(["author_id", "author-1"]);
-      expect(read.ranges).toEqual([[0, 2]]);
+      expect(read.ranges).toEqual([]);
     }
+
+    const activityReads = reads.filter(query => query.selects.includes("published_at, created_at"));
+    expect(activityReads).toHaveLength(1);
+    expect(activityReads[0]?.ranges).toEqual([[0, 499]]);
+    expect(activityReads[0]?.kinds).toEqual([["article", "post"]]);
+
+    const topicReads = reads.filter(query => query.selects.includes("topic_keys, published_at, created_at"));
+    expect(topicReads).toHaveLength(1);
+    expect(topicReads[0]?.ranges).toEqual([[0, 499]]);
+    expect(topicReads[0]?.kinds).toEqual([["article", "post"]]);
+    expect(data?.overview?.activity).toHaveLength(12);
+  });
+});
+
+describe("Full Intellectual Record", () => {
+  it("mixes only current Posts and Articles, paginates, and carries derived writing topics", async () => {
+    const many = Array.from({ length: 25 }, (_, index) =>
+      row({
+        id: `work-${index}`,
+        content_kind: index % 2 === 0 ? "article" : "post",
+        title: index % 2 === 0 ? `Article ${index}` : "Legacy Post title",
+        excerpt: `Excerpt ${index}`,
+        published_at: `2026-09-${String((index % 25) + 1).padStart(2, "0")}T00:00:00Z`,
+        topic_keys: index < 4 ? ["governance"] : index < 7 ? ["education policy"] : [],
+      })
+    );
+    const { client } = makeClient({ routes: { posts: { data: many, error: null, count: 8 } } });
+
+    const record = await loadProfileRecord({
+      supabase: client,
+      profileId: "author-1",
+      page: 1,
+      pageSize: 24,
+    });
+
+    expect(record.items).toHaveLength(24);
+    expect(record.hasNextPage).toBe(true);
+    expect(record.hasPreviousPage).toBe(false);
+    expect(record.items.every(item => item.kind === "post" || item.kind === "article")).toBe(true);
+    expect(record.writingTopics.slice(0, 2)).toEqual([
+      { key: "governance", count: 4 },
+      { key: "education policy", count: 3 },
+    ]);
   });
 });

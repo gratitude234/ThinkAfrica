@@ -9,9 +9,9 @@ describe("ProfileTabs", () => {
 
     expect(screen.getAllByRole("tab").map((link) => link.textContent)).toEqual([
       "Overview",
-      "About",
-      "Articles",
       "Posts",
+      "Articles",
+      "About",
     ]);
     expect(screen.queryByRole("tab", { name: "Drafts" })).not.toBeInTheDocument();
   });
@@ -21,9 +21,9 @@ describe("ProfileTabs", () => {
 
     expect(screen.getAllByRole("tab").map((link) => link.textContent)).toEqual([
       "Overview",
-      "About",
-      "Articles",
       "Posts",
+      "Articles",
+      "About",
       "Drafts",
     ]);
     expect(screen.getByRole("tab", { name: "Drafts" })).toHaveAttribute(

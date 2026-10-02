@@ -33,7 +33,48 @@ export default async function WriterProfilePreviewPage({ searchParams }: { searc
   const articles = profileFixturePage("article", empty);
   const posts = profileFixturePage("post", empty);
   const viewer = { viewerId: own ? profile.id : null, isOwnProfile: own, isFollowing: query.following === "1", isBlocked: false, followerCount: 128, followingCount: 42 };
-  const data: ProfileViewData = { profile, viewer, tab, overview: { articles, posts }, publications: null, drafts: own ? (empty ? [] : PROFILE_DRAFT_FIXTURES) : null };
+  const recentWork = [...articles.items, ...posts.items]
+    .sort((a, b) => (b.publishedAt ?? b.createdAt).localeCompare(a.publishedAt ?? a.createdAt))
+    .slice(0, 6);
+  const data: ProfileViewData = {
+    profile,
+    viewer,
+    tab,
+    overview: {
+      selectedWork: empty ? null : articles.items[0] ?? posts.items[0] ?? null,
+      recentWork,
+      articleCount: empty ? 0 : 24,
+      postCount: empty ? 0 : 86,
+      totalPublished: empty ? 0 : 110,
+      activity: [
+        { month: "2025-11", count: empty ? 0 : 3 },
+        { month: "2025-12", count: empty ? 0 : 5 },
+        { month: "2026-01", count: empty ? 0 : 4 },
+        { month: "2026-02", count: empty ? 0 : 6 },
+        { month: "2026-03", count: empty ? 0 : 5 },
+        { month: "2026-04", count: empty ? 0 : 7 },
+        { month: "2026-05", count: empty ? 0 : 8 },
+        { month: "2026-06", count: empty ? 0 : 7 },
+        { month: "2026-07", count: empty ? 0 : 9 },
+        { month: "2026-08", count: empty ? 0 : 8 },
+        { month: "2026-09", count: empty ? 0 : 10 },
+        { month: "2026-10", count: empty ? 0 : 6 },
+      ],
+      writingTopics: empty ? [] : [
+        { key: "politics & governance", count: 18 },
+        { key: "education policy", count: 12 },
+        { key: "african culture", count: 9 },
+        { key: "youth", count: 7 },
+      ],
+      relatedThinkers: empty ? [] : [
+        { id: "fixture-thinker-1", username: "tundereads", fullName: "Tunde Adebayo", avatarUrl: null, professionalTitle: "Policy researcher", sharedTopics: ["politics & governance", "education policy"], ownerFollows: true, followsOwner: true, viewerFollows: false, latestPublishedAt: "2026-10-01T09:00:00Z" },
+        { id: "fixture-thinker-2", username: "aminathinks", fullName: "Amina Yusuf", avatarUrl: null, professionalTitle: "Writer · Education", sharedTopics: ["education policy"], ownerFollows: false, followsOwner: true, viewerFollows: false, latestPublishedAt: "2026-09-29T09:00:00Z" },
+        { id: "fixture-thinker-3", username: "kwamemensah", fullName: "Kwame Mensah", avatarUrl: null, professionalTitle: "Urban policy writer", sharedTopics: ["politics & governance"], ownerFollows: false, followsOwner: false, viewerFollows: false, latestPublishedAt: "2026-09-27T09:00:00Z" },
+      ],
+    },
+    publications: null,
+    drafts: own ? (empty ? [] : PROFILE_DRAFT_FIXTURES) : null,
+  };
   return <AppChromeProvider>
     <NavigationShell user={null} profile={null} isAdmin={false} />
     <AppShell showGuestBanner={false} userId={null} username={null}>
@@ -43,7 +84,7 @@ export default async function WriterProfilePreviewPage({ searchParams }: { searc
         <StickyProfileBar username={profile.username} name={profile.full_name || profile.username} profileId={profile.id}
           currentUserId={viewer.viewerId} initialFollowing={viewer.isFollowing} isBlocked={false} active={tab} />
         <ProfileTabs username={profile.username} active={tab} isOwnProfile={own} />
-        <div id="profile-panel" role="tabpanel" aria-labelledby={`main-tab-${tab}`} tabIndex={0} className="profile-panel">
+        <div id="profile-panel" role="tabpanel" aria-labelledby={`main-tab-${tab}`} tabIndex={0} className={`profile-panel ${tab === "overview" ? "profile-panel-overview" : "profile-panel-reading"}`}>
           {tab === "overview" ? <ProfileOverview data={data} /> : tab === "about" ? <ProfileAbout profile={profile} isOwnProfile={own} />
             : tab === "drafts" && data.drafts ? <ProfileDraftList initialDrafts={data.drafts} />
             : tab === "articles" || tab === "posts" ? <ProfilePublicationList username={profile.username} profileId={profile.id}

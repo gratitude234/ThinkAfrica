@@ -31,6 +31,7 @@ import { createClient } from "@/lib/supabase/server";
 export async function saveOnboardingProfile(input: {
   fullName: string;
   username: string;
+  headline: string;
   bio: string;
 }): Promise<ActionResult<{ username: string }>> {
   const viewer = await requireViewer();
@@ -39,6 +40,7 @@ export async function saveOnboardingProfile(input: {
   const draft = {
     fullName: String(input.fullName ?? ""),
     username: String(input.username ?? ""),
+    headline: String(input.headline ?? ""),
     bio: String(input.bio ?? ""),
   };
   const problem = getOnboardingProfileError(draft);
@@ -51,6 +53,7 @@ export async function saveOnboardingProfile(input: {
     patch: {
       full_name: draft.fullName.trim(),
       username,
+      professional_title: draft.headline.trim() || null,
       bio: draft.bio.trim(),
     },
   });
