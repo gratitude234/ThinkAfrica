@@ -661,6 +661,11 @@ font-family: var(--font-inter), system-ui, sans-serif;
 .app-shell-with-rail.app-shell-home {
   padding: 0 16px calc(96px + env(safe-area-inset-bottom));
 }
+/* Explore follows the standalone mockup's tighter mobile reading gutter while
+   keeping the shared desktop rail geometry. */
+.app-shell-with-rail.app-shell-explore {
+  padding: 20px 16px calc(96px + env(safe-area-inset-bottom));
+}
 .app-side-rail { display: none; }
 .app-rail-write-label { display: none; }
 [data-app-primary-nav], [data-app-bottom-nav], .app-side-rail { font-family: var(--font-public-sans), system-ui, sans-serif; }
@@ -668,6 +673,7 @@ font-family: var(--font-inter), system-ui, sans-serif;
   :root { --app-rail-width: 56px; }
   .app-shell-with-rail { margin-left: var(--app-rail-width); padding: 28px 20px 64px; }
   .app-shell-with-rail.app-shell-home { margin-left: var(--app-rail-width); padding: 28px 20px 64px; }
+  .app-shell-with-rail.app-shell-explore { padding: 28px 20px 64px; }
   .app-side-rail { display: block; position: fixed; left: 0; top: var(--app-nav-offset); bottom: 0; width: var(--app-rail-width); padding: 24px 8px; overflow-y: auto; border-right: 0; background: #FAF8F5; z-index: 30; }
   .app-side-rail a, .app-side-rail button { position: relative; min-height: 40px; justify-content: center; padding-left: 8px; padding-right: 8px; }
   .app-rail-label { display: none; }

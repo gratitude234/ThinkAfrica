@@ -27,7 +27,7 @@ interface ExploreFeedProps {
   primary: ExplorePrimaryFilter;
   signedIn: boolean;
   surface: string;
-  /** Rendered after the third card, once the reading run has begun. */
+  /** After two cards on mobile and three on desktop, as in the mockup. */
   interlude?: ReactNode;
 }
 
@@ -71,12 +71,14 @@ export default function ExploreFeed({
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
+  const inFlightRef = useRef(false);
   const feedSessionIdRef = useRef(
     initialPosts[0]?.feed_exposure?.feedSessionId ?? crypto.randomUUID()
   );
 
   const loadMore = useCallback(async () => {
-    if (loading || !hasMore) return;
+    if (inFlightRef.current || !hasMore) return;
+    inFlightRef.current = true;
     setLoading(true);
     setFailed(false);
     const nextPage = page + 1;
@@ -114,7 +116,11 @@ export default function ExploreFeed({
       // a retry/corruption defense rather than as normal pagination logic.
       setPosts((current) => {
         const seen = new Set(current.map((post) => post.id));
-        return [...current, ...data.posts.filter((post) => !seen.has(post.id))];
+        return [...current, ...data.posts.filter((post) => {
+          if (seen.has(post.id)) return false;
+          seen.add(post.id);
+          return true;
+        })];
       });
       setHasMore(data.hasMore);
       setCursor(data.nextCursor ?? null);
@@ -138,9 +144,10 @@ export default function ExploreFeed({
     } catch {
       setFailed(true);
     } finally {
+      inFlightRef.current = false;
       setLoading(false);
     }
-  }, [cursor, hasMore, loading, page, primary, surface, tab]);
+  }, [cursor, hasMore, page, primary, surface, tab]);
 
   // The filter is pushed down to the query, so this is a safety net against a
   // page that returned something the filter excludes rather than a second,
@@ -149,7 +156,11 @@ export default function ExploreFeed({
 
   if (visible.length === 0) {
     return (
-      <ExploreFeedEmptyState primary={primary} signedIn={signedIn} />
+      <>
+        <ExploreFeedEmptyState tab={tab} primary={primary} signedIn={signedIn} />
+        {interlude}
+        {hasMore ? <ExploreFeedFooter hasMore={hasMore} loading={loading} failed={failed} onLoadMore={loadMore} /> : null}
+      </>
     );
   }
 
@@ -160,11 +171,14 @@ export default function ExploreFeed({
   const interludeIndex = Math.min(2, visible.length - 1);
 
   return (
-    <div>
+    <div aria-busy={loading}>
+      <p role="status" className="sr-only">{loading ? "Loading more publications" : `${visible.length} publications shown`}</p>
       {visible.map((post, index) => (
         <div key={post.id}>
           <PostCardImpression post={post} surface={surface} variant="explore" />
-          {interlude && index === interludeIndex ? interlude : null}
+          {interlude && visible.length <= 2 && index === interludeIndex ? interlude : null}
+          {interlude && visible.length > 2 && index === 1 ? <div className="sm:hidden">{interlude}</div> : null}
+          {interlude && visible.length > 2 && index === 2 ? <div className="hidden sm:block">{interlude}</div> : null}
         </div>
       ))}
 
@@ -179,9 +193,9 @@ export default function ExploreFeed({
 }
 
 const SECONDARY_ACTION_CLASS =
-  "inline-flex min-h-11 items-center rounded-lg border border-card-border bg-card px-4 py-2 text-sm font-medium text-ink-soft transition-colors hover:border-card-border-hover hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2";
+  "inline-flex min-h-10 items-center rounded-lg border border-card-border bg-card px-4 py-2 text-[13.5px] font-semibold text-ink-soft transition-colors hover:border-card-border-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2";
 const PRIMARY_ACTION_CLASS =
-  "inline-flex min-h-11 items-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0E4B37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 disabled:opacity-60";
+  "inline-flex min-h-10 items-center rounded-lg bg-emerald-brand px-4 py-2 text-[13.5px] font-semibold text-white transition-colors hover:bg-[#0E4B37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 disabled:opacity-60";
 
 function ExploreFeedFooter({
   hasMore,
@@ -197,7 +211,7 @@ function ExploreFeedFooter({
   if (failed) {
     return (
       <div className="flex flex-col items-center gap-2 py-6 text-center">
-        <p className="text-byline font-medium text-ink">
+        <p role="alert" className="text-byline font-medium text-ink">
           Those posts didn&apos;t load.
         </p>
         <button type="button" onClick={onLoadMore} className={SECONDARY_ACTION_CLASS}>
@@ -246,9 +260,11 @@ function ExploreFeedFooter({
  * even when the real cause was a content-type filter with nothing behind it.
  */
 function ExploreFeedEmptyState({
+  tab,
   primary,
   signedIn,
 }: {
+  tab: ExploreFeedTab;
   primary: ExplorePrimaryFilter;
   signedIn: boolean;
 }) {
@@ -258,7 +274,7 @@ function ExploreFeedEmptyState({
   let detail: string;
 
   if (filtered) {
-    heading = `No ${getPrimaryFilterLabel(primary)} published yet.`;
+    heading = `No ${getPrimaryFilterLabel(primary).toLowerCase()} in this view yet.`;
     detail = "Nothing matches this content type right now. Try another filter.";
   } else if (signedIn) {
     heading = "Nothing to show here yet.";
@@ -269,12 +285,12 @@ function ExploreFeedEmptyState({
   }
 
   return (
-    <div className="rounded-xl border border-dashed border-card-border bg-card px-6 py-10 text-center">
-      <p className="text-byline font-medium text-ink">{heading}</p>
-      <p className="mx-auto mt-1.5 max-w-md text-meta text-ink-muted">{detail}</p>
+    <div className="border-t border-divider px-5 py-9 text-center sm:py-10">
+      <p className="text-[14px] font-semibold text-ink">{heading}</p>
+      <p className="mx-auto mt-1.5 max-w-md text-[12.5px] text-ink-muted">{detail}</p>
       <div className="mt-4 flex flex-wrap justify-center gap-2">
         {filtered ? (
-          <Link href="/explore" className={SECONDARY_ACTION_CLASS}>
+          <Link href={tab === "trending" ? "/explore?tab=trending" : "/explore"} className={SECONDARY_ACTION_CLASS}>
             Clear filters
           </Link>
         ) : (

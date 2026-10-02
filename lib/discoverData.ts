@@ -312,6 +312,8 @@ export async function getDiscoverData(
     getFeed(supabase, {
       tab: "home",
       timeframe: "week",
+      // Keep the same viewer exclusions as the continuation request.
+      excludedAuthorIds: userContext.blockedIds,
       userId: null,
       userInterests: [],
       followedIds: [],

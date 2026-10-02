@@ -200,6 +200,152 @@ export default function PostCard({ post, variant = "standard" }: PostCardProps) 
     <GradientThumbnail kind={kind} className={thumbnailClass} />
   );
 
+  if (isExplore) {
+    const primaryTag = post.tags?.find((tag) => tag.trim()) ?? null;
+    const exploreThumbnail = hasCoverImage ? (
+      <PostCover
+        src={post.cover_image_url}
+        alt={displayTitle}
+        content_kind={post.content_kind}
+        sizes="(max-width: 639px) 56px, 72px"
+        className="h-14 w-14 rounded-lg sm:h-[72px] sm:w-[72px]"
+        imageClassName="object-cover"
+      />
+    ) : kind === "article" ? (
+      <div
+        aria-hidden="true"
+        className="h-14 w-14 rounded-lg sm:h-[72px] sm:w-[72px]"
+        style={{
+          backgroundImage:
+            "repeating-linear-gradient(135deg,#F0EDE6,#F0EDE6 6px,#E6E1D9 6px,#E6E1D9 12px)",
+        }}
+      />
+    ) : null;
+
+    const authorLine = (
+      <div className="flex min-w-0 items-center gap-2">
+        {author?.avatar_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={author.avatar_url}
+            alt={authorName}
+            className={kind === "article" ? "hidden h-[22px] w-[22px] shrink-0 rounded-full object-cover sm:block" : "h-6 w-6 shrink-0 rounded-full object-cover sm:h-[26px] sm:w-[26px]"}
+          />
+        ) : (
+          <span className={`${kind === "article" ? "hidden h-[22px] w-[22px] sm:flex text-[9.5px]" : "flex h-6 w-6 sm:h-[26px] sm:w-[26px] text-[10px] sm:text-[11px]"} shrink-0 items-center justify-center rounded-full bg-green-tint font-bold text-emerald-ink`}>
+            {getInitials(authorName)}
+          </span>
+        )}
+        {authorHref ? (
+          <Link
+            href={authorHref}
+            className={`${kind === "article" ? "text-[11px] sm:text-[12.5px]" : "text-[12.5px] sm:text-[13.5px]"} min-w-0 truncate font-semibold text-ink transition-colors hover:text-emerald-ink`}
+          >
+            {authorName}
+          </Link>
+        ) : (
+          <span className={`${kind === "article" ? "text-[11px] sm:text-[12.5px]" : "text-[12.5px] sm:text-[13.5px]"} min-w-0 truncate font-semibold text-ink`}>
+            {authorName}
+          </span>
+        )}
+        <span className="shrink-0 text-[11px] text-[#9C9A94] sm:text-xs">
+          · {formatRelativeTime(displayDate)}
+        </span>
+      </div>
+    );
+
+    const engagementMetrics = (
+      <>
+        <EngagementMetric icon={<HeartIcon />} value={likeCount} label="likes" />
+        <EngagementMetric icon={<CommentIcon />} value={commentCount} label="comments" />
+      </>
+    );
+    const postEngagement = (
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-ink-muted sm:gap-x-3.5">
+        {primaryTag ? (
+          <Link
+            href={`/topics/${encodeURIComponent(primaryTag)}`}
+            className="min-w-0 max-w-full truncate text-[11px] font-semibold text-emerald-ink hover:text-emerald-brand hover:underline sm:text-xs"
+          >
+            #{primaryTag}
+          </Link>
+        ) : null}
+        {engagementMetrics}
+      </div>
+    );
+    const articleEngagement = (
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-ink-muted sm:gap-x-3.5">
+        {engagementMetrics}
+      </div>
+    );
+
+    if (kind === "post") {
+      return (
+        <article className="border-b border-divider py-3.5 sm:py-[18px]">
+          <div
+            className={
+              exploreThumbnail
+                ? "grid grid-cols-[minmax(0,1fr)_56px] gap-3 sm:grid-cols-[minmax(0,1fr)_72px] sm:gap-4"
+                : "min-w-0"
+            }
+          >
+            <div className="min-w-0">
+              {authorLine}
+              {displayTitle ? (
+                <Link href={`/post/${post.slug}`} className="group/title block">
+                  <h2 className="mt-2 font-display text-[16px] font-semibold leading-[1.3] text-ink transition-colors group-hover/title:text-emerald-brand sm:text-[18px]">
+                    {displayTitle}
+                  </h2>
+                </Link>
+              ) : null}
+              <Link href={`/post/${post.slug}`} className="group/body block">
+                <p className={`${displayTitle ? "mt-1.5 text-[13.5px] text-ink-soft" : "mt-2 text-[13.5px] text-ink"} line-clamp-4 leading-[1.5] transition-colors group-hover/body:text-emerald-brand sm:text-[15px] sm:leading-[1.55]`}>
+                  {excerpt || "View post"}
+                </p>
+              </Link>
+              <div className="mt-2 sm:mt-2.5">{postEngagement}</div>
+            </div>
+            {exploreThumbnail ? (
+              <Link href={`/post/${post.slug}`} aria-label={`Read ${displayTitle || "post"}`} className="shrink-0 self-start">
+                {exploreThumbnail}
+              </Link>
+            ) : null}
+          </div>
+        </article>
+      );
+    }
+
+    return (
+      <article className="border-b border-divider py-3.5 sm:py-[18px]">
+        <div className="grid grid-cols-[minmax(0,1fr)_56px] gap-3 sm:grid-cols-[minmax(0,1fr)_72px] sm:gap-4">
+          <div className="min-w-0">
+            <div className="text-[10px] font-bold uppercase tracking-[0.05em] text-gold-ink sm:text-[11px]">
+              {kindLabel}{readingLabel ? ` · ${readingLabel}` : ""}
+            </div>
+            <Link href={`/post/${post.slug}`} className="group/title block">
+              <h2 className="mt-1 font-display text-[15px] font-semibold leading-[1.3] text-ink transition-colors group-hover/title:text-emerald-brand sm:mt-1.5 sm:text-[19px]">
+                {displayTitle || "Untitled article"}
+              </h2>
+            </Link>
+            {excerpt ? (
+              <p className="mt-1.5 line-clamp-2 text-[12.5px] leading-[1.5] text-ink-soft max-sm:hidden sm:text-[13.5px]">
+                {excerpt}
+              </p>
+            ) : null}
+            <div className="mt-2 flex min-w-0 items-center gap-2 sm:mt-2.5">
+              <div className="min-w-0 flex-1">{authorLine}</div>
+              <div className="ml-auto hidden shrink-0 sm:block">{articleEngagement}</div>
+            </div>
+            <div className="mt-2 sm:hidden">{articleEngagement}</div>
+          </div>
+          <Link href={`/post/${post.slug}`} aria-label={`Read ${displayTitle || "post"}`} className="shrink-0 self-start">
+            {exploreThumbnail}
+          </Link>
+        </div>
+      </article>
+    );
+  }
+
   return (
     <article
       className={`group mb-3 overflow-hidden rounded-xl border border-gray-200 bg-white transition-[transform,box-shadow,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-[0_8px_20px_-4px_rgb(0_0_0/0.08),0_2px_6px_-2px_rgb(0_0_0/0.04)] ${
@@ -296,7 +442,7 @@ export default function PostCard({ post, variant = "standard" }: PostCardProps) 
           </div>
         </div>
 
-        <Link href={`/post/${post.slug}`} className="shrink-0 self-start">
+        <Link href={`/post/${post.slug}`} aria-label={`Read ${displayTitle || "post"}`} className="shrink-0 self-start">
           {thumbnail}
         </Link>
       </div>

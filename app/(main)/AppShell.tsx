@@ -36,9 +36,10 @@ export default function AppShell({
   const pathname = usePathname();
   const showRail = shouldShowDesktopRail(pathname);
   const isHome = pathname === "/";
+  const isExplore = pathname === "/explore";
 
   const mainClassName = showRail
-    ? `${MAIN_WITH_RAIL}${isHome ? " app-shell-home" : ""}`
+    ? `${MAIN_WITH_RAIL}${isHome ? " app-shell-home" : ""}${isExplore ? " app-shell-explore" : ""}`
     : MAIN_BASE;
 
   return (

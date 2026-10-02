@@ -1,0 +1,14 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> indegenius@0.1.0 test
+> vitest run app/(main)/explore lib/discoverData.test.ts components/post/PostCard.test.tsx app/(main)/AppShell.test.tsx components/ui/FollowButton.test.tsx app/api/feed/route.test.ts
+
+
+ RUN  v4.1.10 /workspace/scratch/0b54cd14f5d5/project
+
+
+ Test Files  9 passed (9)
+      Tests  73 passed (73)
+   Start at  11:21:24
+   Duration  2.47s (transform 1.07s, setup 1.51s, import 1.65s, tests 2.38s, environment 6.17s)
+

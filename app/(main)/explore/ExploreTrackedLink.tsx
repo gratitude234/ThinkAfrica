@@ -30,7 +30,7 @@ export default function ExploreTrackedLink({
   return (
     <Link
       href={href}
-      className={className}
+      className={`${className ?? ""} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand focus-visible:ring-offset-2`}
       aria-current={ariaCurrent}
       onClick={() => {
         trackActivationEvent({

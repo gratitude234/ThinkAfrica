@@ -68,22 +68,21 @@ beforeEach(() => {
 describe("Explore filters reach the query", () => {
   it("pushes the active content filter down to fetchFeedPage", async () => {
     await getDiscoverData(createSupabase(), null, {
-      primary: "research",
-      genre: "all",
+      primary: "post",
     });
 
     // The regression this guards: `type` was hardcoded to null here while the
-    // page filtered the returned page in memory, so selecting Research
+    // page filtered the returned page in memory, so selecting Posts
     // searched only whatever the unfiltered ranking happened to return and
     // reported "no recommendations" when none of them matched.
     expect(fetchFeedPage).toHaveBeenCalled();
     for (const [options] of fetchFeedPage.mock.calls) {
-      expect((options as { type: unknown }).type).toBe("research");
+      expect((options as { type: unknown }).type).toBe("post");
     }
   });
 
   it("sends null rather than the string 'all' when no filter is active", async () => {
-    await getDiscoverData(createSupabase(), null, { primary: "all", genre: "all" });
+    await getDiscoverData(createSupabase(), null, { primary: "all" });
 
     for (const [options] of fetchFeedPage.mock.calls) {
       expect((options as { type: unknown }).type).toBeNull();
@@ -99,7 +98,7 @@ describe("Explore filters reach the query", () => {
   });
 
   it("applies the filter to both the For you and Trending shelves", async () => {
-    await getDiscoverData(createSupabase(), null, { primary: "article", genre: "essay" });
+    await getDiscoverData(createSupabase(), null, { primary: "article" });
 
     const timeframes = fetchFeedPage.mock.calls.map(
       ([options]) => (options as { timeframe: string }).timeframe
@@ -155,3 +154,16 @@ describe("Trending stays depersonalized", () => {
     expect(trending?.userInterests).toEqual([]);
   });
 });
+
+ it("passes blocked writers to both initial shelves", async () => {
+    const base = createSupabase();
+    const client = { from: (table: string) => {
+      if (table !== "user_blocks") return base.from();
+      const query = { select: () => query, eq: () => query, limit: async () => ({ data: [{ blocked_id: "blocked-writer" }] }) };
+      return query;
+    } };
+    await getDiscoverData(client, "viewer");
+    for (const [options] of fetchFeedPage.mock.calls) {
+      expect(options.excludedAuthorIds).toEqual(["blocked-writer"]);
+    }
+ });

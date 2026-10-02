@@ -1,0 +1,485 @@
+{
+  "method": "Static SSR fixtures of real Explore components with mocked data, auth and writer FollowButton. Shared header is a simplified fixture. Not a live backend test.",
+  "results": [
+    {
+      "tab": "for-you",
+      "state": "member",
+      "width": 320,
+      "scrollWidth": 320,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "trending",
+      "state": "member",
+      "width": 320,
+      "scrollWidth": 320,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "topics",
+      "state": "member",
+      "width": 320,
+      "scrollWidth": 320,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "people",
+      "state": "member",
+      "width": 320,
+      "scrollWidth": 320,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "for-you",
+      "state": "guest",
+      "width": 320,
+      "scrollWidth": 320,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "trending",
+      "state": "guest",
+      "width": 320,
+      "scrollWidth": 320,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "topics",
+      "state": "guest",
+      "width": 320,
+      "scrollWidth": 320,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "people",
+      "state": "guest",
+      "width": 320,
+      "scrollWidth": 320,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "for-you",
+      "state": "member",
+      "width": 390,
+      "scrollWidth": 390,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "trending",
+      "state": "member",
+      "width": 390,
+      "scrollWidth": 390,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "topics",
+      "state": "member",
+      "width": 390,
+      "scrollWidth": 390,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "people",
+      "state": "member",
+      "width": 390,
+      "scrollWidth": 390,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "for-you",
+      "state": "guest",
+      "width": 390,
+      "scrollWidth": 390,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "trending",
+      "state": "guest",
+      "width": 390,
+      "scrollWidth": 390,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "topics",
+      "state": "guest",
+      "width": 390,
+      "scrollWidth": 390,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "people",
+      "state": "guest",
+      "width": 390,
+      "scrollWidth": 390,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "for-you",
+      "state": "member",
+      "width": 768,
+      "scrollWidth": 768,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "trending",
+      "state": "member",
+      "width": 768,
+      "scrollWidth": 768,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "topics",
+      "state": "member",
+      "width": 768,
+      "scrollWidth": 768,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "people",
+      "state": "member",
+      "width": 768,
+      "scrollWidth": 768,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "for-you",
+      "state": "guest",
+      "width": 768,
+      "scrollWidth": 768,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "trending",
+      "state": "guest",
+      "width": 768,
+      "scrollWidth": 768,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "topics",
+      "state": "guest",
+      "width": 768,
+      "scrollWidth": 768,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "people",
+      "state": "guest",
+      "width": 768,
+      "scrollWidth": 768,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "for-you",
+      "state": "member",
+      "width": 1024,
+      "scrollWidth": 1024,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "trending",
+      "state": "member",
+      "width": 1024,
+      "scrollWidth": 1024,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "topics",
+      "state": "member",
+      "width": 1024,
+      "scrollWidth": 1024,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "people",
+      "state": "member",
+      "width": 1024,
+      "scrollWidth": 1024,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "for-you",
+      "state": "guest",
+      "width": 1024,
+      "scrollWidth": 1024,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "trending",
+      "state": "guest",
+      "width": 1024,
+      "scrollWidth": 1024,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "topics",
+      "state": "guest",
+      "width": 1024,
+      "scrollWidth": 1024,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "people",
+      "state": "guest",
+      "width": 1024,
+      "scrollWidth": 1024,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "for-you",
+      "state": "member",
+      "width": 1280,
+      "scrollWidth": 1280,
+      "railVisible": true,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "trending",
+      "state": "member",
+      "width": 1280,
+      "scrollWidth": 1280,
+      "railVisible": true,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "topics",
+      "state": "member",
+      "width": 1280,
+      "scrollWidth": 1280,
+      "railVisible": true,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "people",
+      "state": "member",
+      "width": 1280,
+      "scrollWidth": 1280,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "for-you",
+      "state": "guest",
+      "width": 1280,
+      "scrollWidth": 1280,
+      "railVisible": true,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "trending",
+      "state": "guest",
+      "width": 1280,
+      "scrollWidth": 1280,
+      "railVisible": true,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "topics",
+      "state": "guest",
+      "width": 1280,
+      "scrollWidth": 1280,
+      "railVisible": true,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "people",
+      "state": "guest",
+      "width": 1280,
+      "scrollWidth": 1280,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "for-you",
+      "state": "member",
+      "width": 1440,
+      "scrollWidth": 1440,
+      "railVisible": true,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "trending",
+      "state": "member",
+      "width": 1440,
+      "scrollWidth": 1440,
+      "railVisible": true,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "topics",
+      "state": "member",
+      "width": 1440,
+      "scrollWidth": 1440,
+      "railVisible": true,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "people",
+      "state": "member",
+      "width": 1440,
+      "scrollWidth": 1440,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "for-you",
+      "state": "guest",
+      "width": 1440,
+      "scrollWidth": 1440,
+      "railVisible": true,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "trending",
+      "state": "guest",
+      "width": 1440,
+      "scrollWidth": 1440,
+      "railVisible": true,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "topics",
+      "state": "guest",
+      "width": 1440,
+      "scrollWidth": 1440,
+      "railVisible": true,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    },
+    {
+      "tab": "people",
+      "state": "guest",
+      "width": 1440,
+      "scrollWidth": 1440,
+      "railVisible": false,
+      "headings": 1,
+      "clipped": 0,
+      "pass": true
+    }
+  ]
+}
