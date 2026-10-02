@@ -2,7 +2,6 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-// @ts-expect-error - plain ESM migration tooling, no types
 import { splitStatements } from "./sqlStatements.mjs";
 
 /**

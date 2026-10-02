@@ -95,7 +95,7 @@ function makeClient({ routes = {} }: { routes?: Routes } = {}) {
       },
       rpc(name: string) {
         rpcNames.push(name);
-        return Promise.resolve({ data: null, error: null });
+        return Promise.resolve(name === "profile_publication_activity" || name === "profile_publication_topics" ? { data: null, error: { code: "PGRST202", message: "aggregate absent" } } : { data: null, error: null });
       },
     } as never,
   };

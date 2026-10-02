@@ -18,6 +18,7 @@ export interface PublicProfileIdentity {
   /** The member's own headline. Stored in `profiles.professional_title`. */
   professional_title?: string | null;
   verified?: boolean;
+  country?: string | null;
 }
 
 /** A headline is one line under a name, not a paragraph. */

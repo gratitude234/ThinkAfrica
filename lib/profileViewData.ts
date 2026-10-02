@@ -1,5 +1,6 @@
 import "server-only";
 
+import { compareProfileWork } from "@/lib/profileWorkOrder";
 import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getFeedExcludedUserIds } from "@/lib/blocking";
@@ -10,7 +11,7 @@ import type {
   ProfileRelatedThinker,
   ProfileWritingTopic,
 } from "@/lib/db/profilePage";
-import { profilePageRepository } from "@/lib/db/readAdapter";
+import { feedRepository, profilePageRepository } from "@/lib/db/readAdapter";
 import type { ProfileIdentityRecord } from "@/lib/db/types";
 import {
   DEFAULT_PROFILE_TAB,
@@ -75,6 +76,12 @@ export interface ProfilePublication {
   createdAt: string;
   isCoAuthor: boolean;
   wordCount?: number | null;
+  engagement?: {
+    likeCount: number;
+    commentCount: number;
+    viewerLiked: boolean;
+    viewerBookmarked: boolean;
+  };
 }
 
 export interface ProfilePublicationPage {
@@ -136,7 +143,6 @@ export interface ProfileRecordViewData {
   record: ProfileRecordPage;
 }
 
-
 /**
  * Wraps a failed query in something a server log can hold. A gateway in front
  * of Postgres can answer with a whole HTML error page, and an unbounded
@@ -152,7 +158,7 @@ function queryFailure(label: string, message: string) {
 function toPublication(
   row: ProfilePublicationRow,
   kind: ProfilePublicationKind,
-  isCoAuthor: boolean
+  isCoAuthor: boolean,
 ): ProfilePublication {
   return {
     id: row.id,
@@ -181,7 +187,7 @@ const findVisibleIdentity = cache(async (username: string) => {
   const viewer = await getCurrentUser();
   return getDatabase().profiles.findIdentityByUsername(
     username,
-    viewer?.id ?? null
+    viewer?.id ?? null,
   );
 });
 
@@ -193,7 +199,7 @@ const findVisibleIdentity = cache(async (username: string) => {
  */
 export async function loadProfileIdentity(
   _supabase: SupabaseClient,
-  username: string
+  username: string,
 ): Promise<ProfileIdentityRecord | null> {
   return findVisibleIdentity(username);
 }
@@ -269,7 +275,7 @@ export async function loadProfilePublications({
   } catch (error) {
     throw queryFailure(
       "publications failed",
-      error instanceof Error ? error.message : String(error)
+      error instanceof Error ? error.message : String(error),
     );
   }
 
@@ -278,11 +284,7 @@ export async function loadProfilePublications({
     byId.set(row.id, toPublication(row, kind, false));
   }
 
-  const ordered = [...byId.values()].sort((left, right) => {
-    const leftAt = left.publishedAt ?? left.createdAt;
-    const rightAt = right.publishedAt ?? right.createdAt;
-    return rightAt.localeCompare(leftAt) || right.id.localeCompare(left.id);
-  });
+  const ordered = [...byId.values()].sort(compareProfileWork);
 
   return {
     kind,
@@ -315,7 +317,7 @@ export async function loadProfileRecentWork({
   } catch (error) {
     throw queryFailure(
       "recent work failed",
-      error instanceof Error ? error.message : String(error)
+      error instanceof Error ? error.message : String(error),
     );
   }
 
@@ -325,17 +327,13 @@ export async function loadProfileRecentWork({
       return kind ? toPublication(row, kind, false) : null;
     })
     .filter((item): item is ProfilePublication => Boolean(item))
-    .sort((left, right) => {
-      const leftAt = left.publishedAt ?? left.createdAt;
-      const rightAt = right.publishedAt ?? right.createdAt;
-      return rightAt.localeCompare(leftAt) || right.id.localeCompare(left.id);
-    })
+    .sort(compareProfileWork)
     .slice(0, limit);
 }
 
 function profileActivityStartMonth(now = new Date(), months = 12) {
   const start = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1)
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1),
   );
   return start.toISOString();
 }
@@ -350,40 +348,43 @@ export async function loadProfileOverview({
   viewerId: string | null;
 }): Promise<ProfileOverviewData> {
   const repository = profilePageRepository(supabase);
-  const [recentWork, counts, selectedRow, activity, writingTopics] = await Promise.all([
-    loadProfileRecentWork({ supabase, profileId, limit: 7 }),
-    repository.publicationCounts(profileId),
-    repository.selectedWork(profileId),
-    repository.publicationActivity({
-      profileId,
-      startMonth: profileActivityStartMonth(),
-      months: 12,
-    }),
-    repository.publicationTopics({ profileId, limit: 6 }),
-  ]);
+  const [recentWork, counts, selectedRow, activity, writingTopics] =
+    await Promise.all([
+      loadProfileRecentWork({ supabase, profileId, limit: 7 }),
+      repository.publicationCounts(profileId),
+      repository.selectedWork(profileId),
+      repository.publicationActivity({
+        profileId,
+        startMonth: profileActivityStartMonth(),
+        months: 12,
+      }),
+      repository.publicationTopics({ profileId, limit: 6 }),
+    ]);
   const selectedKind = selectedRow ? profilePublicationKind(selectedRow) : null;
 
-  const selectedWork = selectedRow && selectedKind
-    ? toPublication(selectedRow, selectedKind, false)
-    : null;
+  const selectedWork =
+    selectedRow && selectedKind
+      ? toPublication(selectedRow, selectedKind, false)
+      : null;
 
   let relatedThinkers: ProfileRelatedThinker[] = [];
   if (writingTopics.length > 0) {
     try {
-      const [candidates, ownerExcludedIds, viewerExcludedIds] = await Promise.all([
-        repository.relatedThinkers({
-          profileId,
-          topicKeys: writingTopics.map((topic) => topic.key),
-          viewerId,
-          // Fetch a small reserve so block exclusions do not leave an otherwise
-          // healthy profile with an artificially short recommendation list.
-          limit: 6,
-        }),
-        getFeedExcludedUserIds(profileId, { strict: true }),
-        viewerId && viewerId !== profileId
-          ? getFeedExcludedUserIds(viewerId, { strict: true })
-          : Promise.resolve([]),
-      ]);
+      const [candidates, ownerExcludedIds, viewerExcludedIds] =
+        await Promise.all([
+          repository.relatedThinkers({
+            profileId,
+            topicKeys: writingTopics.map((topic) => topic.key),
+            viewerId,
+            // Fetch a small reserve so block exclusions do not leave an otherwise
+            // healthy profile with an artificially short recommendation list.
+            limit: 6,
+          }),
+          getFeedExcludedUserIds(profileId, { strict: true }),
+          viewerId && viewerId !== profileId
+            ? getFeedExcludedUserIds(viewerId, { strict: true })
+            : Promise.resolve([]),
+        ]);
 
       const excludedIds = new Set<string>([
         profileId,
@@ -406,7 +407,9 @@ export async function loadProfileOverview({
 
   return {
     selectedWork,
-    recentWork: recentWork.filter((item) => item.id !== selectedWork?.id).slice(0, 6),
+    recentWork: recentWork
+      .filter((item) => item.id !== selectedWork?.id)
+      .slice(0, 6),
     articleCount: counts.articleCount,
     postCount: counts.postCount,
     totalPublished: counts.articleCount + counts.postCount,
@@ -453,7 +456,7 @@ export async function loadProfileRecord({
   } catch (error) {
     throw queryFailure(
       "profile record failed",
-      error instanceof Error ? error.message : String(error)
+      error instanceof Error ? error.message : String(error),
     );
   }
 
@@ -463,11 +466,7 @@ export async function loadProfileRecord({
       return kind ? toPublication(row, kind, false) : null;
     })
     .filter((item): item is ProfilePublication => Boolean(item))
-    .sort((left, right) => {
-      const leftAt = left.publishedAt ?? left.createdAt;
-      const rightAt = right.publishedAt ?? right.createdAt;
-      return rightAt.localeCompare(leftAt) || right.id.localeCompare(left.id);
-    });
+    .sort(compareProfileWork);
 
   return {
     items: items.slice(0, safePageSize),
@@ -530,11 +529,14 @@ export async function loadProfileDrafts({
 
   let rows;
   try {
-    rows = await profilePageRepository(supabase).ownerDrafts({ profileId, viewerId });
+    rows = await profilePageRepository(supabase).ownerDrafts({
+      profileId,
+      viewerId,
+    });
   } catch (error) {
     throw queryFailure(
       "drafts failed",
-      error instanceof Error ? error.message : String(error)
+      error instanceof Error ? error.message : String(error),
     );
   }
 
@@ -545,6 +547,38 @@ export async function loadProfileDrafts({
     updatedAt: row.updated_at,
     excerpt: row.excerpt ? sanitizePostExcerpt(row.excerpt) : null,
   }));
+}
+
+async function hydrateProfileWork(
+  supabase: SupabaseClient,
+  works: ProfilePublication[],
+  viewerId: string | null,
+) {
+  const unique = [...new Set(works.map((work) => work.id))];
+  if (!unique.length) return;
+  try {
+    const hydration = await feedRepository(supabase, supabase).hydrate({
+      postIds: unique,
+      authorIds: [],
+      viewer: { id: viewerId },
+    });
+    if (hydration.countsReliable === false) return;
+    const counts = new Map(
+      hydration.counts.map((count) => [count.postId, count]),
+    );
+    for (const work of works) {
+      const count = counts.get(work.id);
+      if (count)
+        work.engagement = {
+          likeCount: count.likeCount,
+          commentCount: count.commentCount,
+          viewerLiked: count.viewerLiked,
+          viewerBookmarked: count.viewerBookmarked,
+        };
+    }
+  } catch (error) {
+    console.warn("[profile] engagement unavailable", error);
+  }
 }
 
 /**
@@ -573,7 +607,8 @@ export async function loadProfileView({
   if (!profile) return null;
 
   const isOwnProfile = viewer?.id === profile.id;
-  const effectiveTab = tab === "drafts" && !isOwnProfile ? DEFAULT_PROFILE_TAB : tab;
+  const effectiveTab =
+    tab === "drafts" && !isOwnProfile ? DEFAULT_PROFILE_TAB : tab;
 
   const [viewerContext, publications, drafts, overview] = await Promise.all([
     loadProfileViewerContext({
@@ -581,7 +616,9 @@ export async function loadProfileView({
       profileId: profile.id,
       viewerId: viewer?.id ?? null,
     }),
-    effectiveTab === "overview" || effectiveTab === "about" || effectiveTab === "drafts"
+    effectiveTab === "overview" ||
+    effectiveTab === "about" ||
+    effectiveTab === "drafts"
       ? Promise.resolve(null)
       : loadProfilePublications({
           supabase,
@@ -604,6 +641,15 @@ export async function loadProfileView({
         })
       : Promise.resolve(null),
   ]);
+
+  await hydrateProfileWork(
+    supabase,
+    publications?.items ??
+      [overview?.selectedWork, ...(overview?.recentWork ?? [])].filter(
+        (work): work is ProfilePublication => Boolean(work),
+      ),
+    viewer?.id ?? null,
+  );
 
   return {
     profile,

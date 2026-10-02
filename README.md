@@ -57,3 +57,6 @@ Admins can access users, moderation, reports, communications, basic platform cou
 ## Database cleanup boundary
 
 Legacy tables, columns, notification rows, and analytics data remain in place until Phase 2J dependency verification. This UI pass does not drop or rewrite database structures.
+## Profile mockup update
+
+See [PROFILE_IMPLEMENTATION_REPORT.md](./PROFILE_IMPLEMENTATION_REPORT.md) for the changes, required database migration, development preview, and verification commands.

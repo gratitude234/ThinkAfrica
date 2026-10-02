@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { ProfileSettingsModel } from "@/lib/profileSettings";
 import { saveVisibilitySection } from "../actions";
 import SectionShell from "../SectionShell";
-import { useSectionSave } from "../useSectionSave";
+import { useSectionSave, useUnsavedChangesWarning } from "../useSectionSave";
 import { Field, FIELD_INPUT, Toggle } from "./fields";
 
 export default function VisibilitySection({ model }: { model: ProfileSettingsModel }) {
@@ -20,6 +20,8 @@ export default function VisibilitySection({ model }: { model: ProfileSettingsMod
     profileVisibility !== saved.profileVisibility ||
     showInDirectory !== saved.showInDirectory;
 
+  useUnsavedChangesWarning(isDirty);
+
   const { status, error, save } = useSectionSave({
     section: "visibility",
     profileId: model.id,
@@ -30,6 +32,7 @@ export default function VisibilitySection({ model }: { model: ProfileSettingsMod
     <SectionShell
       section="visibility"
       status={status}
+      canSave={isDirty}
       error={error}
       onSave={() =>
         void save(async () => {

@@ -35,7 +35,7 @@ function post(overrides: Partial<RankablePost> = {}): RankablePost {
     title: "A useful post",
     slug: "a-useful-post",
     excerpt: "An excerpt",
-    type: "blog",
+
     content_kind: "post",
     tags: [],
     created_at: NOW.toISOString(),

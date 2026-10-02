@@ -102,9 +102,9 @@ vi.mock("@/lib/supabase/admin", () => ({
     from: (table: string) => ({
       select: () => makeQuery(table, "select"),
       update: (values: Record<string, unknown>) =>
-        makeQuery(table, "update").update(values),
+        (makeQuery(table, "update").update as (patch: Record<string, unknown>) => unknown)(values),
       insert: (values: Record<string, unknown>) =>
-        makeQuery(table, "insert").insert(values),
+        (makeQuery(table, "insert").insert as (patch: Record<string, unknown>) => unknown)(values),
       upsert: async () => ({ data: null, error: null }),
     }),
     rpc: async (name: string, args: unknown) => {

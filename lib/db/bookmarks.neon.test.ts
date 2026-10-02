@@ -197,10 +197,8 @@ describe.skipIf(!enabled)("the bookmarks list against PostgreSQL", () => {
 
       const [row] = await repository.list(reader.id);
       if (!row) return;
-      // jsonb_agg returns null over no rows, and the contract says array. A
-      // caller doing .map() on this is the bug being prevented.
-      expect(Array.isArray(row.post_authors)).toBe(true);
-      expect(row.post_authors).toEqual([]);
+      // Retired co-authorship is absent from the read contract.
+      expect(row).not.toHaveProperty("post_authors");
     });
   });
 

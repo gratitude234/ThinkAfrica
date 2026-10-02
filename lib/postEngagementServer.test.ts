@@ -307,7 +307,8 @@ describe("post engagement server", () => {
             slug: "work",
             title: "Work",
             excerpt: null,
-            type: "blog",
+            content_kind: "post",
+
             tags: [],
             created_at: new Date().toISOString(),
             published_at: new Date().toISOString(),

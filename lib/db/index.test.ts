@@ -79,6 +79,7 @@ describe("the connection", () => {
     resetPostgresConnectionForTests();
     expect(
       resolveConnectionString({
+        NODE_ENV: "test",
         DATABASE_URL: "postgres://pooled/db",
         DATABASE_URL_DIRECT: "postgres://direct/db",
       } as NodeJS.ProcessEnv)
@@ -86,6 +87,7 @@ describe("the connection", () => {
 
     expect(() =>
       resolveConnectionString({
+        NODE_ENV: "test",
         DATABASE_URL_DIRECT: "postgres://direct/db",
       } as NodeJS.ProcessEnv)
     ).toThrow(PostgresConnectionError);

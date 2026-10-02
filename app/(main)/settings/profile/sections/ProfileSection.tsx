@@ -38,6 +38,7 @@ function draftFrom(model: ProfileSettingsModel): ProfileDetailsDraft {
     university: model.university,
     fieldOfStudy: model.fieldOfStudy,
     graduationYear: model.graduationYear,
+    website: model.website ?? "",
   };
 }
 
@@ -48,9 +49,17 @@ function draftFrom(model: ProfileSettingsModel): ProfileDetailsDraft {
  * the persona picker. Location and education are ordinary optional facts:
  * nothing requires them and nothing is derived from them.
  */
-export default function ProfileSection({ model }: { model: ProfileSettingsModel }) {
-  const [draft, setDraft] = useState<ProfileDetailsDraft>(() => draftFrom(model));
-  const [saved, setSaved] = useState<ProfileDetailsDraft>(() => draftFrom(model));
+export default function ProfileSection({
+  model,
+}: {
+  model: ProfileSettingsModel;
+}) {
+  const [draft, setDraft] = useState<ProfileDetailsDraft>(() =>
+    draftFrom(model),
+  );
+  const [saved, setSaved] = useState<ProfileDetailsDraft>(() =>
+    draftFrom(model),
+  );
   const [avatarUrl, setAvatarUrl] = useState(model.avatarUrl);
   const [coverUrl, setCoverUrl] = useState(model.coverImageUrl);
 
@@ -84,13 +93,16 @@ export default function ProfileSection({ model }: { model: ProfileSettingsModel 
       section="profile"
       status={status}
       error={error}
-      canSave={!problem}
+      canSave={isDirty && !problem}
       footnote="Your photo and cover save as soon as they finish uploading. Everything else saves when you choose Save."
       onSave={() =>
         void save(async () => {
           const result = await saveProfileSection(draft);
           if (result.ok) {
-            const next = { ...draft, username: result.username ?? normalizedUsername };
+            const next = {
+              ...draft,
+              username: result.username ?? normalizedUsername,
+            };
             setSaved(next);
             setDraft(next);
             if (result.username && result.username !== model.username) {
@@ -119,9 +131,14 @@ export default function ProfileSection({ model }: { model: ProfileSettingsModel 
       <div>
         <div className="mb-1 flex items-baseline justify-between gap-3">
           <p className="block text-sm font-medium text-ink-soft">
-            Cover <span className="text-xs font-normal text-ink-muted">(optional)</span>
+            Cover{" "}
+            <span className="text-xs font-normal text-ink-muted">
+              (optional)
+            </span>
           </p>
-          <p className="text-xs text-ink-muted">A short banner on your public profile.</p>
+          <p className="text-xs text-ink-muted">
+            A short banner on your public profile.
+          </p>
         </div>
         <CoverImageUploader
           initialUrl={coverUrl ?? undefined}
@@ -142,7 +159,10 @@ export default function ProfileSection({ model }: { model: ProfileSettingsModel 
         />
       </div>
 
-      <Field label="Name" error={draft.fullName.trim() ? null : "Add your name."}>
+      <Field
+        label="Name"
+        error={draft.fullName.trim() ? null : "Add your name."}
+      >
         {(props) => (
           <input
             {...props}
@@ -193,7 +213,10 @@ export default function ProfileSection({ model }: { model: ProfileSettingsModel 
               className={`${FIELD_INPUT} pr-16`}
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2">
-              <CharacterCount value={draft.headline} max={PROFILE_HEADLINE_MAX_LENGTH} />
+              <CharacterCount
+                value={draft.headline}
+                max={PROFILE_HEADLINE_MAX_LENGTH}
+              />
             </span>
           </div>
         )}
@@ -214,6 +237,24 @@ export default function ProfileSection({ model }: { model: ProfileSettingsModel 
               <CharacterCount value={draft.bio} max={PROFILE_BIO_MAX_LENGTH} />
             </span>
           </div>
+        )}
+      </Field>
+
+      <Field
+        label="Website"
+        optional
+        help="A full http:// or https:// URL for your public work."
+      >
+        {(props) => (
+          <input
+            {...props}
+            type="url"
+            value={draft.website ?? ""}
+            maxLength={2048}
+            placeholder="https://example.com"
+            onChange={(event) => update({ website: event.target.value })}
+            className={FIELD_INPUT}
+          />
         )}
       </Field>
 

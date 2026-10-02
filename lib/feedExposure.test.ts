@@ -16,7 +16,7 @@ function post(id: string, overrides: Partial<PostCardData> = {}): PostCardData {
     title: `Post ${id}`,
     slug: `post-${id}`,
     excerpt: "An excerpt",
-    type: "blog",
+
     content_kind: "post",
     tags: [],
     created_at: "2026-08-18T10:00:00.000Z",
@@ -29,7 +29,6 @@ function post(id: string, overrides: Partial<PostCardData> = {}): PostCardData {
     profiles: {
       username: "amara",
       full_name: "Amara",
-      university: null,
       avatar_url: null,
     },
     ...overrides,

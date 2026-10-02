@@ -28,6 +28,7 @@ function topicsClient(pages: Array<{ data: unknown[] | null; error: { message: s
   let index = 0;
 
   const client = {
+    rpc: async () => ({ data: null, error: { code: "PGRST202", message: "function absent" } }),
     from(table: string) {
       const call = {
         table,

@@ -1,8 +1,13 @@
+import ProfileActivityChart from "./ProfileActivityChart";
+import { safeExternalProfileUrl } from "@/lib/profileWebsite";
 import Link from "next/link";
 import type { ProfileViewData } from "@/lib/profileViewData";
 import { getProfileViewerState } from "@/lib/profileFunnel";
 import { profileRecordHref, profileTabHref } from "@/lib/profileTabs";
-import { formatInterestLabel, formatPublishedTopicLabel } from "@/lib/profileTopics";
+import {
+  formatInterestLabel,
+  formatPublishedTopicLabel,
+} from "@/lib/profileTopics";
 import { joinedLabel } from "./ProfileFacts";
 import ProfileRecentWork from "./ProfileRecentWork";
 import ProfileRelatedThinkers from "./ProfileRelatedThinkers";
@@ -35,7 +40,10 @@ function IntellectualRecord({
             Published work built on Indegenius.
           </p>
         </div>
-        <Link href={profileRecordHref(username)} className="focus-ring profile-view-all">
+        <Link
+          href={profileRecordHref(username)}
+          className="focus-ring profile-view-all"
+        >
           View full record
         </Link>
       </div>
@@ -54,48 +62,32 @@ function IntellectualRecord({
         </div>
       </dl>
 
-      <div className="profile-activity" aria-labelledby="profile-activity-title">
+      <div
+        className="profile-activity"
+        aria-labelledby="profile-activity-title"
+      >
         <div className="profile-activity-heading">
           <h3 id="profile-activity-title">Last 12 months</h3>
-          <span>{hasActivity ? "Published works by month" : "No recent publications"}</span>
+          <span>
+            {hasActivity
+              ? "Published works by month"
+              : "No recent publications"}
+          </span>
         </div>
-        {hasActivity ? (
-          <ol className="profile-activity-chart" aria-label="Published works by month">
-            {activity.map((point) => {
-              const date = new Date(`${point.month}-01T00:00:00.000Z`);
-              const label = Number.isNaN(date.getTime())
-                ? point.month
-                : new Intl.DateTimeFormat("en", { month: "short" }).format(date);
-              const height = Math.max(8, Math.round((point.count / maxActivity) * 52));
-              return (
-                <li key={point.month} title={`${label}: ${point.count.toLocaleString()} published`}>
-                  <span className="sr-only">
-                    {`${label}: ${point.count.toLocaleString()} published work${point.count === 1 ? "" : "s"}`}
-                  </span>
-                  <span
-                    aria-hidden="true"
-                    className="profile-activity-bar"
-                    style={{ height: `${height}px` }}
-                  />
-                  <span aria-hidden="true" className="profile-activity-label">
-                    {label}
-                  </span>
-                </li>
-              );
-            })}
-          </ol>
-        ) : (
-          <p className="profile-activity-empty">
-            This record will grow as new Posts and Articles are published.
-          </p>
-        )}
+        <ProfileActivityChart activity={activity} />
       </div>
 
-      <div className="profile-record-links" aria-label="Browse intellectual record">
+      <div
+        className="profile-record-links"
+        aria-label="Browse intellectual record"
+      >
         <Link href={profileTabHref(username, "posts")} className="focus-ring">
           View Posts
         </Link>
-        <Link href={profileTabHref(username, "articles")} className="focus-ring">
+        <Link
+          href={profileTabHref(username, "articles")}
+          className="focus-ring"
+        >
           View Articles
         </Link>
       </div>
@@ -108,8 +100,13 @@ function EmptyOverview({ data }: { data: ProfileViewData }) {
 
   if (data.viewer.isOwnProfile) {
     return (
-      <section className="profile-empty-overview" aria-labelledby="empty-record-heading">
-        <p className="profile-work-kicker">Your profile starts with your work</p>
+      <section
+        className="profile-empty-overview"
+        aria-labelledby="empty-record-heading"
+      >
+        <p className="profile-work-kicker">
+          Your profile starts with your work
+        </p>
         <h2 id="empty-record-heading">Build your intellectual record</h2>
         <p>
           Publish a Post or Article and it will begin shaping your Recent Work,
@@ -119,7 +116,10 @@ function EmptyOverview({ data }: { data: ProfileViewData }) {
           <Link href="/write" className="focus-ring profile-empty-primary">
             Write a Post
           </Link>
-          <Link href="/write?editor=article" className="focus-ring profile-empty-secondary">
+          <Link
+            href="/write?editor=article"
+            className="focus-ring profile-empty-secondary"
+          >
             Write an Article
           </Link>
         </div>
@@ -128,15 +128,19 @@ function EmptyOverview({ data }: { data: ProfileViewData }) {
   }
 
   return (
-    <section className="profile-empty-overview" aria-labelledby="empty-record-heading">
+    <section
+      className="profile-empty-overview"
+      aria-labelledby="empty-record-heading"
+    >
       <h2 id="empty-record-heading">No published work yet</h2>
       <p>{name} hasn’t published a Post or Article on Indegenius yet.</p>
     </section>
   );
 }
 
-function OverviewAside({ data }: { data: ProfileViewData }) {
+export function OverviewAside({ data }: { data: ProfileViewData }) {
   const { profile } = data;
+  const website = safeExternalProfileUrl(profile.organization_website);
   const education = [
     profile.field_of_study?.trim(),
     profile.university?.trim(),
@@ -149,7 +153,7 @@ function OverviewAside({ data }: { data: ProfileViewData }) {
       (profile.interests ?? [])
         .map((value) => value.trim())
         .filter(Boolean)
-        .map((value) => [value.toLowerCase(), value])
+        .map((value) => [value.toLowerCase(), value]),
     ).values(),
   ];
   const joined = joinedLabel(profile.created_at);
@@ -158,9 +162,16 @@ function OverviewAside({ data }: { data: ProfileViewData }) {
 
   return (
     <aside className="profile-overview-aside" aria-label="Profile context">
-      {education || profile.country?.trim() || joined ? (
+      {education ||
+      profile.country?.trim() ||
+      joined ||
+      profile.bio?.trim() ||
+      website ? (
         <section className="profile-aside-section">
           <h2>About</h2>
+          {profile.bio?.trim() ? (
+            <p className="profile-aside-bio">{profile.bio.trim()}</p>
+          ) : null}
           <dl className="profile-aside-facts">
             {education ? (
               <div>
@@ -174,6 +185,22 @@ function OverviewAside({ data }: { data: ProfileViewData }) {
                 <dd>{profile.country.trim()}</dd>
               </div>
             ) : null}
+            {website ? (
+              <div>
+                <dt>Website</dt>
+                <dd>
+                  <a
+                    className="focus-ring profile-aside-website"
+                    href={website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {new URL(website).hostname}
+                    <span className="sr-only"> (opens in a new tab)</span>
+                  </a>
+                </dd>
+              </div>
+            ) : null}
             {joined ? (
               <div>
                 <dt>Joined</dt>
@@ -181,7 +208,10 @@ function OverviewAside({ data }: { data: ProfileViewData }) {
               </div>
             ) : null}
           </dl>
-          <Link href={profileTabHref(profile.username, "about")} className="focus-ring profile-aside-link">
+          <Link
+            href={profileTabHref(profile.username, "about")}
+            className="focus-ring profile-aside-link"
+          >
             View full About
           </Link>
         </section>
@@ -190,7 +220,7 @@ function OverviewAside({ data }: { data: ProfileViewData }) {
       {writingTopics.length ? (
         <section className="profile-aside-section">
           <h2>Writes about</h2>
-          <p className="profile-aside-note">Derived from published Posts and Articles.</p>
+          <p className="profile-aside-note">From published work.</p>
           <ul className="profile-writing-topic-list">
             {writingTopics.map((topic) => (
               <li key={topic.key}>
@@ -215,7 +245,7 @@ function OverviewAside({ data }: { data: ProfileViewData }) {
       {interests.length ? (
         <section className="profile-aside-section">
           <h2>Interests</h2>
-          <p className="profile-aside-note">Topics this member chose for their reading feed.</p>
+          <p className="profile-aside-note">Reading interests.</p>
           <ul className="profile-interest-list">
             {interests.map((interest) => (
               <li key={interest}>{formatInterestLabel(interest)}</li>
@@ -227,7 +257,13 @@ function OverviewAside({ data }: { data: ProfileViewData }) {
   );
 }
 
-export default function ProfileOverview({ data }: { data: ProfileViewData }) {
+export default function ProfileOverview({
+  data,
+  showAside = true,
+}: {
+  data: ProfileViewData;
+  showAside?: boolean;
+}) {
   const { profile, viewer, overview } = data;
   if (!overview) return null;
   const viewerState = getProfileViewerState({
@@ -236,7 +272,11 @@ export default function ProfileOverview({ data }: { data: ProfileViewData }) {
   });
 
   return (
-    <div className="profile-overview-grid">
+    <div
+      className={
+        showAside ? "profile-overview-grid" : "profile-overview-content"
+      }
+    >
       <div className="profile-overview-main">
         {overview.totalPublished === 0 ? (
           <EmptyOverview data={data} />
@@ -246,6 +286,8 @@ export default function ProfileOverview({ data }: { data: ProfileViewData }) {
               work={overview.selectedWork}
               profileId={profile.id}
               viewerState={viewerState}
+              author={profile}
+              currentUserId={viewer.viewerId}
               isOwnProfile={viewer.isOwnProfile}
             />
 
@@ -257,7 +299,10 @@ export default function ProfileOverview({ data }: { data: ProfileViewData }) {
               activity={overview.activity}
             />
 
-            <section className="profile-section profile-recent-section" aria-labelledby="recent-work">
+            <section
+              className="profile-section profile-recent-section"
+              aria-labelledby="recent-work"
+            >
               <div className="profile-section-heading">
                 <h2 id="recent-work" className="profile-section-title">
                   Recent Work
@@ -267,13 +312,15 @@ export default function ProfileOverview({ data }: { data: ProfileViewData }) {
                 items={overview.recentWork}
                 profileId={profile.id}
                 viewerState={viewerState}
+                author={profile}
+                currentUserId={viewer.viewerId}
                 isOwnProfile={viewer.isOwnProfile}
               />
             </section>
           </>
         )}
       </div>
-      <OverviewAside data={data} />
+      {showAside ? <OverviewAside data={data} /> : null}
     </div>
   );
 }

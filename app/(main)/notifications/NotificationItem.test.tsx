@@ -19,6 +19,7 @@ const publicationNotification = {
     avatar_url: null,
   },
   post_title: "Designing Lagos",
+  post_content_kind: null,
   post_slug: "designing-lagos",
   actor_username: "ama",
 };
@@ -68,7 +69,8 @@ describe("historic subscriber notifications", () => {
     link: null as string | null,
     post_id: null,
     post_title: null,
-    post_slug: null,
+    post_content_kind: null,
+  post_slug: null,
   };
 
   it("reads as the follow it also was", () => {

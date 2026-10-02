@@ -70,14 +70,14 @@ function post(id: string): PostCardData {
     title: null,
     slug: `post-${id}`,
     excerpt: "A short thought.",
-    type: "blog",
+
     content_kind: "post",
-    article_format: null,
+
     tags: [],
     created_at: "2026-07-22T10:00:00.000Z",
     published_at: "2026-07-22T10:00:00.000Z",
     like_count: 0,
-    profiles: { username: "amara", full_name: "Amara", university: null, avatar_url: null },
+    profiles: { username: "amara", full_name: "Amara", avatar_url: null },
   };
 }
 

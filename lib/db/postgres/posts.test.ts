@@ -170,7 +170,7 @@ describe("createPostgresPostsRepository", () => {
   it("returns null for a slug that resolves to nothing", async () => {
     const { executor } = fakeExecutor([]);
     await expect(
-      createPostgresPostsRepository(executor).findBySlug("missing")
+      createPostgresPostsRepository(executor).findBySlug("missing", null)
     ).resolves.toBeNull();
   });
 
@@ -183,7 +183,7 @@ describe("createPostgresPostsRepository", () => {
     };
 
     await expect(
-      createPostgresPostsRepository(executor).findBySlug("example-slug")
+      createPostgresPostsRepository(executor).findBySlug("example-slug", null)
     ).rejects.toThrow('Failed to load post "example-slug".');
     expect(error).toHaveBeenCalledWith(
       "[post/example-slug] core post query failed",
@@ -197,7 +197,7 @@ describe("createPostgresPostsRepository", () => {
     const { executor } = fakeExecutor([fullRow, { ...fullRow, id: "post-2" }]);
 
     await expect(
-      createPostgresPostsRepository(executor).findBySlug("example-slug")
+      createPostgresPostsRepository(executor).findBySlug("example-slug", null)
     ).rejects.toThrow('Failed to load post "example-slug".');
     error.mockRestore();
   });

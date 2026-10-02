@@ -4,14 +4,8 @@ import { getProfileHeadline } from "@/lib/profileIdentity";
 import AboutSectionIndex from "./AboutSectionIndex";
 import { joinedLabel, WriterTopics } from "./ProfileFacts";
 
-/** Accept only explicit public web URLs; no credentials or executable schemes. */
-export function safeExternalProfileUrl(value: string | null | undefined) {
-  if (!value?.trim()) return null;
-  try {
-    const url = new URL(value.trim());
-    return ["https:", "http:"].includes(url.protocol) && !url.username && !url.password ? url.href : null;
-  } catch { return null; }
-}
+import { safeExternalProfileUrl } from "@/lib/profileWebsite";
+export { safeExternalProfileUrl } from "@/lib/profileWebsite";
 
 export default function ProfileAbout({ profile, isOwnProfile }: { profile: ProfileIdentityRecord; isOwnProfile: boolean }) {
   const bio = profile.bio?.trim();

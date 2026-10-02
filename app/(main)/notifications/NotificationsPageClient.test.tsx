@@ -43,6 +43,7 @@ function notification(overrides: Partial<NotificationData>): NotificationData {
     actor_username: "yusuph",
     post_title: null,
     post_slug: null,
+    post_content_kind: null,
     ...overrides,
   };
 }

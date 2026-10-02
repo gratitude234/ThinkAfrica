@@ -45,6 +45,7 @@ export default function TopicsSection({ model }: { model: ProfileSettingsModel }
     <SectionShell
       section="topics"
       status={status}
+      canSave={isDirty}
       error={error}
       onSave={() =>
         void save(async () => {

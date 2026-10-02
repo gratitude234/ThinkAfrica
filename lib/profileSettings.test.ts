@@ -59,3 +59,12 @@ describe("getGraduationYearError", () => {
     expect(getGraduationYearError("2200")).toMatch(/between/);
   });
 });
+
+
+describe("public website editing", () => {
+  it("accepts a public web URL and clearing, while rejecting executable schemes and credentials", () => {
+    expect(getProfileDetailsError(draft({ website: "https://example.org/work" }))).toBeNull();
+    expect(getProfileDetailsError(draft({ website: "" }))).toBeNull();
+    for (const website of ["javascript:alert(1)", "data:text/html,test", "https://user:secret@example.org/", "example.org", "https://example.org/" + "x".repeat(2048)]) expect(getProfileDetailsError(draft({ website }))).toMatch(/website URL/);
+  });
+});

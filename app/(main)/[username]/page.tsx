@@ -1,20 +1,12 @@
 import "@/components/profile/profile.css";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import ProfileOverview from "@/components/profile/ProfileOverview";
-import StickyProfileBar from "@/components/profile/StickyProfileBar";
-import ProfileAbout from "@/components/profile/ProfileAbout";
-import ProfileDraftList from "@/components/profile/ProfileDraftList";
-import ProfileHeader from "@/components/profile/ProfileHeader";
-import ProfilePublicationList from "@/components/profile/ProfilePublicationList";
-import ProfileTabs from "@/components/profile/ProfileTabs";
-import { getProfileViewerState } from "@/lib/profileFunnel";
+import ProfilePageContent from "@/components/profile/ProfilePageContent";
 import {
   getProfileDisplayName,
   getProfileMetaDescription,
   getProfileTitle,
 } from "@/lib/profileIdentity";
-import { PROFILE_SHELL } from "@/lib/profileLayout";
 import {
   profileTabHref,
   resolveProfilePage,
@@ -50,7 +42,9 @@ export async function generateMetadata({
     alternates: {
       canonical: profileTabHref(
         profile.username,
-        resolveProfileTab(query) === "drafts" ? "posts" : resolveProfileTab(query)
+        resolveProfileTab(query) === "drafts"
+          ? "posts"
+          : resolveProfileTab(query),
       ),
     },
     openGraph: {
@@ -59,17 +53,26 @@ export async function generateMetadata({
       description,
       images: [profile.avatar_url ?? "/logo.png"],
     },
-    twitter: { card: "summary", title, description, images: [profile.avatar_url ?? "/logo.png"] },
+    twitter: {
+      card: "summary",
+      title,
+      description,
+      images: [profile.avatar_url ?? "/logo.png"],
+    },
   };
 }
 
 /** A writer profile: one header and one tab navigation. */
-export default async function UserProfilePage({ params, searchParams }: PageProps) {
+export default async function UserProfilePage({
+  params,
+  searchParams,
+}: PageProps) {
   const [{ username }, query] = await Promise.all([params, searchParams]);
   const requestedTab = resolveProfileTab(query);
-  const page = requestedTab === "about" || requestedTab === "drafts"
-    ? 1
-    : resolveProfilePage(query.page);
+  const page =
+    requestedTab === "about" || requestedTab === "drafts"
+      ? 1
+      : resolveProfilePage(query.page);
   const supabase = await createClient();
 
   const data = await loadProfileView({
@@ -88,61 +91,5 @@ export default async function UserProfilePage({ params, searchParams }: PageProp
    */
   if (!data) notFound();
 
-  const { profile, viewer, tab, publications, drafts } = data;
-  const viewerState = getProfileViewerState({
-    viewerId: viewer.viewerId,
-    profileId: profile.id,
-  });
-
-  return (
-    <div className={PROFILE_SHELL}>
-      <ProfileHeader
-        profile={{
-          id: profile.id,
-          username: profile.username,
-          full_name: profile.full_name,
-          bio: profile.bio,
-          avatar_url: profile.avatar_url,
-          cover_image_url: profile.cover_image_url,
-          professional_title: profile.professional_title,
-          verified: profile.verified,
-        }}
-        followerCount={viewer.followerCount}
-        followingCount={viewer.followingCount}
-        isOwnProfile={viewer.isOwnProfile}
-        currentUserId={viewer.viewerId}
-        initialFollowing={viewer.isFollowing}
-        initialBlocked={viewer.isBlocked}
-      />
-
-      <StickyProfileBar username={profile.username} name={getProfileDisplayName(profile)}
-        profileId={profile.id} currentUserId={viewer.viewerId} initialFollowing={viewer.isFollowing}
-        isBlocked={viewer.isBlocked} active={tab} />
-
-      <ProfileTabs
-        username={profile.username}
-        active={tab}
-        isOwnProfile={viewer.isOwnProfile}
-      />
-
-      <div id="profile-panel" role="tabpanel" aria-labelledby={`main-tab-${tab}`} tabIndex={0} className={`profile-panel focus-ring ${tab === "overview" ? "profile-panel-overview" : "profile-panel-reading"}`}>
-        {tab === "drafts" && drafts ? (
-          <ProfileDraftList initialDrafts={drafts} />
-        ) : tab === "overview" ? (
-          <ProfileOverview data={data} />
-        ) : publications && (tab === "articles" || tab === "posts") ? (
-          <ProfilePublicationList
-            username={profile.username}
-            profileId={profile.id}
-            tab={tab}
-            publications={publications}
-            isOwnProfile={viewer.isOwnProfile}
-            viewerState={viewerState}
-          />
-        ) : (
-          <ProfileAbout profile={profile} isOwnProfile={viewer.isOwnProfile} />
-        )}
-      </div>
-    </div>
-  );
+  return <ProfilePageContent data={data} />;
 }

@@ -1,3 +1,6 @@
+import ProfileWorkActions from "./ProfileWorkActions";
+import ProfileWorkByline from "./ProfileWorkByline";
+import type { PublicProfileIdentity } from "@/lib/profileIdentity";
 import Link from "next/link";
 import PostCover from "@/components/post/PostCover";
 import ProfileWorkLink from "@/components/profile/ProfileWorkLink";
@@ -10,11 +13,15 @@ export default function ProfileRecentWork({
   profileId,
   viewerState,
   isOwnProfile,
+  author,
+  currentUserId,
 }: {
   items: ProfilePublication[];
   profileId: string;
   viewerState: ProfileViewerState;
   isOwnProfile: boolean;
+  author?: PublicProfileIdentity;
+  currentUserId?: string | null;
 }) {
   if (!items.length) {
     return (
@@ -40,14 +47,21 @@ export default function ProfileRecentWork({
         const tracking = {
           profileId,
           viewerState,
-          surface: article ? ("profile_articles" as const) : ("profile_posts" as const),
+          surface: article
+            ? ("profile_articles" as const)
+            : ("profile_posts" as const),
         };
 
         return (
           <li key={item.id}>
-            <article className={`profile-recent-item ${article ? "is-article" : "is-post"}`}>
-              <div className="min-w-0 flex-1">
-                <div className="profile-work-kicker">{article ? "Article" : "Post"}</div>
+            <article
+              className={`profile-recent-item ${article ? "is-article" : "is-post"}`}
+            >
+              <div className="profile-work-content min-w-0 flex-1">
+                <ProfileWorkByline author={author} />
+                <div className="profile-work-kicker">
+                  {article ? "Article" : "Post"}
+                </div>
                 {article ? (
                   <h3 className="profile-recent-title">
                     <ProfileWorkLink
@@ -55,7 +69,7 @@ export default function ProfileRecentWork({
                       workId={item.id}
                       workKind={item.kind}
                       tracking={tracking}
-                      className="stretch-target focus-ring after:z-10"
+                      className="focus-ring"
                     >
                       {content}
                     </ProfileWorkLink>
@@ -67,7 +81,7 @@ export default function ProfileRecentWork({
                       workId={item.id}
                       workKind={item.kind}
                       tracking={tracking}
-                      className="stretch-target focus-ring after:z-10"
+                      className="focus-ring"
                     >
                       {content}
                     </ProfileWorkLink>
@@ -82,6 +96,7 @@ export default function ProfileRecentWork({
                     ? ` · ${Math.max(1, Math.ceil(item.wordCount / 200))} min read`
                     : null}
                 </p>
+                <ProfileWorkActions work={item} currentUserId={currentUserId} />
               </div>
               {item.coverImageUrl ? (
                 <PostCover

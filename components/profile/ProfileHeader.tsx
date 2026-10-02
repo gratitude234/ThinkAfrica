@@ -23,7 +23,7 @@ import {
 export type { PublicProfileIdentity } from "@/lib/profileIdentity";
 
 const ACTION_BASE =
-  "focus-ring inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-sm font-semibold transition-colors";
+  "focus-ring inline-flex min-h-11 items-center justify-center rounded-full px-4 text-sm font-semibold transition-colors";
 
 /** The single filled action. Only ever one of these is on screen at a time. */
 const ACTION_PRIMARY = `${ACTION_BASE} bg-emerald-brand text-white hover:bg-[#0E4B37]`;
@@ -62,9 +62,17 @@ function MoreMenu({
       setOpen(false);
       triggerRef.current?.focus();
     };
+    const panel =
+      wrapperRef.current?.querySelector<HTMLElement>('[role="dialog"]');
+    panel?.querySelector<HTMLElement>("button, a[href]")?.focus();
+    const closeOnFocusOutside = (event: FocusEvent) => {
+      if (!wrapperRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("focusin", closeOnFocusOutside);
     document.addEventListener("mousedown", closeOnOutsideClick);
     document.addEventListener("keydown", closeOnEscape);
     return () => {
+      document.removeEventListener("focusin", closeOnFocusOutside);
       document.removeEventListener("mousedown", closeOnOutsideClick);
       document.removeEventListener("keydown", closeOnEscape);
     };
@@ -93,7 +101,11 @@ function MoreMenu({
             label="Share profile"
             className="min-h-11 w-full justify-start border-0 px-3 shadow-none"
           />
-          <ShareButton label="Copy profile link" copyOnly className="min-h-11 w-full justify-start border-0 px-3 shadow-none" />
+          <ShareButton
+            label="Copy profile link"
+            copyOnly
+            className="min-h-11 w-full justify-start border-0 px-3 shadow-none"
+          />
           {currentUserId ? (
             <>
               <ReportButton
@@ -174,6 +186,11 @@ export default function ProfileHeader({
           })
         }
       />
+      <ShareButton
+        iconOnly
+        label="Share profile"
+        className="profile-share-action"
+      />
       <MoreMenu
         profile={profile}
         currentUserId={currentUserId}
@@ -182,12 +199,17 @@ export default function ProfileHeader({
     </>
   );
 
-  const countLinkClass = "tap-target focus-ring font-medium text-ink-soft hover:text-ink";
+  const countLinkClass =
+    "tap-target focus-ring font-medium text-ink-soft hover:text-ink";
 
   return (
     <>
       <ProfileViewTracker profileId={profile.id} viewerState={viewerState} />
-      <section id="profile-identity" aria-labelledby="profile-name" className="profile-identity">
+      <section
+        id="profile-identity"
+        aria-labelledby="profile-name"
+        className={`profile-identity ${profile.cover_image_url && !coverFailed ? "has-cover" : ""}`}
+      >
         {profile.cover_image_url && !coverFailed ? (
           <div className="profile-cover" aria-label="Profile cover">
             {/* The URL is constrained server-side to this project's Supabase Storage host. */}
@@ -201,19 +223,16 @@ export default function ProfileHeader({
           </div>
         ) : null}
         <div className="profile-identity-top">
-          <div className="flex min-w-0 items-center gap-4">
+          <div className="profile-identity-person">
             <UserAvatar
               name={displayName}
               src={profile.avatar_url}
-              size={76}
-              className="shrink-0 overflow-hidden rounded-full"
+              size={108}
+              className="profile-avatar shrink-0 overflow-hidden rounded-full"
             />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <h1
-                  id="profile-name"
-                  className="profile-name"
-                >
+                <h1 id="profile-name" className="profile-name">
                   {displayName}
                 </h1>
                 <IdentityVerification verified={profile.verified} />
@@ -224,16 +243,25 @@ export default function ProfileHeader({
               {headline ? <p className="profile-headline">{headline}</p> : null}
             </div>
           </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
+          <div className="profile-header-actions">{actions}</div>
         </div>
 
+        {profile.country?.trim() ? (
+          <p className="profile-location">{profile.country.trim()}</p>
+        ) : null}
         {bio ? <ProfileBio bio={bio} /> : null}
 
         <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-muted">
-          <Link href={`/${profile.username}/followers`} className={countLinkClass}>
+          <Link
+            href={`/${profile.username}/followers`}
+            className={countLinkClass}
+          >
             {`${followerCount.toLocaleString()} follower${followerCount === 1 ? "" : "s"}`}
           </Link>
-          <Link href={`/${profile.username}/following`} className={countLinkClass}>
+          <Link
+            href={`/${profile.username}/following`}
+            className={countLinkClass}
+          >
             {`${followingCount.toLocaleString()} following`}
           </Link>
         </p>

@@ -14,9 +14,9 @@ function post(overrides: Partial<PostCardData> = {}): PostCardData {
     title: null,
     slug: "clear-thinking",
     excerpt: "A short thought about building better institutions.",
-    type: "blog",
+
     content_kind: "post",
-    article_format: null,
+
     tags: [],
     created_at: "2026-07-22T10:00:00.000Z",
     published_at: "2026-07-22T10:00:00.000Z",
@@ -24,7 +24,6 @@ function post(overrides: Partial<PostCardData> = {}): PostCardData {
     profiles: {
       username: "amara",
       full_name: "Amara Okafor",
-      university: "University of Lagos",
       avatar_url: null,
     },
     ...overrides,
@@ -209,7 +208,7 @@ describe("HomeFeedCard", () => {
       <HomeFeedCard
         post={post({
           title: "Why institutions outlast intentions",
-          type: "essay",
+
           content_kind: "article",
           cover_image_url: "https://example.com/article-cover.jpg",
         })}
@@ -238,7 +237,7 @@ describe("HomeFeedCard", () => {
       <HomeFeedCard
         post={post({
           title: "Why institutions outlast intentions",
-          type: "essay",
+
           content_kind: "article",
         })}
         currentUserId="user-1"

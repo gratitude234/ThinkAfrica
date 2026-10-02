@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Avatar from "boring-avatars";
 
 interface UserAvatarProps {
@@ -17,11 +18,13 @@ export default function UserAvatar({
   src,
   className = "",
 }: UserAvatarProps) {
-  if (src) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  if (src && src !== failedSrc) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={src}
+        onError={() => setFailedSrc(src)}
         alt={name}
         width={size}
         height={size}
@@ -32,7 +35,12 @@ export default function UserAvatar({
   }
 
   return (
-    <div className={className} style={{ width: size, height: size }}>
+    <div
+      role="img"
+      aria-label={name}
+      className={className}
+      style={{ width: size, height: size }}
+    >
       <Avatar size={size} name={name} variant="beam" colors={PALETTE} />
     </div>
   );

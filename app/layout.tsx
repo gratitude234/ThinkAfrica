@@ -1,14 +1,12 @@
 import type { Metadata, Viewport } from "next";
+import localFont from "next/font/local";
 import { Inter, Bodoni_Moda, Newsreader, Public_Sans } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
 import { DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL, absoluteUrl } from "@/lib/site";
 import ServiceWorkerRegister from "@/components/push/ServiceWorkerRegister";
 import GuestAuthGateProvider from "@/components/ui/GuestAuthGateProvider";
-import {
-  BRAND_PROMISE,
-  BRAND_SEO_DESCRIPTION,
-} from "@/lib/brand";
+import { BRAND_PROMISE, BRAND_SEO_DESCRIPTION } from "@/lib/brand";
 
 const bodoniModa = Bodoni_Moda({
   subsets: ["latin"],
@@ -18,8 +16,24 @@ const bodoniModa = Bodoni_Moda({
   display: "swap",
 });
 
-const newsreader = Newsreader({ subsets: ["latin"], variable: "--font-newsreader", display: "swap" });
-const publicSans = Public_Sans({ subsets: ["latin"], variable: "--font-public-sans", display: "swap" });
+const newsreader = Newsreader({
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  variable: "--font-newsreader",
+  display: "swap",
+});
+const publicSans = Public_Sans({
+  subsets: ["latin"],
+  variable: "--font-public-sans",
+  display: "swap",
+});
+
+const hanken = localFont({
+  src: "./fonts/hanken-grotesk-latin.woff2",
+  weight: "100 900",
+  variable: "--font-hanken",
+  display: "swap",
+});
 
 const inter = Inter({
   subsets: ["latin"],
@@ -35,12 +49,7 @@ export const metadata: Metadata = {
     template: "%s - Indegenius",
   },
   description: BRAND_SEO_DESCRIPTION,
-  keywords: [
-    "ideas",
-    "publishing",
-    "African writers",
-    "articles",
-  ],
+  keywords: ["ideas", "publishing", "African writers", "articles"],
   manifest: "/manifest.webmanifest",
   openGraph: {
     type: "website",
@@ -59,11 +68,23 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
-      { url: "/indegenius-app-icon-transparent-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/indegenius-app-icon-transparent-512.png", sizes: "512x512", type: "image/png" },
+      {
+        url: "/indegenius-app-icon-transparent-192.png",
+        sizes: "192x192",
+        type: "image/png",
+      },
+      {
+        url: "/indegenius-app-icon-transparent-512.png",
+        sizes: "512x512",
+        type: "image/png",
+      },
     ],
     apple: [
-      { url: "/indegenius-app-icon-white-bg-180.png", sizes: "180x180", type: "image/png" },
+      {
+        url: "/indegenius-app-icon-white-bg-180.png",
+        sizes: "180x180",
+        type: "image/png",
+      },
     ],
   },
   appleWebApp: {
@@ -91,7 +112,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${bodoniModa.variable} ${inter.variable} ${newsreader.variable} ${publicSans.variable}`}>
+    <html
+      lang="en"
+      className={`${bodoniModa.variable} ${inter.variable} ${newsreader.variable} ${publicSans.variable} ${hanken.variable}`}
+    >
       <body className="font-sans">
         <GuestAuthGateProvider>
           {children}

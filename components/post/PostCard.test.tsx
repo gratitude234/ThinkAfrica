@@ -15,7 +15,6 @@ function basePost(overrides: Partial<PostCardData> = {}): PostCardData {
     profiles: {
       username: "ada",
       full_name: "Ada Lovelace",
-      university: null,
       avatar_url: null,
     },
     ...overrides,

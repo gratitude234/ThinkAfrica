@@ -147,11 +147,13 @@ describe("simple writer profile: the profile", () => {
     expect(tabs).toMatch(/isOwnProfile \? OWNER_PROFILE_TABS : PUBLIC_PROFILE_TABS/);
 
     const page = codeOf("app/(main)/[username]/page.tsx");
-    expect(page).toMatch(/isOwnProfile=\{viewer\.isOwnProfile\}/);
+    const renderer = codeOf("components/profile/ProfilePageContent.tsx");
+    expect(page).toMatch(/<ProfilePageContent data=\{data\}/);
+    expect(renderer).toMatch(/isOwnProfile=\{viewer\.isOwnProfile\}/);
     // The drafts list, with its Edit and Delete controls, renders only from
     // the drafts the loader returns, and the loader returns them only to the
     // owner. See lib/profileViewData.test.ts.
-    expect(page).toMatch(/tab === "drafts" && drafts \? \(\s*<ProfileDraftList/);
+    expect(renderer).toMatch(/tab === "drafts" && drafts \? \(\s*<ProfileDraftList/);
   });
 
   it("builds the page from the header, the tabs, the list and About, and nothing else", () => {
@@ -163,16 +165,8 @@ describe("simple writer profile: the profile", () => {
       [
         "next",
         "next/navigation",
-        "@/components/profile/ProfileAbout",
-        "@/components/profile/ProfileOverview",
-        "@/components/profile/StickyProfileBar",
-        "@/components/profile/ProfileDraftList",
-        "@/components/profile/ProfileHeader",
-        "@/components/profile/ProfilePublicationList",
-        "@/components/profile/ProfileTabs",
-        "@/lib/profileFunnel",
+        "@/components/profile/ProfilePageContent",
         "@/lib/profileIdentity",
-        "@/lib/profileLayout",
         "@/lib/profileTabs",
         "@/lib/profileViewData",
         "@/lib/supabase/server",
@@ -225,6 +219,8 @@ describe("simple writer profile: the profile", () => {
             "lib/db/supabase/profiles.ts": "Existing external link projection",
             "lib/db/postgres/profiles.ts": "Same external link projection",
             "components/profile/ProfileAbout.tsx": "Validated external work URL",
+            "lib/profileSettingsData.ts": "Existing website loaded for public link editing",
+            "app/(main)/settings/profile/actions.ts": "Validated public website save",
           },
           within: (file) =>
             identitySurfaces.has(file) ||

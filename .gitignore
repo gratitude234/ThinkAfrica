@@ -44,3 +44,8 @@ scripts/migration/out/
 
 .vercel
 .env*
+
+# Browser verification output (checked-in baselines remain in tests/browser).
+/test-results/
+/playwright-report/
+/supabase/.temp/

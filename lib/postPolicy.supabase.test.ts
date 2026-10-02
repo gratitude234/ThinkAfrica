@@ -9,7 +9,7 @@ vi.mock("server-only", () => ({}));
  * A policy layer is easy to make safe by making it strict. The risk that
  * matters is the other one: a real row shape nobody thought of, refused by a
  * rule written from a trigger and a reading of the call sites. So this samples
- * actual production rows, across every status and type that exists, and asserts
+ * actual production rows, across every status and content kind that exists, and asserts
  * the policy permits what the application currently permits for each.
  *
  * READ ONLY. It issues SELECTs and evaluates a pure function. No production row
@@ -25,7 +25,6 @@ const { canWriteToPost, checkContentEdit, checkDelete, checkTransition } =
 import type { PostActor, PostStateSnapshot } from "@/lib/postPolicy";
 import type { PostStatus } from "@/lib/types";
 
-const EDITORIAL = new Set(["research", "policy_brief"]);
 
 describe.skipIf(!enabled)("the policy against real production rows", () => {
   it("permits what the product does today, for every status and type in use", async () => {
@@ -37,7 +36,7 @@ describe.skipIf(!enabled)("the policy against real production rows", () => {
     const { data, error } = await supabase
       .from("posts")
       .select(
-        "id, author_id, status, type, content_kind, article_format, citation_id, published_version_id"
+        "id, author_id, status, content_kind, citation_id, published_version_id"
       )
       .limit(500);
 
@@ -50,18 +49,16 @@ describe.skipIf(!enabled)("the policy against real production rows", () => {
 
     for (const post of rows) {
       const owner: PostActor = { kind: "author", userId: post.author_id };
-      const key = `${post.status}/${post.type}`;
+      const key = `${post.status}/${post.content_kind}`;
       seen.set(key, (seen.get(key) ?? 0) + 1);
 
-      const editorial = EDITORIAL.has(post.type);
       const writable = canWriteToPost(owner, post).allowed;
 
       // What the owner should be able to do with this row, stated from the
       // product rather than from the implementation.
       const expectedWritable =
         post.status !== "removed" &&
-        post.status !== "withdrawn" &&
-        !(post.status === "published" && editorial);
+        post.status !== "withdrawn";
 
       if (writable !== expectedWritable) {
         surprises.push(
@@ -84,7 +81,7 @@ describe.skipIf(!enabled)("the policy against real production rows", () => {
     }
 
     console.info(
-      `\n[compat] sampled ${rows.length} posts across ${seen.size} status/type combinations:\n` +
+      `\n[compat] sampled ${rows.length} posts across ${seen.size} status/kind combinations:\n` +
         [...seen.entries()]
           .sort()
           .map(([key, count]) => `    ${key.padEnd(28)} ${count}`)
@@ -109,31 +106,8 @@ describe.skipIf(!enabled)("the policy against real production rows", () => {
       to: PostStatus;
       actor: PostActor["kind"];
       site: string;
-      editorialOnly?: boolean;
     }> = [
       { from: "draft", to: "published", actor: "author", site: "write/actions.ts" },
-      { from: "draft", to: "pending", actor: "author", site: "retired editorial review (legacy rows only)" },
-      {
-        from: "pending_revision",
-        to: "pending",
-        actor: "author",
-        site: "retired editorial review (legacy rows only)",
-      },
-      {
-        from: "pending",
-        to: "pending_revision",
-        actor: "editor",
-        site: "retired editorial review (legacy rows only)",
-      },
-      { from: "pending", to: "rejected", actor: "editor", site: "retired editorial review (legacy rows only)" },
-      { from: "pending", to: "published", actor: "system", site: "retired editorial review (legacy rows only)" },
-      {
-        from: "pending",
-        to: "withdrawn",
-        actor: "author",
-        site: "withdraw_post_submission()",
-        editorialOnly: true,
-      },
       { from: "published", to: "removed", actor: "admin", site: "admin/moderation/actions.ts" },
     ];
 
@@ -142,20 +116,17 @@ describe.skipIf(!enabled)("the policy against real production rows", () => {
     const { data } = await supabase
       .from("posts")
       .select(
-        "id, author_id, status, type, content_kind, article_format, citation_id, published_version_id"
+        "id, author_id, status, content_kind, citation_id, published_version_id"
       )
       .limit(200);
     const rows = (data ?? []) as PostStateSnapshot[];
 
-    const editorialRow =
-      rows.find((row) => EDITORIAL.has(row.type)) ??
-      ({ ...rows[0], type: "research" } as PostStateSnapshot);
-    const ordinaryRow =
-      rows.find((row) => !EDITORIAL.has(row.type)) ?? rows[0];
+    const ordinaryRow = rows[0];
+    expect(ordinaryRow, "no posts sampled").toBeDefined();
 
     const failures: string[] = [];
     for (const flow of flows) {
-      const base = flow.editorialOnly ? editorialRow : ordinaryRow;
+      const base = ordinaryRow;
       // A draft-to-published flow on editorial content is the one case the
       // product genuinely forbids, so ordinary content is the right sample.
       const post: PostStateSnapshot = { ...base, status: flow.from };

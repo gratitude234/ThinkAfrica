@@ -215,7 +215,7 @@ describe("updateOwnProfile", () => {
       { reason: "forbidden_columns", rejected: ["role"] },
       { reason: "not_found" },
       { reason: "query_failed" },
-    ] as const;
+    ] satisfies import("./profileMutations").ProfileUpdateFailure[];
 
     for (const failure of failures) {
       const message = profileUpdateMessage(failure);

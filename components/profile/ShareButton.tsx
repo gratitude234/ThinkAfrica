@@ -7,12 +7,14 @@ interface ShareButtonProps {
   label?: string;
   className?: string;
   copyOnly?: boolean;
+  iconOnly?: boolean;
 }
 
 export default function ShareButton({
   label = "Share",
   className = "",
   copyOnly = false,
+  iconOnly = false,
 }: ShareButtonProps) {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -44,7 +46,8 @@ export default function ShareButton({
       <button
         type="button"
         onClick={handleShare}
-        className={`focus-ring inline-flex items-center justify-center gap-2 rounded-lg border border-card-border bg-card px-4 py-2 text-sm font-medium text-ink-soft transition-colors hover:border-card-border-hover hover:text-ink ${className}`}
+        aria-label={label}
+        className={`focus-ring inline-flex items-center justify-center gap-2 rounded-full border border-card-border bg-card px-4 py-2 text-sm font-medium text-ink-soft transition-colors hover:border-card-border-hover hover:text-ink ${className}`}
       >
         <svg
           className="h-4 w-4"
@@ -60,7 +63,7 @@ export default function ShareButton({
             strokeLinejoin="round"
           />
         </svg>
-        {label}
+        {iconOnly ? <span className="sr-only">{label}</span> : label}
       </button>
       {toastMessage ? (
         <Toast message={toastMessage} onDone={() => setToastMessage(null)} />

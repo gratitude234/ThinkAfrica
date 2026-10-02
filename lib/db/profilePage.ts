@@ -207,7 +207,7 @@ const PUBLICATION_BRANCHES_SQL = `
     and p.content_kind in (
       select value from jsonb_array_elements_text($2::text::jsonb)
     )
-  order by p.published_at desc nulls last, p.created_at desc
+  order by p.published_at desc nulls last, p.created_at desc, p.id desc
   offset $3::int
   limit $4::int
 `;
@@ -574,6 +574,10 @@ function topicKeys(value: unknown): string[] {
   )];
 }
 
+function missingProfileAggregate(error: { code?: string }) {
+  return error.code === "PGRST202" || error.code === "42883";
+}
+
 export function createSupabaseProfilePageRepository(
   supabase: SupabaseClient
 ): ProfilePageRepository {
@@ -642,6 +646,7 @@ export function createSupabaseProfilePageRepository(
         .in("content_kind", [...contentKinds])
         .order("published_at", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
         .range(start, start + limit - 1);
 
       const owned = rows<ProfilePublicationRow>(ownedResult, "publications failed");
@@ -670,6 +675,10 @@ export function createSupabaseProfilePageRepository(
 
     async publicationActivity({ profileId, startMonth, months }) {
       const windows = monthWindow(startMonth, months);
+      const aggregate = await supabase.rpc("profile_publication_activity", { p_profile_id: profileId, p_start_month: windows[0].start, p_months: windows.length });
+      if (!aggregate.error) return rows<Record<string, unknown>>(aggregate, "publication activity failed").map(row => ({ month: String(row.month), count: toNumber(row.publication_count) }));
+      // Only an absent migration permits the old, exact paginated path.
+      if (!missingProfileAggregate(aggregate.error)) throw new Error(`publication activity failed: ${aggregate.error.message}`);
       const first = windows[0];
       const last = windows[windows.length - 1];
       if (!first || !last) return [];
@@ -690,6 +699,7 @@ export function createSupabaseProfilePageRepository(
           )
           .order("published_at", { ascending: true, nullsFirst: false })
           .order("created_at", { ascending: true })
+          .order("id", { ascending: true })
           .range(start, start + pageSize - 1);
 
         if (result.error) {
@@ -721,6 +731,9 @@ export function createSupabaseProfilePageRepository(
 
     async publicationTopics({ profileId, limit }) {
       const safeLimit = Math.max(1, Math.min(12, Math.trunc(limit)));
+      const aggregate = await supabase.rpc("profile_publication_topics", { p_profile_id: profileId, p_limit: safeLimit });
+      if (!aggregate.error) return rows<Record<string, unknown>>(aggregate, "publication topics failed").map(row => ({ key: String(row.topic_key).trim().toLowerCase(), count: toNumber(row.publication_count) })).filter(topic => topic.key.length > 0 && topic.count > 0);
+      if (!missingProfileAggregate(aggregate.error)) throw new Error(`publication topics failed: ${aggregate.error.message}`);
       const pageSize = 500;
       const counts = new Map<string, { count: number; latestAt: string }>();
       let start = 0;
@@ -734,6 +747,7 @@ export function createSupabaseProfilePageRepository(
           .in("content_kind", ["article", "post"])
           .order("published_at", { ascending: false, nullsFirst: false })
           .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
           .range(start, start + pageSize - 1);
 
         if (result.error) {
@@ -787,6 +801,7 @@ export function createSupabaseProfilePageRepository(
         .overlaps("topic_keys", normalizedTopics)
         .order("published_at", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
         .limit(RELATED_THINKERS_MATCH_WINDOW);
 
       if (matching.error) {

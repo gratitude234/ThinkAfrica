@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProfileSettingsModel } from "@/lib/profileSettings";
+import { loadSelectedWorkPage } from "./actions";
 import ProfileSettings from "./ProfileSettings";
 
 const saveProfileSection = vi.hoisted(() => vi.fn());
@@ -9,6 +10,7 @@ const saveSelectedWorkSection = vi.hoisted(() => vi.fn());
 const saveTopicsSection = vi.hoisted(() => vi.fn());
 const saveVisibilitySection = vi.hoisted(() => vi.fn());
 vi.mock("./actions", () => ({
+  loadSelectedWorkPage: vi.fn(),
   saveProfileSection,
   saveSelectedWorkSection,
   saveTopicsSection,
@@ -65,6 +67,8 @@ function section(name: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(loadSelectedWorkPage).mockReset();
+  vi.mocked(loadSelectedWorkPage).mockResolvedValue({ ok: true, items: [], hasMore: false });
   saveProfileSection.mockResolvedValue({ ok: true, username: "ada" });
   saveSelectedWorkSection.mockResolvedValue({ ok: true });
   saveTopicsSection.mockResolvedValue({ ok: true });
@@ -85,7 +89,7 @@ describe("Edit profile", () => {
       />
     );
 
-    expect(screen.getByRole("status")).toHaveTextContent(/no longer published/i);
+    expect(within(section("Selected Work")).getByText(/Your previously selected work is no longer published/i)).toBeInTheDocument();
     await user.click(screen.getByRole("radio", { name: /No selected work/i }));
     const selected = section("Selected Work");
     await user.click(within(selected).getByRole("button", { name: /save/i }));
@@ -108,17 +112,17 @@ describe("Edit profile", () => {
   it("asks for no persona, focus statement, organisation, old Featured Work manager or completion", () => {
     const { container } = render(<ProfileSettings model={model} />);
     const text = container.textContent ?? "";
+    expect(screen.queryByRole("heading", { name: "Intellectual Record" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Profile preview" })).not.toBeInTheDocument();
 
     for (const retired of [
       /Profile type/i,
       /Intellectual focus/i,
       /Organi[sz]ation/i,
       /Featured Work/i,
-      /Intellectual Record/i,
       /Demonstrated topics/i,
       /% complete/i,
       /Complete your profile/i,
-      /Preview/,
     ]) {
       expect(text).not.toMatch(retired);
     }
@@ -235,5 +239,41 @@ describe("section save states", () => {
       })
     );
     expect(saveProfileSection).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("published work catalogue", () => {
+  it("loads older works, deduplicates pages and shows a selection preview", async () => {
+    vi.mocked(loadSelectedWorkPage).mockResolvedValue({ ok: true, items: [model.selectedWorkOptions[0], { id: "older", title: "An older argument", kind: "article", publishedAt: "2020-01-01", excerpt: "The older article summary." }], hasMore: false });
+    const user = setup(); render(<ProfileSettings model={{ ...model, selectedWorkHasMore: true }} />);
+    const selected = section("Selected Work");
+    await user.click(within(selected).getByRole("button", { name: "Load older work" }));
+    await waitFor(() => expect(loadSelectedWorkPage).toHaveBeenCalledWith({ query: "", page: 1 }));
+    expect(within(selected).getAllByRole("radio", { name: /A public argument/ })).toHaveLength(1);
+    await user.click(within(selected).getByRole("radio", { name: /An older argument/ }));
+    expect(within(selected).getByRole("heading", { name: "An older argument" })).toBeVisible();
+    expect(within(selected).getByText("The older article summary.")).toBeInTheDocument();
+    await user.click(within(selected).getByRole("button", { name: "Save" }));
+    expect(saveSelectedWorkSection).toHaveBeenCalledWith({ postId: "older" });
+  });
+  it("retains the chosen work on an empty search and preserves results on failure", async () => {
+    const user = setup(); render(<ProfileSettings model={model} />);
+    const selected = section("Selected Work");
+    await user.click(within(selected).getByRole("radio", { name: /A public argument/ }));
+    await user.type(within(selected).getByRole("searchbox"), "no match");
+    await user.click(within(selected).getByRole("button", { name: "Search" }));
+    await waitFor(() => expect(loadSelectedWorkPage).toHaveBeenCalledWith({ query: "no match", page: 0 }));
+    expect(within(selected).getByText(/No published work matches/)).toBeInTheDocument();
+    expect(within(selected).getByRole("heading", { name: "A public argument" })).toBeInTheDocument();
+    vi.mocked(loadSelectedWorkPage).mockResolvedValue({ ok: false, items: [], hasMore: false, error: "Could not load your work." });
+    await user.click(within(selected).getByRole("button", { name: "Search" }));
+    await waitFor(() => expect(within(selected).getByRole("alert")).toHaveTextContent("Could not load your work."));
+    await user.click(within(selected).getByRole("button", { name: "Save" }));
+    expect(saveSelectedWorkSection).toHaveBeenCalledWith({ postId: "article-1" });
+  });
+  it("keeps every section Save disabled until its fields change", () => {
+    render(<ProfileSettings model={model} />);
+    for (const name of ["Profile", "Selected Work", "Topics", "Visibility"]) expect(within(section(name)).getByRole("button", { name: "Save" })).toBeDisabled();
   });
 });

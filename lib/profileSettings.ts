@@ -1,3 +1,4 @@
+import { safeExternalProfileUrl } from "@/lib/profileWebsite";
 import {
   PROFILE_BIO_MAX_LENGTH,
   PROFILE_HEADLINE_MAX_LENGTH,
@@ -18,7 +19,12 @@ import {
  * this. There is no completion score and nothing on the page suggests what a
  * member should add.
  */
-export const PROFILE_SETTINGS_SECTIONS = ["profile", "selected-work", "topics", "visibility"] as const;
+export const PROFILE_SETTINGS_SECTIONS = [
+  "profile",
+  "selected-work",
+  "topics",
+  "visibility",
+] as const;
 
 export type ProfileSettingsSection = (typeof PROFILE_SETTINGS_SECTIONS)[number];
 
@@ -28,11 +34,13 @@ export const PROFILE_SETTINGS_SECTION_DEFINITIONS: Record<
 > = {
   profile: {
     label: "Profile",
-    summary: "Your photo, optional cover, name, username, headline and bio, and where you are and studied.",
+    summary:
+      "Your photo, optional cover, name, username, headline and bio, and where you are and studied.",
   },
   "selected-work": {
     label: "Selected Work",
-    summary: "Choose one published Post or Article to represent your work at the top of your profile.",
+    summary:
+      "Choose one published Post or Article to represent your work at the top of your profile.",
   },
   topics: {
     label: "Topics",
@@ -40,7 +48,8 @@ export const PROFILE_SETTINGS_SECTION_DEFINITIONS: Record<
   },
   visibility: {
     label: "Visibility",
-    summary: "Who can see your profile, and whether you appear in the directory.",
+    summary:
+      "Who can see your profile, and whether you appear in the directory.",
   },
 };
 
@@ -49,6 +58,8 @@ export interface ProfileSettingsWorkOption {
   title: string;
   kind: "post" | "article";
   publishedAt: string | null;
+  excerpt?: string | null;
+  coverImageUrl?: string | null;
 }
 
 export interface ProfileSettingsModel {
@@ -68,6 +79,8 @@ export interface ProfileSettingsModel {
   /** True when the stored pointer no longer resolves to a published Post/Article. */
   selectedWorkUnavailable: boolean;
   selectedWorkOptions: ProfileSettingsWorkOption[];
+  selectedWorkHasMore?: boolean;
+  website?: string;
   visibility: {
     profileVisibility: "public" | "members_only";
     showInDirectory: boolean;
@@ -84,6 +97,7 @@ export interface ProfileDetailsDraft {
   university: string;
   fieldOfStudy: string;
   graduationYear: string;
+  website?: string;
 }
 
 export const GRADUATION_YEAR_MIN = 1950;
@@ -106,12 +120,16 @@ export function getGraduationYearError(value: string): string | null {
  * name and a valid username are required. Everything else is optional and
  * only bounded.
  */
-export function getProfileDetailsError(draft: ProfileDetailsDraft): string | null {
+export function getProfileDetailsError(
+  draft: ProfileDetailsDraft,
+): string | null {
   const name = draft.fullName.trim();
   if (!name) return "Add your name.";
   if (name.length > PROFILE_NAME_MAX_LENGTH) return "That name is too long.";
 
-  const usernameError = getProfileUsernameError(normalizeProfileUsername(draft.username));
+  const usernameError = getProfileUsernameError(
+    normalizeProfileUsername(draft.username),
+  );
   if (usernameError) return usernameError;
 
   if (draft.headline.trim().length > PROFILE_HEADLINE_MAX_LENGTH) {
@@ -121,7 +139,14 @@ export function getProfileDetailsError(draft: ProfileDetailsDraft): string | nul
     return `Keep your bio to ${PROFILE_BIO_MAX_LENGTH} characters or fewer.`;
   }
   for (const value of [draft.country, draft.university, draft.fieldOfStudy]) {
-    if (value.trim().length > PROFILE_FACT_MAX_LENGTH) return "That entry is too long.";
+    if (value.trim().length > PROFILE_FACT_MAX_LENGTH)
+      return "That entry is too long.";
   }
+  if (
+    draft.website?.trim() &&
+    (draft.website.trim().length > 2048 ||
+      !safeExternalProfileUrl(draft.website))
+  )
+    return "Enter a full http:// or https:// website URL without login credentials.";
   return getGraduationYearError(draft.graduationYear);
 }

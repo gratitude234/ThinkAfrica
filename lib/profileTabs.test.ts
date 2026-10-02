@@ -73,10 +73,12 @@ describe("Post and Article classification", () => {
     // A writer old Research paper or Policy Brief carries content_kind
     // "article" since 20260915000005, and lands on Articles because it is one
     // rather than because a mapping table says so.
-    expect(profilePublicationKind({ content_kind: "article", type: "research" })).toBe(
+    const legacyArticle = { content_kind: "article", type: "research" };
+    const legacyPost = { content_kind: "post", type: "essay" };
+    expect(profilePublicationKind(legacyArticle)).toBe(
       "article"
     );
-    expect(profilePublicationKind({ content_kind: "post", type: "essay" })).toBe("post");
+    expect(profilePublicationKind(legacyPost)).toBe("post");
   });
 
   it("lists nothing it cannot classify", () => {

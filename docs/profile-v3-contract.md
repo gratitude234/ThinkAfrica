@@ -54,3 +54,15 @@ Onboarding is Profile Stage 1, not a separate identity system.
 - The optional profile cover is a restrained banner, not a full-screen hero and not a requirement for profile completeness.
 - Avoid wrapping every section in rounded cards.
 - The profile must remain readable and work-first at desktop, tablet and mobile widths.
+
+## Mockup polish
+
+- The cover, identity, tabs and work share the primary column. Overview context starts alongside the cover on desktop, then moves below work on smaller screens.
+- Profile typography uses Hanken Grotesk and Newsreader, with a warm paper palette scoped to profile pages. The existing application navigation stays in place.
+- One featured article has a wide cover and explicit reading action. Posts retain their body-first presentation. Selected Work is omitted from Recent Work.
+- Work engagement reuses the existing feed actions and bounded, viewer-aware hydration. Unknown aggregates are omitted rather than reported as zero.
+- Activity is bucketed in UTC; a zero month has zero filled height. Each month exposes a full date and count through keyboard and touch interaction.
+- A public website is edited as a validated external URL using the existing `organization_website` storage column; this does not restore organisation profiles.
+- Selected Work settings search and paginate all of the owner's published Posts and Articles. The picker provides a preview of the chosen work and preserves it across searches.
+- Supabase aggregate RPCs use SECURITY INVOKER and caller RLS. Only a missing function permits the legacy aggregate fallback. The catalogue RPC is authenticated-only and derives its owner from `auth.uid()`.
+- Every settings section saves independently and enables Save only for a changed, valid draft.

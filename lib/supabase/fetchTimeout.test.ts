@@ -73,7 +73,7 @@ describe("withSupabaseTimeout", () => {
 
   it("lets a storage transfer run past the deadline", async () => {
     const base = vi.fn(
-      async () =>
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
         await new Promise<Response>((resolve) =>
           setTimeout(() => resolve(new Response("ok")), 40)
         )

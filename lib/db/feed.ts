@@ -82,6 +82,8 @@ export interface FeedAuthorProfile {
 }
 
 export interface FeedHydration {
+  /** Optional compatibility aggregates failed; their defaults are not factual counts. */
+  countsReliable?: boolean;
   counts: FeedPostCounts[];
   profiles: FeedAuthorProfile[];
 }
@@ -506,6 +508,7 @@ export function createSupabaseFeedRepository(
           viewerBookmarked: bookmarkedSet.has(postId),
         })),
         profiles: profileRows,
+        ...([likeCountsResult, commentCountsResult, viewerLikesResult, viewerBookmarksResult].some(result => result.status === "rejected") ? { countsReliable: false } : {}),
       };
     },
 
