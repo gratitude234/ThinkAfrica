@@ -2,12 +2,14 @@
 
 The project now implements the recommended profile improvements while keeping the application's current Posts and Articles product contract. The existing application navigation and authenticated account flows are retained.
 
+The subsequent visual alignment is documented in [Profile V3 design-system alignment](docs/Profile_V3_Design_System_Alignment_2026-10-04.md), with the checks run for that change. The original mockup validation below is historical.
+
 ## Changes
 
 | Recommendation | Implementation |
 | --- | --- |
 | Header geometry | Cover and identity share the primary column. The avatar overlaps the cover at 108px on desktop and 84px on mobile, with the name alongside it. Profile actions use rounded controls and mobile Follow uses the available width. |
-| Typography and palette | Profile-scoped warm paper, green, border and text colours; Hanken Grotesk for interface text; Newsreader headings and an italic headline. Text sizes use rem units to accommodate larger text settings. |
+| Typography and palette | The shared Home/Explore canvas and semantic application tokens; Public Sans for interface, metadata and body text; Newsreader for the writer name, headings, Selected Work and publication titles, and the italic headline. Text sizes use rem units to accommodate larger text settings. |
 | Selected Work | Articles use a wide 220px desktop / 168px mobile cover, title, excerpt, publication date, stored reading time, and an explicit Read article action. Posts retain a body-first treatment. |
 | Recent Work | Author avatar/name and verification, distinct Article/Post presentation, thumbnails where available, and real like/comment/save/share controls. Selected Work is excluded from Recent Work. |
 | Sidebar | Desktop context begins beside the cover. About includes a brief bio, structured education, location, public website and join date. Smaller screens place context after the work. |
@@ -36,7 +38,7 @@ All three functions use SECURITY INVOKER and an empty search path. Public aggreg
 
 No live database migration was applied during this implementation. The migration was executed and tested in an isolated PostgreSQL runtime with representative profiles, publications, RLS policies and anonymous/authenticated roles. Live credentials, storage and production performance should be verified on staging after deployment.
 
-## Validation
+## Original mockup validation (before visual alignment)
 
 - Production build: passed.
 - Complete TypeScript check (`npm run typecheck:all`): passed.
@@ -72,4 +74,4 @@ npm run profile:browser
 
 Visual baselines were generated on Linux with Chromium 153. Browser/font/platform differences can require reviewed baseline regeneration with `npm run profile:browser -- --update-snapshots`. `PROFILE_CHROMIUM_PATH` can select an installed Chromium executable.
 
-The preview includes imagery extracted from the supplied mockup; production member data continues to use its stored media URLs. The bundled Hanken Grotesk font licence is in `app/fonts/OFL-Hanken-Grotesk.txt`.
+The preview includes imagery extracted from the supplied mockup; production member data continues to use its stored media URLs. Profile uses the application's registered Public Sans and Newsreader families and does not register a separate interface font.

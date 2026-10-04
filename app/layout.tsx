@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import localFont from "next/font/local";
 import { Inter, Bodoni_Moda, Newsreader, Public_Sans } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
@@ -25,13 +24,6 @@ const newsreader = Newsreader({
 const publicSans = Public_Sans({
   subsets: ["latin"],
   variable: "--font-public-sans",
-  display: "swap",
-});
-
-const hanken = localFont({
-  src: "./fonts/hanken-grotesk-latin.woff2",
-  weight: "100 900",
-  variable: "--font-hanken",
   display: "swap",
 });
 
@@ -114,7 +106,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${bodoniModa.variable} ${inter.variable} ${newsreader.variable} ${publicSans.variable} ${hanken.variable}`}
+      className={`${bodoniModa.variable} ${inter.variable} ${newsreader.variable} ${publicSans.variable}`}
     >
       <body className="font-sans">
         <GuestAuthGateProvider>

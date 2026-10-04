@@ -23,10 +23,10 @@ import {
 export type { PublicProfileIdentity } from "@/lib/profileIdentity";
 
 const ACTION_BASE =
-  "focus-ring inline-flex min-h-11 items-center justify-center rounded-full px-4 text-sm font-semibold transition-colors";
+  "focus-ring inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-sm font-semibold transition-colors";
 
 /** The single filled action. Only ever one of these is on screen at a time. */
-const ACTION_PRIMARY = `${ACTION_BASE} bg-emerald-brand text-white hover:bg-[#0E4B37]`;
+const ACTION_PRIMARY = `${ACTION_BASE} bg-emerald-brand text-white hover:bg-emerald-brand/90`;
 
 interface ProfileHeaderProps {
   profile: PublicProfileIdentity;

@@ -47,7 +47,7 @@ export default function ShareButton({
         type="button"
         onClick={handleShare}
         aria-label={label}
-        className={`focus-ring inline-flex items-center justify-center gap-2 rounded-full border border-card-border bg-card px-4 py-2 text-sm font-medium text-ink-soft transition-colors hover:border-card-border-hover hover:text-ink ${className}`}
+        className={`focus-ring inline-flex items-center justify-center gap-2 rounded-lg border border-card-border bg-card px-4 py-2 text-sm font-medium text-ink-soft transition-colors hover:border-card-border-hover hover:text-ink ${className}`}
       >
         <svg
           className="h-4 w-4"

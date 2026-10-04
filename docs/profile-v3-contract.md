@@ -58,7 +58,9 @@ Onboarding is Profile Stage 1, not a separate identity system.
 ## Mockup polish
 
 - The cover, identity, tabs and work share the primary column. Overview context starts alongside the cover on desktop, then moves below work on smaller screens.
-- Profile typography uses Hanken Grotesk and Newsreader, with a warm paper palette scoped to profile pages. The existing application navigation stays in place.
+- Profile shares Home/Explore's global canvas and the semantic colour tokens in `app/globals.css`. Public Sans is used for interface, metadata and body text; Newsreader remains for the writer name, major headings, Selected Work and publication titles, and the editorial headline. Brand emerald is used for filled controls/marks; emerald ink is used for links, tabs and textual accents.
+- Follow keeps the shared `FollowButton` styling. Edit, Share and More use the application's `rounded-lg` control language and retain their touch targets; mobile Follow still fills the available width. Topic and interest pills use card backgrounds, card borders and soft ink, with semantic emerald interaction on topic links. Publication interactions style the individual link rather than the entire row.
+- Mobile Profile and the full record use a Profile-scoped 4px extension into the shell's 20px side padding to align with Home/Explore's 16px reading gutter. Desktop geometry and global route handling stay unchanged.
 - One featured article has a wide cover and explicit reading action. Posts retain their body-first presentation. Selected Work is omitted from Recent Work.
 - Work engagement reuses the existing feed actions and bounded, viewer-aware hydration. Unknown aggregates are omitted rather than reported as zero.
 - Activity is bucketed in UTC; a zero month has zero filled height. Each month exposes a full date and count through keyboard and touch interaction.
