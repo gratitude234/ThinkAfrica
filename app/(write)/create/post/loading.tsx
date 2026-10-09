@@ -1,5 +1,1 @@
-import WriteCanvasSkeleton from "../../write/WriteCanvasSkeleton";
-
-export default function Loading() {
-  return <WriteCanvasSkeleton />;
-}
+export { default } from "../../write/loading";

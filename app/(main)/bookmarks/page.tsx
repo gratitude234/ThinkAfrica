@@ -1,5 +1,7 @@
 "use client";
 
+import { BookmarkSkeletons } from "@/components/post/PublicationCardSkeleton";
+
 import { useEffect, useState } from "react";
 import type { PostCardData } from "@/components/post/PostCard";
 import PostCardImpression from "@/components/post/PostCardImpression";
@@ -12,31 +14,6 @@ const KIND_FILTERS = [
   { label: "Posts", value: "post" },
   { label: "Articles", value: "article" },
 ];
-
-function BookmarkSkeletons() {
-  return (
-    <div className="space-y-4 animate-pulse motion-reduce:animate-none">
-      {[...Array(3)].map((_, index) => (
-        <div
-          key={index}
-          className="rounded-xl border border-gray-200/70 bg-white p-5"
-        >
-          <div className="space-y-3">
-            <div className="h-5 w-16 rounded-full bg-gray-200" />
-            <div className="h-6 w-4/5 rounded bg-gray-200" />
-            <div className="h-4 w-full rounded bg-gray-100" />
-            <div className="h-4 w-3/4 rounded bg-gray-100" />
-            <div className="mt-4 flex items-center gap-2 border-t border-gray-100 pt-4">
-              <div className="h-3 w-24 rounded bg-gray-200" />
-              <div className="h-3 w-28 rounded bg-gray-100" />
-              <div className="h-3 w-20 rounded bg-gray-100" />
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 function kindLabel(filter: string) {
   const match = KIND_FILTERS.find((item) => item.value === filter);

@@ -1,39 +1,51 @@
-/** A quiet preview of the current composer, rather than the retired editor. */
-export default function WriteCanvasSkeleton() {
-  return (
-    <div className="min-h-dvh bg-canvas text-ink md:min-h-[calc(100dvh-var(--app-nav-height))] md:bg-[#F1EEE7] md:px-6 md:py-14">
-      <section
-        role="status"
-        aria-label="Opening your writing space"
-        aria-live="polite"
-        className="mx-auto min-h-dvh w-full bg-canvas md:min-h-0 md:max-w-[560px] md:rounded-[14px] md:border md:border-card-border md:shadow-[0_8px_30px_rgba(0,0,0,0.07)]"
-      >
-        <div aria-hidden="true" className="flex h-[60px] items-center gap-3 border-b border-divider px-5">
-          <div className="h-8 w-8 rounded-full bg-surface" />
-          <div className="h-2 w-16 rounded-full bg-card-border/70" />
-          <div className="ml-auto h-8 w-16 rounded-lg bg-emerald-brand/10" />
+import LoadingState from "@/components/ui/LoadingState";
+import Skeleton from "@/components/ui/Skeleton";
+
+export default function WriteCanvasSkeleton({
+  variant = "post",
+  fullScreen = false
+}: {
+  variant?: "post" | "article";
+  fullScreen?: boolean;
+}) {
+  const article = variant === "article";
+  return <LoadingState label={fullScreen ? "Opening publication editor" : "Opening your writing space"} className={fullScreen ? "fixed inset-0 z-[70] overflow-y-auto bg-canvas" : ""}>
+    <div className={`min-h-dvh bg-canvas text-ink ${fullScreen ? "" : "md:min-h-[calc(100dvh-var(--app-nav-height))]"} ${article ? "" : "md:bg-[#F1EEE7] md:py-14"}`}>
+      <section className={article ? "w-full" : "mx-auto min-h-dvh w-full bg-canvas md:min-h-0 md:w-[560px] md:rounded-[14px] md:border md:border-card-border md:shadow-[0_8px_30px_rgba(0,0,0,0.07)]"}>
+        <div className={`grid grid-cols-[1fr_auto_1fr] items-center gap-1 border-b border-divider ${article ? "min-h-[52px] px-2 sm:px-6 md:min-h-[60px] md:px-10" : "min-h-14 px-3 sm:px-5"}`}>
+          <Skeleton className="h-11 w-16 rounded-lg" />
+          <Skeleton className="h-4 w-20" />
+          <div className="flex min-w-0 justify-end gap-2">
+            <Skeleton className="h-11 w-7 rounded-lg" />
+            <Skeleton className="h-11 w-16 rounded-lg" />
+          </div>
         </div>
-        <div className="px-5 pb-6 pt-6 sm:px-6">
-          <div aria-hidden="true" className="motion-safe:animate-pulse">
-            <div className="mb-7 flex items-center gap-2.5">
-              <div className="h-8 w-8 rounded-full bg-card-border/60" />
-              <div className="h-2 w-24 rounded-full bg-card-border/70" />
+        {article ? <>
+          <div className="flex min-h-8 items-center gap-2 border-b border-divider px-5 md:hidden"><Skeleton className="h-3 w-24" /></div>
+          <div className="mx-auto w-full max-w-[680px] px-5 pt-5 sm:px-8 md:pt-10">
+            <Skeleton className="mb-6 hidden h-11 w-32 rounded-lg md:block" />
+            <Skeleton className="h-10 w-11/12 sm:h-14" />
+            <Skeleton className="mt-3 h-10 w-3/4 sm:h-14" />
+            <div className="mt-6 min-h-[50vh] space-y-4 sm:mt-8">
+              <Skeleton className="h-5 w-full" />
+              <Skeleton className="h-5 w-11/12" />
+              <Skeleton className="h-5 w-4/5" />
             </div>
-            <div className="h-2.5 w-4/5 rounded-full bg-card-border/60" />
-            <div className="mt-3.5 h-2.5 w-3/5 rounded-full bg-card-border/40" />
           </div>
-          <div className="flex min-h-44 flex-col items-center justify-center gap-3 py-8">
-            <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-full bg-green-wash">
-              <span className="h-5 w-5 rounded-full border-2 border-emerald-brand/20 border-t-emerald-brand motion-safe:animate-spin" />
-            </span>
-            <p className="text-sm font-medium text-ink-muted">Opening your writing space…</p>
+        </> : <div className="px-4 pb-24 pt-3.5 sm:px-5 md:pb-5 md:pt-5">
+          <div className="flex items-center gap-2.5">
+            <Skeleton className="h-8 w-8 shrink-0 rounded-full" />
+            <Skeleton className="h-4 w-28" />
           </div>
-          <div aria-hidden="true" className="flex items-center justify-between border-t border-divider pt-4">
-            <div className="h-8 w-8 rounded-lg bg-surface" />
-            <div className="h-2 w-28 rounded-full bg-card-border/50" />
+          <div className="mt-3 min-h-24 space-y-3">
+            <Skeleton className="h-5 w-4/5" />
+            <Skeleton className="h-5 w-3/5" />
           </div>
-        </div>
+          <div className="mt-3 hidden min-h-11 items-center md:flex"><Skeleton className="h-11 w-11 rounded-lg" /></div>
+          <Skeleton className="mt-3 h-11 w-full rounded-lg" />
+        </div>}
       </section>
+      <div className="fixed inset-x-0 bottom-0 flex min-h-14 items-center gap-4 border-t border-divider bg-canvas px-5 pb-[env(safe-area-inset-bottom)] md:hidden">{[0, 1, 2].map(index => <Skeleton key={index} className="h-8 w-8 rounded-lg" />)}</div>
     </div>
-  );
+  </LoadingState>;
 }

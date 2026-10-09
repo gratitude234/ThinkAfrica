@@ -1,3 +1,6 @@
+import LoadingState from "@/components/ui/LoadingState";
+import PublicationSkeleton, { ArticleAuthorSkeleton } from "@/components/post/PublicationSkeleton";
+import { ARTICLE_DETAIL_SHELL } from "@/lib/publicationLayout";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -215,12 +218,12 @@ async function getViewerData({
 
 function SectionSkeleton({ rows = 3 }: { rows?: number }) {
   return (
-    <div className="animate-pulse space-y-3 motion-reduce:animate-none">
+    <LoadingState label="Loading publication details" contentClassName="space-y-3">
       <div className="h-4 w-24 rounded bg-gray-200" />
       {[...Array(rows)].map((_, index) => (
         <div key={index} className="h-4 rounded bg-canvas" />
       ))}
-    </div>
+    </LoadingState>
   );
 }
 
@@ -618,7 +621,7 @@ export default async function PostPage({ params }: PageProps) {
           {isPublished ? (
             <ViewTracker slug={slug} wordCount={wordCount} engagementToken={engagementToken} />
           ) : null}
-          <Suspense fallback={<SectionSkeleton rows={6} />}>
+          <Suspense fallback={<PublicationSkeleton kind="post" />}>
             <PostConversationView
               post={post}
               author={author}
@@ -647,7 +650,7 @@ export default async function PostPage({ params }: PageProps) {
           </>
         ) : null}
 
-        <div className="mx-auto max-w-[740px] pb-20">
+        <div className={ARTICLE_DETAIL_SHELL}>
           <Suspense fallback={null}>
             <PostPublishSuccessSection
               post={post}
@@ -678,7 +681,7 @@ export default async function PostPage({ params }: PageProps) {
               </p>
             ) : null}
 
-            <Suspense fallback={<div className="mt-6 h-10 animate-pulse rounded-lg bg-canvas motion-reduce:animate-none" />}>
+            <Suspense fallback={<ArticleAuthorSkeleton />}>
               <DetailAuthorRow
                 post={post}
                 author={author}
