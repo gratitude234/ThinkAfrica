@@ -39,8 +39,9 @@ for (const width of [1440, 900, 390, 320]) {
     const selectedCover = await page
       .locator(".profile-selected-cover")
       .boundingBox();
-    expect(selectedCover!.height).toBe(width < 768 ? 168 : 220);
-    expect(selectedCover!.width).toBeGreaterThan(250);
+    expect(selectedCover!.height).toBe(width < 768 ? 76 : 220);
+    if (width < 768) expect(selectedCover!.width).toBe(92);
+    else expect(selectedCover!.width).toBeGreaterThan(250);
     expect(
       await page
         .locator(".profile-record-metrics")
@@ -72,11 +73,15 @@ test("featured work is absent from Recent Work and engagement opens the guest ga
   await expect(page.getByRole("dialog")).not.toBeVisible();
 });
 
-test("sharing and More actions support keyboard focus and clipboard", async ({
+test("sharing clipboard fallback and More actions support keyboard focus", async ({
   page,
   context,
 }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  // Exercise the clipboard fallback consistently, including on Windows with native sharing.
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "share", { configurable: true, value: undefined });
+  });
   await open(page);
   await page
     .locator(".profile-header-actions")
@@ -106,6 +111,7 @@ test("mobile sticky tabs, biography and activity remain usable", async ({
   await expect(
     page.getByRole("button", { name: "Less", exact: true }),
   ).toBeVisible();
+  await page.locator(".profile-activity-toggle").click();
   const january = page.getByRole("button", {
     name: "January 2026: 0 published works",
   });
@@ -150,6 +156,8 @@ test("large text and keyboard tab navigation", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 844 });
   await open(page, "?long=1");
   await page.addStyleTag({ content: "html { font-size: 24px !important; }" });
+  await page.locator(".profile-activity-toggle").click();
+  await expect(page.getByRole("button", { name: "January 2026: 0 published works" })).toBeVisible();
   await noOverflow(page);
   const tabs = page.locator(".profile-primary > .profile-tabs");
   await tabs.getByRole("tab", { name: "Overview" }).focus();
@@ -167,5 +175,41 @@ test("large text and keyboard tab navigation", async ({ page }) => {
       .locator(".profile-primary > .profile-tabs")
       .getByRole("tab", { name: "About" }),
   ).toHaveAttribute("aria-selected", "true");
+  await noOverflow(page);
+});
+
+test("desktop profile header and tabs stay aligned across every owner tab", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await open(page, "?owner=1");
+  const cover = await page.locator(".profile-cover").boundingBox();
+  const tabs = await page.locator(".profile-primary > .profile-tabs").boundingBox();
+  const identity = await page.locator("#profile-identity").boundingBox();
+  for (const name of ["Posts", "Articles", "About", "Drafts", "Overview"]) {
+    await page.locator(".profile-primary > .profile-tabs").getByRole("tab", { name, exact: true }).click();
+    await expect(page.locator(".profile-primary > .profile-tabs").getByRole("tab", { name, exact: true })).toHaveAttribute("aria-selected", "true");
+    for (const [selector, original] of [[".profile-cover", cover], [".profile-primary > .profile-tabs", tabs], ["#profile-identity", identity]] as const) {
+      const current = await page.locator(selector).boundingBox();
+      expect(current!.x).toBeCloseTo(original!.x, 0);
+      expect(current!.y).toBeCloseTo(original!.y, 0);
+      expect(current!.width).toBeCloseTo(original!.width, 0);
+    }
+  }
+});
+
+test("mobile overview brings work forward and keeps the full biography available", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await open(page);
+  const selected = await page.locator("#selected-work-heading").boundingBox();
+  const recent = await page.locator("#recent-work").boundingBox();
+  const record = await page.locator("#intellectual-record").boundingBox();
+  expect(selected!.y + selected!.height).toBeLessThan(844);
+  expect(recent!.y).toBeLessThan(record!.y);
+  await expect(page.locator(".profile-recent-work > li:visible")).toHaveCount(2);
+  await expect(page.getByRole("link", { name: "View all work", exact: true })).toHaveAttribute("href", "/amara/record");
+  await expect(page.locator(".profile-work-byline, .profile-aside-bio")).toHaveCount(0);
+  await expect(page.locator(".profile-activity")).not.toHaveAttribute("open");
+  expect(await page.locator(".profile-publication-meta").first().evaluate(element => parseFloat(getComputedStyle(element).fontSize))).toBeGreaterThanOrEqual(14);
+  await page.locator(".profile-primary > .profile-tabs").getByRole("tab", { name: "About", exact: true }).click();
+  await expect(page.locator("#about-profile")).toContainText("conversations across disciplines.");
   await noOverflow(page);
 });

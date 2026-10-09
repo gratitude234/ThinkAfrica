@@ -62,10 +62,11 @@ function IntellectualRecord({
         </div>
       </dl>
 
-      <div
-        className="profile-activity"
-        aria-labelledby="profile-activity-title"
-      >
+      <details className="profile-activity">
+        <summary className="focus-ring profile-activity-toggle">
+          <span>View activity</span>
+          <span className="profile-activity-period">Last 12 months</span>
+        </summary>
         <div className="profile-activity-heading">
           <h3 id="profile-activity-title">Last 12 months</h3>
           <span>
@@ -75,7 +76,7 @@ function IntellectualRecord({
           </span>
         </div>
         <ProfileActivityChart activity={activity} />
-      </div>
+      </details>
 
       <div
         className="profile-record-links"
@@ -165,13 +166,9 @@ export function OverviewAside({ data }: { data: ProfileViewData }) {
       {education ||
       profile.country?.trim() ||
       joined ||
-      profile.bio?.trim() ||
       website ? (
-        <section className="profile-aside-section">
+        <section className="profile-aside-section profile-aside-details">
           <h2>About</h2>
-          {profile.bio?.trim() ? (
-            <p className="profile-aside-bio">{profile.bio.trim()}</p>
-          ) : null}
           <dl className="profile-aside-facts">
             {education ? (
               <div>
@@ -286,17 +283,8 @@ export default function ProfileOverview({
               work={overview.selectedWork}
               profileId={profile.id}
               viewerState={viewerState}
-              author={profile}
               currentUserId={viewer.viewerId}
               isOwnProfile={viewer.isOwnProfile}
-            />
-
-            <IntellectualRecord
-              username={profile.username}
-              articleCount={overview.articleCount}
-              postCount={overview.postCount}
-              totalPublished={overview.totalPublished}
-              activity={overview.activity}
             />
 
             <section
@@ -307,16 +295,29 @@ export default function ProfileOverview({
                 <h2 id="recent-work" className="profile-section-title">
                   Recent Work
                 </h2>
+                <Link
+                  href={profileRecordHref(profile.username)}
+                  className="focus-ring profile-view-all"
+                >
+                  View all work
+                </Link>
               </div>
               <ProfileRecentWork
                 items={overview.recentWork}
                 profileId={profile.id}
                 viewerState={viewerState}
-                author={profile}
                 currentUserId={viewer.viewerId}
                 isOwnProfile={viewer.isOwnProfile}
               />
             </section>
+
+            <IntellectualRecord
+              username={profile.username}
+              articleCount={overview.articleCount}
+              postCount={overview.postCount}
+              totalPublished={overview.totalPublished}
+              activity={overview.activity}
+            />
           </>
         )}
       </div>

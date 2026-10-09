@@ -15,7 +15,7 @@ vi.mock("@/lib/activationEvents", () => ({ trackActivationEvent: vi.fn() }));
 beforeEach(() => { deletion.mockReset(); });
 
 describe("approved writer profile", () => {
-  it("keeps the four Overview sections in order", () => {
+  it("places recent work before the record and keeps activity expandable", () => {
     const articles = profileFixturePage("article").items;
     const posts = profileFixturePage("post").items;
     render(<ProfileOverview data={{ profile: PROFILE_FIXTURE,
@@ -31,9 +31,11 @@ describe("approved writer profile", () => {
         { key: "politics & governance", count: 3 },
         { key: "education policy", count: 2 },
       ], relatedThinkers: [] }, publications: null, drafts: null }} />);
-    expect(screen.getAllByRole("heading", { level: 2 }).map(node => node.textContent)).toEqual(["Intellectual Record", "Recent Work", "About", "Writes about", "Interests"]);
+    expect(screen.getAllByRole("heading", { level: 2 }).map(node => node.textContent)).toEqual(["Recent Work", "Intellectual Record", "About", "Writes about", "Interests"]);
     expect(screen.getByText("Published work built on Indegenius.")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Last 12 months", level: 3 })).toBeInTheDocument();
+    const activity = screen.getByText("View activity").closest("details")!;
+    expect(activity.open).toBe(false);
+    expect(screen.getByRole("heading", { name: "Last 12 months", level: 3, hidden: true })).toBeInTheDocument();
     expect(screen.getByLabelText("Published works by month")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "View Posts" })).toHaveAttribute("href", "/amara?view=posts");
     expect(screen.getByRole("link", { name: "View full record" })).toHaveAttribute("href", "/amara/record");
@@ -54,7 +56,8 @@ describe("approved writer profile", () => {
       ], writingTopics: [], relatedThinkers: [] }, publications: null, drafts: null }} />);
     const headings = screen.getAllByRole("heading", { level: 2 }).map(node => node.textContent);
     expect(headings[0]).toBe(selected.title);
-    expect(headings[1]).toBe("Intellectual Record");
+    expect(headings[1]).toBe("Recent Work");
+    expect(headings[2]).toBe("Intellectual Record");
   });
 
   it("gives a zero-work owner one clear publishing state instead of empty modules", () => {

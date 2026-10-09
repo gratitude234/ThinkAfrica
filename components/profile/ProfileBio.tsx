@@ -11,8 +11,10 @@ export default function ProfileBio({ bio }: { bio: string }) {
     const node = ref.current;
     if (!node) return;
     const measure = () => {
-      const lineHeight = Number.parseFloat(getComputedStyle(node).lineHeight);
-      setOverflows(node.scrollHeight > lineHeight * 3 + 2);
+      const style = getComputedStyle(node);
+      const lineHeight = Number.parseFloat(style.lineHeight);
+      const lines = Number.parseInt(style.getPropertyValue("--profile-bio-lines"), 10) || 3;
+      setOverflows(node.scrollHeight > lineHeight * lines + 2);
     };
     measure();
     const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
@@ -21,7 +23,7 @@ export default function ProfileBio({ bio }: { bio: string }) {
   }, [bio]);
   return (
     <div className="profile-bio">
-      <p ref={ref} id={id} className={expanded ? "" : "line-clamp-3"}>{bio}</p>
+      <p ref={ref} id={id} className={expanded ? "" : "profile-bio-preview"}>{bio}</p>
       {overflows ? <button type="button" className="focus-ring bio-toggle" aria-expanded={expanded}
         aria-controls={id} onClick={() => setExpanded(value => !value)}>{expanded ? "Less" : "More"}</button> : null}
     </div>

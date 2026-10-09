@@ -1,6 +1,4 @@
 import ProfileWorkActions from "./ProfileWorkActions";
-import ProfileWorkByline from "./ProfileWorkByline";
-import type { PublicProfileIdentity } from "@/lib/profileIdentity";
 import Link from "next/link";
 import PostCover from "@/components/post/PostCover";
 import ProfileWorkLink from "@/components/profile/ProfileWorkLink";
@@ -13,14 +11,12 @@ export default function ProfileRecentWork({
   profileId,
   viewerState,
   isOwnProfile,
-  author,
   currentUserId,
 }: {
   items: ProfilePublication[];
   profileId: string;
   viewerState: ProfileViewerState;
   isOwnProfile: boolean;
-  author?: PublicProfileIdentity;
   currentUserId?: string | null;
 }) {
   if (!items.length) {
@@ -58,9 +54,9 @@ export default function ProfileRecentWork({
               className={`profile-recent-item ${article ? "is-article" : "is-post"}`}
             >
               <div className="profile-work-content min-w-0 flex-1">
-                <ProfileWorkByline author={author} />
                 <div className="profile-work-kicker">
                   {article ? "Article" : "Post"}
+                  {item.isCoAuthor ? " \u00b7 Co-authored" : null}
                 </div>
                 {article ? (
                   <h3 className="profile-recent-title">

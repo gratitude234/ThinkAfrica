@@ -75,7 +75,7 @@ contains(
 );
 contains(
   'components/profile/ProfileHeader.tsx',
-  /onError=\{\(\) => setCoverFailed\(true\)\}/,
+  /onError=\{\(\) => setFailedCoverUrl\(profile\.cover_image_url \?\? null\)\}/,
   'Broken cover objects fail closed without a broken banner'
 );
 

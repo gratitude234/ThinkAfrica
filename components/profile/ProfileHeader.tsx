@@ -144,10 +144,16 @@ export default function ProfileHeader({
   const displayName = getProfileDisplayName(profile);
   const headline = getProfileHeadline(profile);
   const bio = profile.bio?.trim() || null;
-  const [coverFailed, setCoverFailed] = useState(false);
+  const [failedCoverUrl, setFailedCoverUrl] = useState<string | null>(null);
+  const coverImageRef = useRef<HTMLImageElement>(null);
+  const coverFailed = Boolean(profile.cover_image_url && profile.cover_image_url === failedCoverUrl);
 
   useEffect(() => {
-    setCoverFailed(false);
+    const image = coverImageRef.current;
+    // Cached failures can finish before hydration attaches the error handler.
+    if (image?.complete && image.naturalWidth === 0) {
+      setFailedCoverUrl(profile.cover_image_url ?? null);
+    }
   }, [profile.cover_image_url]);
   const viewerState = getProfileViewerState({
     viewerId: currentUserId,
@@ -215,10 +221,11 @@ export default function ProfileHeader({
             {/* The URL is constrained server-side to this project's Supabase Storage host. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
+              ref={coverImageRef}
               src={profile.cover_image_url}
               alt=""
               className="profile-cover-image"
-              onError={() => setCoverFailed(true)}
+              onError={() => setFailedCoverUrl(profile.cover_image_url ?? null)}
             />
           </div>
         ) : null}

@@ -67,19 +67,19 @@ export default function Loading() {
                     <Placeholder className="h-4 w-28" />
                   </div>
                   <div className="profile-selected-work-inner">
-                    <div className="profile-selected-cover">
-                      <Placeholder className="h-full w-full" />
-                    </div>
                     <div className="profile-work-content">
-                      <div className="profile-work-byline">
-                        <Placeholder className="h-5 w-5 rounded-full" />
-                        <Placeholder className="h-4 w-32 max-w-full" />
-                      </div>
-                      <div className="profile-selected-kind">
-                        <Placeholder className="h-4 w-16" />
-                      </div>
-                      <div className="profile-selected-title">
-                        <Placeholder className="h-[1.18em] w-3/4" />
+                      <div className="profile-selected-heading has-media">
+                        <div className="profile-selected-cover">
+                          <Placeholder className="h-full w-full" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="profile-selected-kind">
+                            <Placeholder className="h-4 w-16" />
+                          </div>
+                          <div className="profile-selected-title">
+                            <Placeholder className="h-[1.18em] w-3/4" />
+                          </div>
+                        </div>
                       </div>
                       <div className="profile-selected-excerpt space-y-2">
                         <Placeholder className="h-4 w-full" />
@@ -95,55 +95,6 @@ export default function Loading() {
                         </div>
                       </div>
                     </div>
-                  </div>
-                </div>
-
-                <div className="profile-record">
-                  <div className="profile-section-heading">
-                    <div className="min-w-0">
-                      <div className="profile-section-title">
-                        <Placeholder className="h-[1.3em] w-52 max-w-full" />
-                      </div>
-                      <div className="profile-section-note">
-                        <Placeholder className="h-4 w-56 max-w-full" />
-                      </div>
-                    </div>
-                    <Placeholder className="h-9 w-28 max-w-full" />
-                  </div>
-                  <dl className="profile-record-metrics">
-                    {[0, 1, 2].map((metric) => (
-                      <div key={metric}>
-                        <dt className="min-w-0">
-                          <Placeholder className="h-[1.35em] w-20 max-w-full" />
-                        </dt>
-                        <dd className="min-w-0">
-                          <Placeholder className="h-[1em] w-14 max-w-full" />
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-                  <div className="profile-activity">
-                    <div className="profile-activity-heading">
-                      <Placeholder className="h-4 w-24 max-w-full" />
-                      <Placeholder className="h-4 w-36 max-w-full" />
-                    </div>
-                    <ol className="profile-activity-chart">
-                      {Array.from({ length: 12 }, (_, month) => (
-                        <li key={month}>
-                          <div className="profile-activity-point">
-                            <Placeholder className="h-10 w-full max-w-[26px] justify-self-center" />
-                            <Placeholder className="h-2 w-4 max-w-full justify-self-center" />
-                          </div>
-                        </li>
-                      ))}
-                    </ol>
-                    <div className="profile-activity-value">
-                      <Placeholder className="h-5 w-56 max-w-full" />
-                    </div>
-                  </div>
-                  <div className="profile-record-links">
-                    <Placeholder className="h-9 w-20" />
-                    <Placeholder className="h-9 w-24" />
                   </div>
                 </div>
 
@@ -168,16 +119,65 @@ export default function Loading() {
                     ))}
                   </div>
                 </div>
+                <div className="profile-record">
+                  <div className="profile-section-heading">
+                    <div className="min-w-0">
+                      <div className="profile-section-title">
+                        <Placeholder className="h-[1.3em] w-52 max-w-full" />
+                      </div>
+                      <div className="profile-section-note">
+                        <Placeholder className="h-4 w-56 max-w-full" />
+                      </div>
+                    </div>
+                    <Placeholder className="h-9 w-28 max-w-full" />
+                  </div>
+                  <dl className="profile-record-metrics">
+                    {[0, 1, 2].map((metric) => (
+                      <div key={metric}>
+                        <dt className="min-w-0">
+                          <Placeholder className="h-[1.35em] w-20 max-w-full" />
+                        </dt>
+                        <dd className="min-w-0">
+                          <Placeholder className="h-[1em] w-14 max-w-full" />
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <details className="profile-activity">
+                    <summary className="profile-activity-toggle">
+                      <Placeholder className="h-5 w-32" />
+                    </summary>
+                    <div className="profile-activity-heading">
+                      <Placeholder className="h-4 w-24 max-w-full" />
+                      <Placeholder className="h-4 w-36 max-w-full" />
+                    </div>
+                    <ol className="profile-activity-chart">
+                      {Array.from({ length: 12 }, (_, month) => (
+                        <li key={month}>
+                          <div className="profile-activity-point">
+                            <Placeholder className="h-10 w-full max-w-[26px] justify-self-center" />
+                            <Placeholder className="h-2 w-4 max-w-full justify-self-center" />
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                    <div className="profile-activity-value">
+                      <Placeholder className="h-5 w-56 max-w-full" />
+                    </div>
+                  </details>
+                  <div className="profile-record-links">
+                    <Placeholder className="h-9 w-20" />
+                    <Placeholder className="h-9 w-24" />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
         <aside className="profile-overview-aside">
-          <div className="profile-aside-section space-y-3">
+          <div className="profile-aside-section profile-aside-details space-y-3">
             <Placeholder className="h-6 w-16" />
-            <Placeholder className="h-4 w-full" />
-            <Placeholder className="h-4 w-4/5" />
             <div className="profile-aside-facts">
               {[0, 1, 2].map((fact) => (
                 <div key={fact} className="space-y-2">

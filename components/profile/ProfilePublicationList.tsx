@@ -1,6 +1,4 @@
 import ProfileWorkActions from "./ProfileWorkActions";
-import ProfileWorkByline from "./ProfileWorkByline";
-import type { PublicProfileIdentity } from "@/lib/profileIdentity";
 import Link from "next/link";
 import PostCover from "@/components/post/PostCover";
 import ProfileWorkLink from "@/components/profile/ProfileWorkLink";
@@ -16,7 +14,6 @@ export default function ProfilePublicationList({
   publications,
   isOwnProfile,
   viewerState,
-  author,
   currentUserId,
   preview = false,
 }: {
@@ -26,7 +23,6 @@ export default function ProfilePublicationList({
   publications: ProfilePublicationPage;
   isOwnProfile: boolean;
   viewerState: ProfileViewerState;
-  author?: PublicProfileIdentity;
   currentUserId?: string | null;
   preview?: boolean;
 }) {
@@ -89,7 +85,9 @@ export default function ProfilePublicationList({
                 className={`profile-publication ${article ? "is-article" : "is-post"}`}
               >
                 <div className="profile-work-content min-w-0 flex-1">
-                  <ProfileWorkByline author={author} />
+                  {item.isCoAuthor ? (
+                    <p className="profile-work-kicker">Co-authored</p>
+                  ) : null}
                   {article ? (
                     <Heading className="profile-article-title">{work}</Heading>
                   ) : (

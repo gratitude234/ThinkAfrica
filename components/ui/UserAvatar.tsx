@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Avatar from "boring-avatars";
 
 interface UserAvatarProps {
@@ -19,10 +19,17 @@ export default function UserAvatar({
   className = "",
 }: UserAvatarProps) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    const image = imageRef.current;
+    // A cached image failure may happen before React attaches onError.
+    if (src && image?.complete && image.naturalWidth === 0) setFailedSrc(src);
+  }, [src]);
   if (src && src !== failedSrc) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
+        ref={imageRef}
         src={src}
         onError={() => setFailedSrc(src)}
         alt={name}

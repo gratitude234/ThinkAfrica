@@ -1,6 +1,4 @@
 import ProfileWorkActions from "./ProfileWorkActions";
-import ProfileWorkByline from "./ProfileWorkByline";
-import type { PublicProfileIdentity } from "@/lib/profileIdentity";
 import Link from "next/link";
 import PostCover from "@/components/post/PostCover";
 import ProfileWorkLink from "@/components/profile/ProfileWorkLink";
@@ -13,14 +11,12 @@ export default function ProfileSelectedWork({
   profileId,
   viewerState,
   isOwnProfile,
-  author,
   currentUserId,
 }: {
   work: ProfilePublication | null;
   profileId: string;
   viewerState: ProfileViewerState;
   isOwnProfile: boolean;
-  author?: PublicProfileIdentity;
   currentUserId?: string | null;
 }) {
   if (!work) {
@@ -65,36 +61,42 @@ export default function ProfileSelectedWork({
       <article
         className={`profile-selected-work-inner ${article ? "is-article" : "is-post"}`}
       >
-        {work.coverImageUrl ? (
-          <PostCover
-            src={work.coverImageUrl}
-            alt=""
-            content_kind={work.kind}
-            sizes="(max-width: 767px) 100vw, (max-width: 1100px) 75vw, 720px"
-            className="profile-selected-cover"
-            imageClassName="object-cover"
-          />
-        ) : null}
         <div className="profile-work-content min-w-0 flex-1">
-          <ProfileWorkByline author={author} />
-          <p className="profile-selected-kind">
-            {article ? "Article" : "Post"}
-          </p>
-          <h2 id="selected-work-heading" className="profile-selected-title">
-            <ProfileWorkLink
-              href={`/post/${work.slug}`}
-              workId={work.id}
-              workKind={work.kind}
-              tracking={{
-                profileId,
-                viewerState,
-                surface: "profile_selected_work",
-              }}
-              className="focus-ring"
-            >
-              {title}
-            </ProfileWorkLink>
-          </h2>
+          <div
+            className={`profile-selected-heading ${work.coverImageUrl ? "has-media" : ""}`}
+          >
+            {work.coverImageUrl ? (
+              <PostCover
+                src={work.coverImageUrl}
+                alt=""
+                content_kind={work.kind}
+                sizes="(max-width: 767px) 92px, (max-width: 1100px) 75vw, 808px"
+                className="profile-selected-cover"
+                imageClassName="object-cover"
+              />
+            ) : null}
+            <div className="min-w-0">
+              <p className="profile-selected-kind">
+                {article ? "Article" : "Post"}
+                {work.isCoAuthor ? " \u00b7 Co-authored" : null}
+              </p>
+              <h2 id="selected-work-heading" className="profile-selected-title">
+                <ProfileWorkLink
+                  href={`/post/${work.slug}`}
+                  workId={work.id}
+                  workKind={work.kind}
+                  tracking={{
+                    profileId,
+                    viewerState,
+                    surface: "profile_selected_work",
+                  }}
+                  className="focus-ring"
+                >
+                  {title}
+                </ProfileWorkLink>
+              </h2>
+            </div>
+          </div>
           {article && work.excerpt ? (
             <p className="profile-selected-excerpt">{work.excerpt}</p>
           ) : null}

@@ -109,6 +109,19 @@ describe("ProfileHeader identity", () => {
     );
     expect(screen.queryByRole("button", { name: /cover image/i })).toBeNull();
   });
+  it("removes a cached failed cover whose error occurred before hydration", () => {
+    const complete = vi.spyOn(HTMLImageElement.prototype, "complete", "get").mockReturnValue(true);
+    const naturalWidth = vi.spyOn(HTMLImageElement.prototype, "naturalWidth", "get").mockReturnValue(0);
+    try {
+      const { container } = renderHeader({
+        profileOverrides: { cover_image_url: "https://example.supabase.co/missing-cover" },
+      });
+      expect(container.querySelector(".profile-cover")).toBeNull();
+    } finally {
+      complete.mockRestore();
+      naturalWidth.mockRestore();
+    }
+  });
   it("removes a cover banner cleanly when the stored object can no longer load", () => {
     const { container } = renderHeader({
       profileOverrides: { cover_image_url: "https://example.supabase.co/storage/v1/object/public/post-images/covers/user-1/missing-cover" },

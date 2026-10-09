@@ -26,11 +26,7 @@ export default function ProfilePageContent({
 
   return (
     <div className={PROFILE_SHELL}>
-      <div
-        className={
-          tab === "overview" ? "profile-page-grid" : "profile-page-single"
-        }
-      >
+      <div className="profile-page-grid">
         <div className="profile-primary">
           <ProfileHeader
             profile={{
@@ -87,7 +83,6 @@ export default function ProfilePageContent({
                 publications={publications}
                 isOwnProfile={viewer.isOwnProfile}
                 viewerState={viewerState}
-                author={profile}
                 currentUserId={viewer.viewerId}
               />
             ) : (
