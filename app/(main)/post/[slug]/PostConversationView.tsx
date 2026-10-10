@@ -1,4 +1,3 @@
-import { POST_DETAIL_SHELL } from "@/lib/publicationLayout";
 import PublicationIdentity from "./PublicationIdentity";
 import Link from "next/link";
 import UserAvatar from "@/components/ui/UserAvatar";
@@ -93,7 +92,7 @@ export default async function PostConversationView({
   const displayTitle = getPostDisplayTitle(post);
 
   return (
-    <div className={POST_DETAIL_SHELL}>
+    <div className="mx-auto max-w-[700px] pb-20 font-public-sans">
       <PublishedToast
         postId={post.id}
         contentKind={post.content_kind ?? null}

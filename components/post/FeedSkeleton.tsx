@@ -1,77 +1,83 @@
-import LoadingState from "@/components/ui/LoadingState";
-import Skeleton from "@/components/ui/Skeleton";
 import { CARD_SHELL } from "./cardShell";
 
-function SkeletonByline({
-  nameWidth
-}: {
-  nameWidth: string;
-}) {
-  return <div className="flex items-center gap-[9px] sm:gap-2.5">
-    <Skeleton className="h-[30px] w-[30px] shrink-0 rounded-full sm:h-[34px] sm:w-[34px]" />
-    <div className="flex min-w-0 flex-1 items-center gap-1.5">
-      <Skeleton className={`h-3 ${nameWidth}`} />
-      <Skeleton className="h-2.5 w-8" />
-    </div>
-  </div>;
+function Block({ className }: { className: string }) {
+  return <div className={`rounded bg-divider ${className}`} />;
 }
 
-function EngagementSkeleton() {
-  return <div className="mt-3 flex min-h-9 items-center justify-between gap-3 sm:mt-4 sm:min-h-10">
-    <div className="flex min-w-0 items-center gap-5">
-      {[0, 1, 2].map(index => <Skeleton key={index} className="h-4 w-8" />)}
-    </div>
-    <Skeleton className="h-4 w-4 shrink-0" />
-  </div>;
-}
-
-function PostSkeletonCard() {
-  return <article className={CARD_SHELL}>
-    <SkeletonByline nameWidth="w-32" />
-    <div className="mt-2.5 space-y-2 sm:mt-3">
-      <Skeleton className="h-3.5 w-full" />
-      <Skeleton className="h-3.5 w-4/5" />
-    </div>
-    <EngagementSkeleton />
-  </article>;
-}
-
-function ArticleSkeletonCard({
-  withCover
-}: {
-  withCover: boolean;
-}) {
-  return <article className={CARD_SHELL}>
-    <SkeletonByline nameWidth="w-28" />
-    <div className="mt-3 flex items-start gap-3 sm:gap-5">
-      <div className="min-w-0 flex-1">
-        <Skeleton className="h-2.5 w-24" />
-        <Skeleton className="mt-2 h-5 w-5/6" />
-        <Skeleton className="mt-2 h-3.5 w-3/5" />
+/**
+ * Avatar plus a single metadata line, matching AuthorLine.
+ *
+ * This drew two stacked bars until the real byline collapsed onto one line --
+ * name above, university below. Left alone it would have put the drift back
+ * that CARD_SHELL exists to prevent: every card visibly shedding a line at the
+ * moment content arrived.
+ */
+function SkeletonByline({ nameWidth }: { nameWidth: string }) {
+  return (
+    <div className="flex items-center gap-[9px] sm:gap-2.5">
+      <div className="h-[30px] w-[30px] shrink-0 rounded-full bg-divider sm:h-[34px] sm:w-[34px]" />
+      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+        <Block className={`h-3 ${nameWidth}`} />
+        <Block className="h-2.5 w-8" />
       </div>
-      {withCover ? <Skeleton className="mt-1 aspect-square w-24 shrink-0 rounded-xl sm:aspect-[4/3] sm:w-40" /> : null}
     </div>
-    <EngagementSkeleton />
-  </article>;
+  );
 }
 
-const SEQUENCE = ["post", "article-cover", "article", "post"] as const;
+/** Titleless Post: avatar-first, body text, no cover implied. */
+function PostSkeletonCard() {
+  return (
+    <article className={CARD_SHELL}>
+      <SkeletonByline nameWidth="w-32" />
+      <div className="mt-2.5 space-y-2 sm:mt-3">
+        <Block className="h-3.5 w-full" />
+        <Block className="h-3.5 w-4/5" />
+      </div>
+    </article>
+  );
+}
 
-/** Shares card spacing with HomeFeedCard; reserves its always-present action row. */
-export default function FeedSkeleton({
-  count = 4,
-  label = "Loading posts",
-  announce = true
-}: {
-  count?: number;
-  label?: string;
-  announce?: boolean;
-}) {
-  const cards = Array.from({
-    length: count
-  }, (_, index) => {
-    const variant = SEQUENCE[index % SEQUENCE.length];
-    return variant === "post" ? <PostSkeletonCard key={index} /> : <ArticleSkeletonCard key={index} withCover={variant === "article-cover"} />;
-  });
-  return announce ? <LoadingState label={label}>{cards}</LoadingState> : <>{cards}</>;
+/** Article: label + title + excerpt, optional side thumbnail -- not every card gets one. */
+function ArticleSkeletonCard({ withCover = false }: { withCover?: boolean }) {
+  return (
+    <article className={CARD_SHELL}>
+      <SkeletonByline nameWidth="w-28" />
+      <div className="mt-3 flex items-start gap-3 sm:gap-5">
+        <div className="min-w-0 flex-1">
+          <Block className="h-2.5 w-24" />
+          <Block className="mt-2 h-5 w-5/6" />
+          <Block className="mt-2 h-3.5 w-3/5" />
+        </div>
+        {withCover ? <div className="mt-1 aspect-square w-24 shrink-0 rounded-xl bg-divider sm:aspect-[4/3] sm:w-40" /> : null}
+      </div>
+    </article>
+  );
+}
+
+type SkeletonVariant = "post" | "article" | "article-cover";
+
+const SEQUENCE: SkeletonVariant[] = ["post", "article-cover", "article", "post"];
+
+/**
+ * A restrained mix of Post/Article skeletons (never one repeated
+ * generic card) so the Home loading state resembles the real feed and
+ * doesn't imply every card has a cover image.
+ *
+ * Geometry comes from the same CARD_SHELL the real cards use. Holding it
+ * separately is what let the two drift -- the skeleton was drawing a 16px
+ * radius, a grey-200 edge and 16px padding against the cards' 18px radius,
+ * warm edge and 14px padding, so every card resized and re-tinted the instant
+ * real content replaced it.
+ */
+export default function FeedSkeleton({ count = 4 }: { count?: number }) {
+  const items = Array.from({ length: count }, (_, index) => SEQUENCE[index % SEQUENCE.length]);
+
+  return (
+    <div aria-hidden="true" className="animate-pulse motion-reduce:animate-none">
+      {items.map((variant, index) => {
+        if (variant === "post") return <PostSkeletonCard key={index} />;
+        return <ArticleSkeletonCard key={index} withCover={variant === "article-cover"} />;
+      })}
+    </div>
+  );
 }

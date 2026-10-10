@@ -824,7 +824,14 @@ export default function PostsFeedTabs({
       {/* The same skeleton the first load uses, rather than a line of grey
           text. It holds the height the incoming cards will occupy, so the
           scroll position stays put when they land. */}
-      {isLoadingMore ? <FeedSkeleton count={2} label="Loading more posts" /> : null}
+      {isLoadingMore ? (
+        <>
+          <span className="sr-only" role="status" aria-live="polite">
+            Loading more posts
+          </span>
+          <FeedSkeleton count={2} />
+        </>
+      ) : null}
 
       {paginationError ? (
         <div

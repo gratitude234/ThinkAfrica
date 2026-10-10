@@ -8,7 +8,6 @@ import {
   useTransition,
 } from "react";
 import { useRouter } from "next/navigation";
-import OnboardingSkeleton from "@/components/loading/OnboardingSkeleton";
 import AvatarUploader from "@/app/(main)/settings/AvatarUploader";
 import { saveProfileMedia } from "@/app/(main)/settings/profileActions";
 import { trackActivationEvent } from "@/lib/activationEvents";
@@ -298,7 +297,7 @@ export default function OnboardingClient({ requestedStep }: OnboardingClientProp
     goToStep(ONBOARDING_STEPS[Math.max(0, currentIndex - 1)]);
   };
 
-  if (!ready) return <OnboardingSkeleton step={requestedStep === "topics" ? "topics" : "profile"} />;
+  if (!ready) return null;
 
   const busy = loading || isEnteringApp;
 
